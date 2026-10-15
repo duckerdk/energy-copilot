@@ -37,7 +37,8 @@ W rozmowach wymieniano następujące pliki/moduły (nie wszystkie były dostępn
 | `config.yaml` | `home_assistant.url`, `home_assistant.token`, `home_assistant.verify_ssl` | plik historycznie używany, sekretów brak |
 | `logic.txt` | tekst logiki dla agenta | dostarczona osobno logika v5.1 |
 | `ha_api_client.py` | nazwa importu z nieudanej wersji v5.2 | brak modułu; `ModuleNotFoundError` |
-| `copilot_v5.2` / `v5.3` | eksperymentalne wydania | nie ma potwierdzonego pakietu do odtworzenia |
+| `copilot_v5.2.py` | dokładna nazwa z historycznego tracebacku | kodu nie dostarczono |
+| `v5.3` (plik o niepotwierdzonej nazwie) | próba estymacji nocnego poboru | brak źródeł |
 
 Nie znamy pełnych dokładnych nazw wszystkich eksperymentalnych plików, kodu oraz API klas. W szczególności snapshot odsyłał do „Energy Copilot V5” w historycznym Canvas — **oryginału nie ma tutaj**.
 
