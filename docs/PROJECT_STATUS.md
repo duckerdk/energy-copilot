@@ -116,3 +116,11 @@ To jest **specyfikacja zamierzeń**, a nie potwierdzona realizacja.
 To repozytorium **odtwarza wiedzę o dotychczasowej pracy**, nie rekonstruuje brakującego kodu z pamięci i nie deklaruje, że automatyka jest gotowa. Nie podejmowano jeszcze audytu opłacalności, przeglądu założeń ani projektowania zastępczego rozwiązania.
 
 Następny, osobny etap: **ocena wcześniejszej pracy i decyzja, czy zmieniać założenia**.
+
+## 6. Uzupełnienie techniczne repo (15.10.2026)
+
+Wszystkie znane historyczne encje zapisano w [ENTITIES.md](ENTITIES.md), z niezależnym rejestrem maszynowym [config/entities.yaml](../config/entities.yaml). Opis technologii i modułów: [TECHNICAL_BASELINE.md](TECHNICAL_BASELINE.md); REST: [HA_API.md](HA_API.md); CSV i jednostki: [DATA_PIPELINE.md](DATA_PIPELINE.md); pełna logika i korekta: [CONTROL_LOGIC.md](CONTROL_LOGIC.md); szczegółowe uruchomienia: [IMPLEMENTATION_HISTORY.md](IMPLEMENTATION_HISTORY.md); historyczne liczby i plan: [REFERENCE_CASES.md](REFERENCE_CASES.md); brakujące oryginalne źródła: [RECOVERY_INVENTORY.md](RECOVERY_INVENTORY.md).
+
+**Odzyskany przykład historycznego wyjścia planera (§python3 copilot_v5.py§):** SOC 99%; cena 0,979 DKK/kWh; prognoza PV dziś/jutro 41,823/21,218 kWh; wymagany SOC 72,5%; planowane §solar_sell=ON§, §grid_charge=OFF§, limit prądu §1 A§. Zgłoszenie dotyczy **wyjścia modelu**, nie wykonanych poleceń. Innych testów falownika nie potwierdzono.
+
+Nowa dokumentacja nie zmienia etapu projektu: **zachowano dane historyczne i wymagania; analiza słuszności założeń pozostaje osobnym zadaniem**.
