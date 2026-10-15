@@ -1,42 +1,54 @@
-# Energy Co-Pilot
+# Energy Co-Pilot — Home Assistant / PV / magazyn / sieć
 
-Projekt prototypowego systemu zarządzania energią dla **Home Assistant**: instalacja fotowoltaiczna (PV), magazyn energii i sieć elektroenergetyczna.
+Dokumentacja techniczna historycznego prototypu zarządzania energią **Energy Co-Pilot**. Założenia i testy powstawały głównie **14.06.2025**; niniejsze repozytorium uporządkowano **15.10.2026**.
 
-**Stan dokumentacji: 15.10.2026.** Repozytorium zostało założone jako punkt odtworzenia wcześniejszych prac. **Nie zawiera jeszcze kodu źródłowego, konfiguracji Home Assistant ani działającego wdrożenia.** Opis poniżej dotyczy historycznych prac z 14.06.2025, a nie potwierdzonego dzisiaj systemu.
+**Status: DOCUMENTED / NOT DEPLOYABLE.** Odtworzono wymagania, rejestr encji, znaną konfigurację interfejsów, architekturę, wejścia i wyjścia oraz historię uruchomień. **Oryginalne pliki Python, `ha_history.csv` i konfiguracyjne nie są dostępne w repozytorium.** Zawarte tu opisy nie dowodzą automatycznej pracy instalacji.
 
-## Cel projektu
+## Punkt wejścia dla programisty lub kolejnego agenta
 
-Planowanie zakupu, magazynowania, zużycia i sprzedaży energii przy uwzględnieniu:
-- aktualnego SOC magazynu i zużycia domu;
-- bieżących i prognozowanych cen energii;
-- aktualnej i prognozowanej produkcji PV;
-- zapotrzebowania na energię na noc i rezerwy bezpieczeństwa.
+| Obszar | Dokument / zasób | Znaczenie |
+| --- | --- | --- |
+| **Encje HA (wszystkie znane)** | [docs/ENTITIES.md](docs/ENTITIES.md) | **11 identyfikatorów** (7 sensorów, 2 switch, 1 number, 1 usługa notify), jednostki, funkcje i konflikty |
+| **Rejestr do odczytu maszynowego** | [config/entities.yaml](config/entities.yaml) | Klucze logiczne → dokładne historyczne `entity_id` / `service_id` |
+| **Technika i architektura** | [docs/TECHNICAL_BASELINE.md](docs/TECHNICAL_BASELINE.md) | System, magazyn, parametry, środowisko Linux/Python, diagram i lista modułów |
+| **Integracja HA** | [docs/HA_API.md](docs/HA_API.md) | REST, struktura `config.yaml`, autoryzacja, test klienta, formaty komend |
+| **Dane / CSV / obliczenia** | [docs/DATA_PIPELINE.md](docs/DATA_PIPELINE.md) | `timestamp,entity_id,value`, 270 873 rekordów z archiwalnego testu, 6 serii, kW → kWh |
+| **Logika sterowania** | [docs/CONTROL_LOGIC.md](docs/CONTROL_LOGIC.md) | Wymagania v5.1 i **obowiązkowe rozdzielenie funkcji v5.1.1** |
+| **Przebieg implementacji** | [docs/IMPLEMENTATION_HISTORY.md](docs/IMPLEMENTATION_HISTORY.md) | v1 / v2 / v5.0–v5.3, wyniki uruchomień i błędy |
+| **Wyniki odniesienia** | [docs/REFERENCE_CASES.md](docs/REFERENCE_CASES.md) | Przypadki liczbowe i historyczny plan (nie zatwierdzone testy automatyczne) |
+| **Stan i historia** | [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Potwierdzone vs deklarowane vs brak |
+| **Brakujący kod i odtworzenie** | [docs/RECOVERY_INVENTORY.md](docs/RECOVERY_INVENTORY.md) | Dokładnie które historyczne pliki i pomiary trzeba odzyskać |
 
-Priorytety opisane w logice v5.1: **zasilanie domu z PV**, zapewnienie energii na noc, a następnie ekonomicznie uzasadnione ładowanie i sprzedaż.
+Oryginalne materiały bez zmiany założeń: [logic v5.1](docs/reference/logic_v5.1.txt) i [snapshot v5.0](docs/reference/snapshot_v5.0.txt).
 
-## Co zrobiono dotychczas
+## Najważniejsze parametry historyczne
 
-Według historycznego snapshotu v5.0 oraz rozmów projektowych:
-- Opracowano warstwę wczytywania danych historycznych CSV do pandas (`HADataLoader`) oraz metody `get_daily_aggregates()` i `get_current_data()`.
-- Rozwiązywano problemy UTC, dat bez strefy czasowej i serializacji dat do JSON.
-- Zbudowano prototyp `EnergyPolicyAgent`, przekazujący dane do modelu językowego i generujący propozycję planu działań na 24 godziny.
-- Opracowano i przyjęto **logikę sterowania v5.1**.
-- Podejmowano dalsze próby rozwoju; część nie przeszła uruchomienia lub dawała błędne wyniki.
-
-**Ważne:** historyczne deklaracje o „gotowym backendzie” nie są dowodem działania obecnego systemu. Kod ze wspomnianego dokumentu Canvas „Energy Copilot V5” nie jest obecnie dostępny w tym repozytorium.
-
-## Aktualny zakres repozytorium
-
-| Plik | Zawartość |
+| Parametr | Wartość z logiki v5.1 |
 | --- | --- |
-| [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Chronologia prac, fakty/ograniczenia, status wersji, kwestie niewyjaśnione |
-| [docs/reference/logic_v5.1.txt](docs/reference/logic_v5.1.txt) | Źródłowy tekst logiki v5.1 |
-| [docs/reference/snapshot_v5.0.txt](docs/reference/snapshot_v5.0.txt) | Historyczny snapshot v5.0 z 14.06.2025 |
+| Pojemność użytkowa | **8 kWh** |
+| Zakładany SOC | **20–100%** |
+| Nocne zużycie | **5 kWh** minimum / **8 kWh** preferowane |
+| Bufor wymaganej rezerwy | **10 punktów procentowych** w źródłowym wzorze |
+| Minimalna cena sprzedaży spot | **0,4 DKK/kWh** |
+| Dobowy plan | horyzont **24 h**, uruchamianie wg specyfikacji np. **00:10** |
 
-## Stan realizacji
+## Krytyczna korekta techniczna (v5.1.1)
 
-- **Udokumentowane:** cele, logika v5.1, interfejs encji HA, koncepcja architektury i historyczne wyniki prototypu.
-- **Niepotwierdzone:** kompletność i odtwarzalność kodu, poprawność algorytmu, integracja z rzeczywistym falownikiem, automatyczne sterowanie oraz praca produkcyjna.
-- **Do wykonania w osobnym kroku:** ocena istniejących prac i ewentualna rewizja założeń. Tego etapu nie wykonano w ramach niniejszego uporządkowania dokumentacji.
+- `switch.sun12k_grid_charge` → **włącz/wyłącz ładowanie z sieci**.
+- `number.sun12k_maximum_battery_grid_charge_current` → według późniejszego ustalenia użytkownika **ograniczanie ładowania z PV**, przy czym historycznie użyto `1 A`. **Tego znaczenia nie sprawdzono na żywej instalacji; nazwa encji i tekst v5.1 są z nim sprzeczne.**
+- `switch.sun12k_solar_sell` → zezwolenie na sprzedaż/eksport.
 
-Dokumentacja świadomie odróżnia **założenia**, **deklaracje historyczne** i **wyniki potwierdzone uruchomieniem**. Nie należy traktować samej logiki opisowej jako gotowej automatyki sterującej.
+**Nie zastępować `grid_charge=off` nastawą `1 A`.** Nie sterować rzeczywistym falownikiem bez sprawdzenia działania tej encji, zakresu i stanów awaryjnych.
+
+## Historycznie uzyskane wyniki
+
+- Opracowywano `exporter.py`, `data_loader.py` / `HADataLoader`, `agent_llm.py`, `copilot_v2.py`, `copilot_v5.py` i `EnergyPolicyAgent`.
+- Snapshot v5.0 deklarował działającą ścieżkę CSV + bieżące HA + 30-dniowe agregaty → LLM → plan 24 h.
+- Konkretny zrelacjonowany plan: SOC **99%**, cena **0,979 DKK/kWh**, prognoza PV **41,823 / 21,218 kWh**, wymagany SOC **72,5%**, zalecenia sprzedaż **ON**, ładowanie z sieci **OFF**, limit **1 A**. **To wynik modelu/aplikacji, a nie potwierdzenie wykonania.**
+- W późniejszych eksperymentach wystąpiły błędy: brak `ha_api_client`, nierealistyczna estymacja nocnego zużycia i problemy przeliczania kW na kWh.
+
+## Stan repo do dalszej pracy
+
+To **baza wiedzy inżynierskiej i kontrakt interfejsów**, a **nie ukończony pakiet wdrożeniowy**. Nie wprowadzono zmian w logice/założeniach ani kodu wykonawcy poleceń do urządzeń. W [inwentarzu](docs/RECOVERY_INVENTORY.md) opisano brakujące źródła oryginalnego kodu, dane i kwestie do potwierdzenia.
+
+W repo **nie umieszczamy** sekretów HA, rzeczywistych tokenów ani surowych prywatnych danych historycznych bez świadomej decyzji.
