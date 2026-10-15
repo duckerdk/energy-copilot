@@ -11,7 +11,7 @@
 | v5.0 / plan dobowy | `HADataLoader`, `EnergyPolicyAgent`, `copilot_v5.py`, `logic.txt` | wg snapshotu prototyp generował plan na **24 h** z historią, aktualnym stanem i 30-dniowymi agregatami |
 | v5.1 | [logic_v5.1.txt](reference/logic_v5.1.txt) | zapis szczegółowych założeń SOC / PV / sprzedaż / zakup |
 | v5.1.1 / korekta | rozdzielenie `switch.sun12k_grid_charge` i `number.sun12k_maximum_battery_grid_charge_current` | ustalenie użytkownika; test wyjścia planu LLM opisany poniżej |
-| „v5.2” / eksperyment | planowanie tanich godzin z `sensor.energi_data_service` | uruchomienie blokował brak `ha_api_client` |
+| „v5.2” / eksperyment | planowanie tanich godzin z `sensor.energi_data_service` | uruchomienie pliku `copilot_v5.2.py` blokował brak `ha_api_client` |
 | „v5.3” / eksperyment | szacowanie nocnego poboru z historii | błędne liczby energii/SOC, brak potwierdzonej poprawy |
 | v5.4 | pamięć długoterminowa | plan ze snapshotu; brak dowodu wykonania |
 
