@@ -27,7 +27,8 @@ Dokument służy jako lista przekazania projektu kolejnemu programiście/agentow
 | `ha_history.csv` | 270 873 rekordów / 6 encji według archiwalnego testu | nie dostarczono; najpierw ocenić prywatność danych |
 | `logic.txt` używany przez kod | historia promptu; tekst v5.1 zapisany osobno | historycznej kopii z maszyny nie dostarczono |
 | `Energy Copilot V5` w dawnym Canvas | snapshot odsyła do kodu | niedostępny jako plik w repo |
-| ewentualne `v5.2`/`v5.3` skrypty | eksperymenty i błędy | nie dostarczono |
+| `copilot_v5.2.py` | nazwa pliku znana z historycznego tracebacku; brak `ha_api_client` | nie dostarczono pliku |
+| ewentualne pozostałe skrypty `v5.3` | eksperymenty i błędy | nie dostarczono |
 | środowisko `.venv`, lista wersji zależności | historycznie używane `pandas`, `requests`, YAML i biblioteka OpenAI | brak dokładnej listy/pinningu |
 | testy, pełne logi i historia wywołań HA | brak źródeł | nie dostarczono |
 
