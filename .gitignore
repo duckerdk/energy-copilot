@@ -1,0 +1,21 @@
+# Sekrety i konfiguracje prywatnych instancji HA
+config.yaml
+**/.env
+**/.env.*
+!**/.env.example
+*.key
+*.pem
+# Maszyna i środowisko Pythona
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+# Historyczne dane HA mogą zawierać prywatne informacje
+ha_history.csv
+*.sqlite
+*.db
+# Lokalne artefakty
+*.log
+.DS_Store
