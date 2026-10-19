@@ -1,7 +1,7 @@
 # Energy Co-Pilot — aktualny opis instalacji i danych (wg użytkownika)
 
-**Data zebrania:** 15.10.2026.  
-**Podstawa:** odpowiedzi użytkownika 1–36, w tym zrzut ekranu integracji Forecast.Solar. Informacje użytkownika są aktualnie deklarowanym stanem instalacji; nie wykonywano połączenia ani diagnostyki HA.
+**Data zebrania:** 15.10.2026; aktualizacja ustaleń: 19.10.2026.  
+**Podstawa:** odpowiedzi użytkownika 1–36, zrzut Forecast.Solar, późniejsze uzgodnienie prowizji Vindstød oraz przekazane przez użytkownika diagnostyki Battery Controller 2.11.5. Nie wykonywano bezpośredniego połączenia z HA ani operacji sterowania.
 
 ## 1. Elementy fizyczne
 
@@ -22,7 +22,7 @@
 - Home Assistant pracuje **w maszynie wirtualnej na serwerze**.
 - Falownik udostępnia encje przez **customowy Modbus na ESP32**, komunikacja z HA przez **ESPHome po Wi‑Fi**.
 - Dotychczasowe funkcje sterowania mają być wykorzystywane **poprzez już istniejące encje HA**.
-- Historyczny katalog znanych encji (niepotwierdzony odczytem z instalacji teraz): [ENTITIES.md](../archive/energy-copilot-v5/docs/ENTITIES.md). Na tym etapie **nie zastępuje** on bieżącego spisu encji.
+- **Istniejący rejestr znanych encji (11 identyfikatorów)**: [ENTITIES.md](../archive/energy-copilot-v5/docs/ENTITIES.md) i [config/entities.yaml](../archive/energy-copilot-v5/config/entities.yaml). Stanowi bazę mapowania; nie jest potwierdzeniem aktualnych wartości i działania wszystkich encji. Nie wymaga ponownego przekazywania wykazu.
 - Użytkownik potwierdza osobne pomiary chwilowej mocy: **importu, eksportu, ładowania i rozładowania baterii**.
 - Brak dodatkowych odbiorników sterowalnych na obecnym etapie, możliwość przyszłej rozbudowy.
 
@@ -30,9 +30,9 @@
 
 | Dane | Źródło / dostępność | Co wiemy |
 | --- | --- | --- |
-| Cena spot | **Energi Data Service / HA** | Użytkownik ma cenę spot |
-| Cena zakupu z opłatami | **HA** | Jest dostępna jako rzeczywista cena zakupu; **dokładny identyfikator niepodany** |
-| Cena sprzedaży netto | **Brak encji** | Wynagrodzenie za nadwyżki Vindstød wymaga obliczenia/pozyskania |
+| Cena spot | `sensor.energi_data_spotpris` | Historycznie znana encja HA; cena w DKK/kWh, potwierdzić bieżące atrybuty i dostępność |
+| Cena zakupu z opłatami | `sensor.energi_data_service` | Znane źródło prognozy cen i finalnej ceny zakupu; przed implementacją potwierdzić format i jednostki atrybutów |
+| Cena sprzedaży netto | **Wyliczana z ceny spot** | **`spotpris - 0,0215 DKK/kWh`** (ustalona prowizja Vindstød); osobna encja nie jest konieczna |
 | Prognoza PV | **Forecast.Solar (integracja HA)** | Potwierdzona na zrzucie z 15.10.2026 |
 | Historia pomiarów | **HA Recorder / karta Energia** | Użytkownik posiada historię z kilku lat wg standardowych ustawień HA; rozdzielczość starszych danych nieustalona |
 
@@ -55,7 +55,8 @@ Wcześniejsze identyfikatory `sensor.energy_production_today` i `sensor.energy_p
 - Zakup w ramach **Elforbundet / Vindstød**.
 - **Vindstød** jest też odbiorcą nadwyżek PV.
 - Do kalkulacji zakupu użytkownik ma w HA cenę końcową z opłatami.
-- Ceny **netto za eksport** nie ma obecnie jako przygotowanego sygnału. Jej model jest do przygotowania w dalszym kroku.
+- **Reguła ceny sprzedaży netto jest ustalona:** `cena_sprzedazy_netto_DKK_kWh = spotpris_DKK_kWh - 0,0215`; prowizja Vindstød wynosi **0,0215 DKK/kWh**. Formułę stosujemy do bieżącej i przyszłej ceny spot, z zachowaniem zgodności czasowej i jednostek; brak gotowej encji wyliczonej ceny nie jest brakiem reguły rozliczenia.
+- Dokumentacja projektu odróżnia ceny **zakupu końcowego** z opłatami od cen **sprzedaży netto**; nie wolno używać ich zamiennie.
 
 ## 5. Rzeczy do zachowania bez zmian w obecnej instalacji
 
