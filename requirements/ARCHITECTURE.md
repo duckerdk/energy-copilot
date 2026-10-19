@@ -28,6 +28,8 @@ Przed jakimkolwiek zapisem wymagane: zgodne i świeże wejścia, potwierdzone se
 
 Eksport z PV i z baterii musi być rozróżniany na poziomie sprzętowym. Jeżeli przełącznik eksportu działa globalnie i nie można zapobiec celowemu eksportowi z baterii bez zgody, funkcja automatycznego eksportu również pozostaje zablokowana, dopóki nie ma skutecznej separacji.
 
+**Uszczegółowienie wykonania i UI:** [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md) oraz [HA_DASHBOARD.md](HA_DASHBOARD.md). Podsumowanie etapów: [DEVELOPER_HANDOFF.md](DEVELOPER_HANDOFF.md).
+
 ## Wiarygodność prognoz PV przy ograniczeniu produkcji
 
 Wprowadzamy rozróżnienie: `PV_available` (potencjalna produkcja przy rzeczywistej pogodzie), `PV_actual` (faktycznie uzyskana energia, w tym przepływ DC do baterii, gdy pomiar go uwzględnia) oraz `PV_curtailed` (niewyprodukowana energia wskutek limitów). Podczas ograniczenia `PV_available` nie jest bezpośrednio mierzalne. Różnica `prognoza - pomiar` **nie jest** miarą `PV_curtailed`.
