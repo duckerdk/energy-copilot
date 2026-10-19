@@ -8,7 +8,7 @@ Home Assistant → **Narzędzia deweloperskie → Szablony (Templates)**. Wklei�
 
 Szablon wypisuje wyłącznie stany i ograniczony zestaw atrybutów encji o nazwach sugerujących falownik, energię, ceny i prognozy. Nie pobiera tokenów, historii domowników ani adresów hostów.
 
-\`\`\`jinja
+```jinja
 {% set words = ['sun12k', 'energi_data', 'energida', 'spot', 'price', 'pris', 'tariff', 'pv_', 'solar', 'forecast', 'battery', 'grid_', 'import', 'export', 'energy_production_', 'home_energy_'] %}
 {% set ns = namespace(items=[]) %}
 {% for s in states %}
@@ -29,7 +29,7 @@ Szablon wypisuje wyłącznie stany i ograniczony zestaw atrybutów encji o nazwa
   {% endif %}
 {% endfor %}
 {{ ns.items | tojson }}
-\`\`\`
+```
 
 **Ważne:** jeśli wynik obejmuje niezwiązane z projektem urządzenia, usunąć te wiersze przed przesłaniem. Szablon nie wykonuje usług HA i nie zmienia żadnej encji. W trakcie kopiowania może być aktualizowany dynamicznie.
 
