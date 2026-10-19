@@ -31,6 +31,7 @@ Lokalną, własną integrację Home Assistant (`custom_components/energy_copilot
 | 9 | [FORECAST_POLICY.md](FORECAST_POLICY.md) | Niepewność prognoz, nieantycypacyjność i wartość SOC na końcu opublikowanych cen |
 | 10 | [DECISION_LOGGING.md](DECISION_LOGGING.md) | Log każdej decyzji i powód wyboru widoczne od pierwszego uruchomienia |
 | 11 | [BACKTEST_VALIDATION.md](BACKTEST_VALIDATION.md) | Testy na historii bez przyszłych danych i uczciwy benchmark finansowy |
+| 11a | [CALIBRATION_POLICY.md](CALIBRATION_POLICY.md) | Zasady weryfikacji sprawności, degradacji i prognoz — wartości startowe nie są pomiarami |
 | 12 | [OPEN_ITEMS.md](OPEN_ITEMS.md) | Aktualne P0/P1/P2 — nie udawać, że wszystkie są już rozwiązane |
 
 Jeżeli dokumenty zawierają sprzeczność, nie rozwiązywać jej przez arbitralne założenie: zgłosić konkretny fragment, zaproponować rozwiązanie i zaktualizować po potwierdzeniu.
