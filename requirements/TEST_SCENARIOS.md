@@ -189,7 +189,7 @@ Dla **SOC-01** i **SOC-02** wspólne:
 **Oczekiwane:** zasilanie z baterii do domu nie może przekroczyć 1 kW w tym slocie; pozostałe 1 kW byłoby eksportem z magazynu, a więc bez zgody jest niedopuszczalne. Jeśli mapowanie encji nie pozwala rozdzielić kierunków, blokować taki rozkaz zamiast zakładać, że „pójdzie na dom”.
 
 
-## 9. Kontrakt encji HA — testy bez rzeczywistego zapisu
+## 8. Kontrakt encji HA — testy bez rzeczywistego zapisu
 
 ### MAP-01 — Zakup i sprzedaż są odrębne
 
@@ -221,7 +221,7 @@ Dla **SOC-01** i **SOC-02** wspólne:
 **Dane:** skonfigurowano `number.sun12k_maximum_battery_grid_charge_current` z opisem niezgodnym między pierwotną logiką PV a etykietą grid; nie przeprowadzono testu skutku.  
 **Oczekiwane:** sterowanie tą encją pozostaje zablokowane niezależnie od tego, czy liczba wynosi 1 A czy 40 A; jednocześnie można używać sprawdzonych encji do odczytu i symulacji.
 
-## 10. Co programista ma udowodnić
+## 9. Co programista ma udowodnić
 
 | Zestaw | Wynik akceptacji |
 | --- | --- |
