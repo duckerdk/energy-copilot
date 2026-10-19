@@ -188,7 +188,40 @@ Dla **SOC-01** i **SOC-02** wspólne:
 **Dane:** bieżący dom = 1 kW, PV = 0, brak zgody na eksport z baterii, planowany pobór z baterii 2 kW do AC; brak innego odbiornika.  
 **Oczekiwane:** zasilanie z baterii do domu nie może przekroczyć 1 kW w tym slocie; pozostałe 1 kW byłoby eksportem z magazynu, a więc bez zgody jest niedopuszczalne. Jeśli mapowanie encji nie pozwala rozdzielić kierunków, blokować taki rozkaz zamiast zakładać, że „pójdzie na dom”.
 
-## 8. Co programista ma udowodnić
+
+## 9. Kontrakt encji HA — testy bez rzeczywistego zapisu
+
+### MAP-01 — Zakup i sprzedaż są odrębne
+
+**Dane:** źródło spot = `0,80 DKK/kWh`, cena końcowa zakupu w drugim źródle = `1,45 DKK/kWh`; te same znane znaczniki czasu.  
+**Oczekiwane:** `C_buy = 1,45`, `C_sell = 0,7785 DKK/kWh`. Nie wolno przyjąć ceny zakupu jako ceny sprzedaży ani samego spot jako finalnej ceny zakupu.
+
+### MAP-02 — Zmiana jednostki mocy
+
+**Dane:** mock encji PV daje `2500 W`, encja obciążenia domu daje `1,2 kW`, a slot trwa 15 min.  
+**Oczekiwane:** po normalizacji PV = `2,5 kW`, dom = `1,2 kW`, energia PV = `0,625 kWh`; brak błędnego `2500 kW`.
+
+### MAP-03 — Niejednoznaczna definicja mocy baterii
+
+**Dane:** istniejąca encja o stanie `-500 W`, nieznana konwencja znaku i nieokreślony punkt pomiaru DC/AC.  
+**Oczekiwane:** brak arbitralnego przypisania do ładowania lub rozładowania; `data_quality = invalid` dla tej roli i blokada zależnych poleceń.
+
+### MAP-04 — Prognozy jutra nie opublikowano mimo godziny 13:00
+
+**Dane:** zegar 13:10; dostępne ceny wyłącznie do dzisiaj 23:59, brak jutra.  
+**Oczekiwane:** `price_horizon_end` = koniec dzisiejszej doby; brak symulowania nieopublikowanych cen, plan nie przekracza dostępnego horyzontu cen.
+
+### MAP-05 — Planowana moc nie jest potwierdzeniem wykonania
+
+**Dane:** planner zwraca `charge_power_kw = 2`, nie ma fizycznie zweryfikowanej encji regulacji mocy ładowania.  
+**Oczekiwane:** sensor może wyświetlić zamiar 2 kW, `missing_capabilities` zawiera brak regulacji, executor nie wysyła żadnej komendy. Nie zastępować sterowania mocą przełącznikiem zezwolenia na ładowanie.
+
+### MAP-06 — Niezweryfikowane znaczenie historycznego limitu prądu
+
+**Dane:** skonfigurowano `number.sun12k_maximum_battery_grid_charge_current` z opisem niezgodnym między pierwotną logiką PV a etykietą grid; nie przeprowadzono testu skutku.  
+**Oczekiwane:** sterowanie tą encją pozostaje zablokowane niezależnie od tego, czy liczba wynosi 1 A czy 40 A; jednocześnie można używać sprawdzonych encji do odczytu i symulacji.
+
+## 10. Co programista ma udowodnić
 
 | Zestaw | Wynik akceptacji |
 | --- | --- |
@@ -198,5 +231,6 @@ Dla **SOC-01** i **SOC-02** wspólne:
 | TIME | Horyzont tylko opublikowanych cen, brak sztucznych godzin i poprawne DST |
 | PVQ | Curtailment nie psuje kalibracji, przechowanie dawnych wersji prognoz |
 | SAFE | Bez zgody, sprawnych danych i potwierdzonego toru kontroli brak poleceń sprzętowych |
+| MAP | Poprawne mapowanie cen/jednostek i wyraźny rozdział planu od rzeczywistych akcji |
 
 **Warunek ukończenia testów dokumentacyjnych:** wszystkie powyższe oczekiwane wyniki mają dać się wyrazić w testach automatycznych i symulacji z fikcyjnymi encjami. Scenariusze celowo izolują pojedyncze zjawiska; **nie zastępują walidacji rzeczywistej topologii, taryfy, sprawności ani procedury fail-safe**. Przy braku wymaganych informacji oznaczyć odpowiedni etap jako `BLOCKED`, nie tworzyć fikcyjnej kompatybilności.
