@@ -1,0 +1,3 @@
+# Kalibracja modelu
+
+Wersja robocza.
