@@ -83,6 +83,27 @@ Podstawa: [OPTIMIZATION_MODEL.md](OPTIMIZATION_MODEL.md), [GOALS_AND_REQUIREMENT
 **Dane:** jak ECO-02, ale w **fiksturze testowej** koszt degradacji = `0,10 DKK za 1 kWh` energii przepływającej przez baterię, naliczany dla wejścia i wyjścia (2 kWh throughput łącznie).  
 **Oczekiwane:** oszczędność na energii `1,10 DKK`, koszt degradacji `0,20 DKK`, wynik dodatkowy `+0,90 DKK`. Raportować osobno rachunek za energię i wewnętrzny koszt degradacji; nie przyjmować `0,10` jako parametru realnej baterii.
 
+
+### ECO-08 — Niezależne optimum z rzeczywistym kosztem strat i degradacji
+
+**Dane:** dwie kolejne godziny, każda podzielona na 4 sloty. Pojemność 10,24 kWh, SOC początkowy i końcowy **50%**, eksport baterii zabroniony. W 1. godzinie PV dostępne 2 kWh (2 kW, dom 0), sprzedaż PV netto `0,65 DKK/kWh`. W 2. godzinie PV 0, dom pobiera 2 kWh, zakup końcowy `1,20 DKK/kWh`. Brak innego źródła ładowania. Sprawności `η_pv_bat = 0,95`, `η_bat_ac = 0,90`, `η_pv_ac = 1`; testowy koszt degradacji = `0,10 DKK/kWh` PV przyjętego do baterii plus `0,08 DKK/kWh` AC oddanego z baterii. Ograniczenia mocy z fikstury głównej.
+
+**Oczekiwane wyprowadzenie (nie narzucać celu SOC):**
+- Dla 1 kWh PV skierowanego do magazynu zamiast na eksport: energia później oddana do domu = `0,95 × 0,90 = 0,855 kWh`.
+- Uniknięty zakup = `0,855 × 1,20 = 1,026 DKK`.
+- Utracony eksport = `0,65 DKK`; degradacja = `0,10 + 0,08 × 0,855 = 0,1684 DKK`.
+- Dodatkowa korzyść na 1 kWh PV = `1,026 − 0,65 − 0,1684 = +0,2076 DKK`, więc ekonomicznie optymalne jest wykorzystanie **całych dostępnych 2 kWh PV** do baterii.
+- Energia w baterii po ładowaniu = `5,12 + 1,90 = 7,02 kWh`, **SOC = 68,5546875%**; oddana później energia AC = `1,710 kWh`, zakup do domu = `0,290 kWh`, końcowy SOC 50%.
+- Wynik wybranego planu = zakup `0,290 × 1,20 = 0,348 DKK` + degradacja `0,3368 DKK` = **0,6848 DKK**. Plan bez ładowania baterii: zakup `2 × 1,20` minus sprzedaż PV `2 × 0,65` = **1,1000 DKK**. Różnica = **+0,4152 DKK** na korzyść magazynowania.
+
+**Warunek:** wyznaczony SOC wynika z niezależnego rachunku marginalnego, nie z oczekiwanego poziomu 65% lub 78,59375%. Wykonanie dowolnego planu musi zachować limity i identyczny SOC końcowy.
+
+### ECO-09 — Eksport PV teraz, ładowanie magazynu z tańszej sieci później
+
+**Dane:** trzy kolejne godziny (12 kwadransów), `η = 1`, koszt degradacji 0; start i koniec baterii SOC 20%, brak zgody na eksport baterii. Godzina 1: PV 1 kWh, dom 0, sprzedaż netto `0,90 DKK/kWh`. Godzina 2: PV 0, dom 0, cena zakupu `0,20 DKK/kWh`, ładowanie z sieci dostępne. Godzina 3: PV 0, dom 2 kWh, cena zakupu `1,50 DKK/kWh`. Limity mocy pozwalają na ładowanie 2 kWh w godzinę 2.
+
+**Oczekiwane:** eksport **1 kWh PV** w godzinie 1; ładowanie baterii **2 kWh z sieci** w godzinie 2; rozładowanie **2 kWh do domu** w godzinie 3. Rachunek = `2 × 0,20 − 1 × 0,90 = −0,50 DKK`. Alternatywa: magazynować 1 kWh PV i dokupić 1 kWh do baterii w godzinie 2 → koszt `+0,20 DKK`. Wybrany plan jest lepszy o **0,70 DKK**. Nie występuje równoczesny import i eksport w jednym slocie ani eksport z baterii.
+
 ## 4. Dynamiczny SOC — dwa kontrastowe scenariusze
 
 Dla **SOC-01** i **SOC-02** wspólne:
