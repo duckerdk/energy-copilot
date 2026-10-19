@@ -1,7 +1,7 @@
 # Energy Co-Pilot — cele i wymagania nowego rozwiązania
 
-**Status:** wymagania użytkownika zebrane w odpowiedziach na pytania 1–36; 15.10.2026.  
-**Etap:** definicja potrzeb — **bez wyboru oprogramowania, implementacji i działań na Home Assistant**.  
+**Status:** wymagania z 15.10.2026, uzupełnione o ustalenia z 19.10.2026.  
+**Etap:** wybrano architekturę własnej integracji Home Assistant; trwa specyfikacja, **bez implementacji i działań na Home Assistant**.  
 **Źródła:** odpowiedzi użytkownika w bieżącej rozmowie; informacje techniczne i rozbieżności historyczne pozostają w [archiwum](../archive/energy-copilot-v5/README.md).
 
 ## 1. Cel nadrzędny i priorytety
@@ -48,7 +48,7 @@ Nie ma stałego obowiązku pełnej baterii przed wieczorem. **SOC może być ni�
 - Sprzedaż i arbitraż oceniane **po wszystkich istotnych kosztach**, a nie po arbitralnym progu ceny spot (poprzedni próg 0,4 DKK/kWh **nie obowiązuje jako nowy wymóg**).
 - Uwzględnić rzeczywistą cenę **zakupu** z opłatami, sprawność magazynowania, koszt degradacji oraz rzeczywiste wynagrodzenie netto za **sprzedaż**.
 - W HA istnieją cena spot i rzeczywista cena zakupu z opłatami.
-- **Nie ma gotowej encji ceny sprzedaży netto.** Bez jej wyznaczenia nie da się policzyć pełnego zysku ani rzetelnie podjąć decyzji o opłacalności eksportu.
+- **Cena sprzedaży netto jest ustalona:** `cena_sprzedazy_netto_DKK_kWh = spotpris_DKK_kWh - 0,0215` (prowizja Vindstød 0,0215 DKK/kWh). Znane źródło spot: `sensor.energi_data_spotpris`. Nie ma wymogu osobnej encji — integracja może wyznaczać tę serię na bieżąco z danych spot. Ceny zakupu z pełnymi opłatami nie należy mylić z ceną sprzedaży.
 - Umowa / rozliczenia: **Elforbundet / Vindstød**, północna Jutlandia, operator sieci **N1**; Vindstød obsługuje również sprzedaż nadwyżek.
 - Dopuszcza się pobieranie danych zewnętrznych do lokalnego algorytmu.
 
@@ -69,14 +69,17 @@ Nie ma stałego obowiązku pełnej baterii przed wieczorem. **SOC może być ni�
 ## 6. Architektura — twarde ograniczenia i elementy nieprzesądzone
 
 **Ustalono:**
+- Tworzymy **własną integrację `custom_components` Home Assistant**, rozwijaną w repozytorium `duckerdk/energy-copilot` i docelowo instalowaną przez HACS; kod Battery Controller to ewentualna inspiracja, nie zależność projektu.
 - Obliczenia i sterowanie **lokalnie**, na istniejącej infrastrukturze z Home Assistant; zewnętrzne prognozy i ceny są dozwolone.
 - Home Assistant jest dostępny w VM na serwerze.
 - Falownik Deye ma fabryczny harmonogram ładowania i rozładowania i obsługuje wszystkie wcześniej wymienione funkcje (deklaracja użytkownika).
 - Komunikacja falownika z HA **już działa** przez własny Modbus na ESP32 z **ESPHome/Wi-Fi**.
 - Warstwą sterowania nowego rozwiązania mają być **istniejące encje HA**; **bez ingerowania w firmware ESP32, rejestry Modbus lub sposób komunikacji**, o ile później użytkownik nie zmieni zakresu.
+- Źródłowy wykaz znanych identyfikatorów istnieje: [ENTITIES.md](../archive/energy-copilot-v5/docs/ENTITIES.md) i [config/entities.yaml](../archive/energy-copilot-v5/config/entities.yaml). Stanowi bazę mapowania, nie dowód aktualnej dostępności każdej encji.
+- Własny optymalizator ma publikować oprócz mocy także: **źródło ładowania, dynamiczny docelowy SOC, przeznaczenie rozładowania (dom / eksport), decyzję dotyczącą eksportu PV, harmonogram i uzasadnienie**. Aktualne prognozy i wyniki mają być dostępne na żywo w panelu HA, bez ręcznego eksportowania diagnostyki.
 - Nie ma obecnie dodatkowych zarządzalnych odbiorników; projekt ma być później rozszerzalny.
 
-**Nie wybrano:** EMHASS, własnego Pythona, automatyzacji HA, solvera, algorytmu prognozy zużycia, interwału planowania i sposobu zarządzania harmonogramami Deye. Ich ocenę przeprowadzimy osobno.
+**Do zaprojektowania:** konkretny algorytm i solver, prognoza zużycia, interwały planowania, kontrakty encji wyjściowych, harmonogram i bezpieczne wykonywanie decyzji przez encje HA. Decyzja o własnej integracji zastępuje wcześniejszy etap wyboru pomiędzy gotowymi optymalizatorami.
 
 ## 7. Kryteria sukcesu i weryfikacja
 
@@ -90,8 +93,8 @@ Wskaźniki dodatkowe:
 - throughput magazynu oraz oszacowany koszt jego degradacji;
 - liczba propozycji arbitrażu, decyzje użytkownika i rzeczywisty rezultat względem propozycji.
 
-Przed wdrożeniem: porównać kandydatów na tych samych historycznych danych z HA z zachowaniem realistycznych możliwości sterowania. **Brak przyjętego jeszcze konkretnego progu minimalnej oszczędności**, np. w DKK/rok.
+Przed wdrożeniem: zweryfikować i przetestować własny algorytm na historycznych danych HA oraz porównać wynik z rzeczywistym scenariuszem bazowym z zachowaniem realistycznych możliwości sterowania. **Brak przyjętego jeszcze konkretnego progu minimalnej oszczędności**, np. w DKK/rok.
 
 ## 8. Granica tej specyfikacji
 
-To komplet **uzgodnionych celów funkcjonalnych** z aktualnej serii pytań, nie komplet szczegółów implementacyjnych. Niewyjaśnione dane i testy przed wyborem technologii zebrano w [OPEN_ITEMS.md](OPEN_ITEMS.md). Nie zmieniono encji, harmonogramów, integracji ani kodu.
+To komplet **uzgodnionych celów funkcjonalnych** z aktualnej serii pytań, nie komplet szczegółów implementacyjnych. Niewyjaśnione dane i testy przed implementacją zebrano w [OPEN_ITEMS.md](OPEN_ITEMS.md). Nie zmieniono encji, harmonogramów, integracji ani kodu.
