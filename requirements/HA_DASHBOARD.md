@@ -71,7 +71,11 @@ Propozycja na panelu zawiera **jednocześnie**: czas początku i końca, liczbę
 - Brak niezależnego fail-safe = niemożliwość włączenia trybu automatycznego, ale nadal działa podgląd/planowanie w `dry_run`.
 - Panel musi wskazywać, które konkretnie funkcje są dostępne jako `validated_write`, a które tylko w symulacji.
 
-## 7. Weryfikacja UX na danych fikcyjnych
+## 7. Rejestr decyzji widoczny od pierwszego uruchomienia
+
+Widok pokazuje **ostatnią decyzję wraz z cenami, prognozami, SOC, planowaną mocą, porównaniem kosztów i uzasadnieniem** oraz historię decyzji z czasem, `plan_id`, przyczyną, stanem i możliwością rozwinięcia danych. Każda bezczynność/odmowa/odrzucenie planu musi mieć wyjaśnienie; brak obliczonego wyniku przedstawiać jako nieznany, nie 0. Wspiera poziom INFO zawsze dostępny i konfigurowalny DEBUG, bez ręcznego eksportu JSON. Logi po restarcie zachowane lokalnie, z ograniczoną retencją. Kontrakt pól i testy: [DECISION_LOGGING.md](DECISION_LOGGING.md).
+
+## 8. Weryfikacja UX na danych fikcyjnych
 
 - `UI-01`: brak nowych cen po 13:00 — wykres kończy się dziś, informacja o braku jutra.
 - `UI-02`: aktualny SOC nieznany — brak „0%” i brak fałszywej wykonywalnej rekomendacji.
@@ -84,6 +88,6 @@ Propozycja na panelu zawiera **jednocześnie**: czas początku i końca, liczbę
 - `UI-09`: ujemna cena sprzedaży — widoczny znak i wartość, bez ukrywania ujemnego przychodu.
 - `UI-10`: po jesiennej zmianie czasu — osobne punkty dla obu wystąpień lokalnej 02:00.
 
-## 8. Warunek odbioru
+## 9. Warunek odbioru
 
 Użytkownik widzi w HA bez ręcznego JSON: **aktualne pomiary, następne decyzje, cały dostępny horyzont cen i planu, koszt netto, SOC, prognozy, powody oraz blokady i zgody**. UI nie może sugerować faktycznego sterowania, gdy aktywny jest tylko podgląd.
