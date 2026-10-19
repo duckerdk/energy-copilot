@@ -1,100 +1,42 @@
-# Energy Co-Pilot — cele i wymagania nowego rozwiązania
+# Cele funkcjonalne — obowiązujące
 
-**Status:** wymagania z 15.10.2026, uzupełnione o ustalenia z 19.10.2026.  
-**Etap:** wybrano architekturę własnej integracji Home Assistant; trwa specyfikacja, **bez implementacji i działań na Home Assistant**.  
-**Źródła:** odpowiedzi użytkownika w bieżącej rozmowie; informacje techniczne i rozbieżności historyczne pozostają w [archiwum](../archive/energy-copilot-v5/README.md).
+## Cel ekonomiczny
 
-## 1. Cel nadrzędny i priorytety
+Minimalizacja faktycznego **rachunku netto w DKK** w porównywalnym okresie:
 
-**Minimalizacja końcowego rachunku netto za energię elektryczną (DKK).** To nadrzędny priorytet, także gdy koliduje z bezwzględną maksymalizacją autokonsumpcji albo minimalizacją liczby kupionych kWh.
+**Koszt importowanej energii (z opłatami zmiennymi) − przychód netto z eksportu + marginalny koszt zużycia baterii wskutek dodatkowych cykli.**
 
-Cele dodatkowe / mierniki działania:
-1. Zmniejszyć ilość energii importowanej z sieci (kWh).
-2. Obniżyć średni, rzeczywisty koszt jednostki zakupionej energii (DKK/kWh).
-3. Zwiększać autokonsumpcję energii PV, **jeżeli sprzyja to wynikowi ekonomicznemu**.
-4. Sprzedawać nadwyżkę, ale tylko gdy jest to opłacalne.
+Koszty stałe, podatki, bilansowanie, rozliczenia eksportu i sposób obciążenia baterii w modelu wymagają weryfikacji. Nie dodawać kosztu całego wcześniej zakupionego magazynu do każdej decyzji. Rozdzielać koszt rachunku od wewnętrznego kosztu degradacji; nie podawać wskaźnika wewnętrznego jako wartości faktury.
 
-**Nie wolno optymalizować średniej ceny zakupu w izolacji**: tańszy średni zakup przy większej ilości energii nie musi dawać niższego rachunku. Raportować osobno całościowy koszt netto, kWh importu i średni koszt kupowanej kWh.
+Drugorzędne KPI: import kWh, ważona wolumenem średnia cena zakupu DKK/kWh, eksport kWh i przychód netto, autokonsumpcja PV, straty i throughput baterii, skuteczność propozycji. Żaden z nich samodzielnie nie zastępuje wyniku netto.
 
-Docelowo rachunek netto powinien uwzględniać kwotę za import (rzeczywistą cenę ze zmiennymi opłatami), przychód z eksportu netto oraz — na etapie kalkulowania decyzji o dodatkowym cyklu — koszt zużycia baterii i straty. Koszty stałe i zakres rozliczeń wymagają ustalenia w modelu ekonomicznym.
+## Dozwolone funkcje
 
-## 2. Dozwolone decyzje energetyczne
+| Funkcja | Wymagana decyzja |
+| --- | --- |
+| Zasilanie domu z PV / baterii | Standardowa funkcja falownika, bez koniecznej zmiany |
+| Ładowanie baterii z PV | Automatyczne, gdy korzystne |
+| Ładowanie baterii z sieci | Automatyczne, gdy korzystne i technicznie zweryfikowane |
+| Eksport nadwyżki PV | Automatyczny, jeśli wykonalny, legalny i korzystny |
+| Celowe rozładowanie baterii na eksport | **Osobne zatwierdzenie każdej propozycji przez użytkownika** |
+| Ładowanie z sieci na późniejszą odsprzedaż | Dozwolone ekonomicznie, ale **sam eksport z baterii wymaga zgody** |
+| Sterowanie dodatkowymi odbiornikami | Poza MVP |
 
-| Operacja | Decyzja użytkownika | Tryb |
-| --- | --- | --- |
-| Zasilanie domu z PV i magazynu | Tak | System / standardowa praca falownika |
-| Ładowanie baterii z nadwyżki PV | Tak | Automatyczne, gdy ekonomicznie uzasadnione |
-| Ładowanie baterii z sieci przy korzystnej cenie | **Tak, zdecydowanie** | Automatyczne na podstawie kalkulacji |
-| Sprzedaż nadwyżki produkcji PV | Tak, tylko gdy jest ekonomicznie uzasadniona | Automatyczna (w ramach zweryfikowanych możliwości falownika) |
-| Celowe rozładowanie baterii w celu sprzedaży do sieci | Tak, warunkowo | **Tylko po zatwierdzeniu użytkownika** |
-| Zakup energii z sieci, magazynowanie i późniejsza odsprzedaż | **Dopuszczone** | Wyłącznie jeśli opłacalne i **po zatwierdzeniu sprzedaży** |
-| Sterowanie dodatkowymi odbiornikami energii | Nie teraz; w przyszłości | Poza zakresem pierwszego wdrożenia |
+Nie obowiązują historyczne: próg sprzedaży 0,4 DKK/kWh, sztywna rezerwa nocna, stały docelowy SOC, zakup tylko bez PV ani konieczność pełnej baterii wieczorem. Docelowy SOC może zmieniać się dynamicznie. Zadeklarowane granice SOC: 20–100%; faktyczne ograniczenia BMS/falownika mają pierwszeństwo. Użytkownik nie wymaga rezerwy na blackout.
 
-Nie ma stałego obowiązku pełnej baterii przed wieczorem. **SOC może być niższy, jeśli jest to korzystniejsze finansowo i przewidziano możliwość ładowania następnego dnia.**
+## Cena i opłacalność
 
-## 3. Magazyn, granice i zasada bezpieczeństwa
+- **Zakup:** końcowa zmienna cena zakupu z opłatami; dokładna seria i jej składniki do sprawdzenia.
+- **Sprzedaż — reguła przekazana przez użytkownika:** netto = cena spot − **0,0215 DKK/kWh** prowizji Vindstød. Sprawdzić na rzeczywistych rozliczeniach, czy jest to komplet wszystkich zmiennych obciążeń; nie dopowiadać innych kwot.
+- Ocena ładowania/rozładowania obejmuje sprawność w obie strony, koszt zużycia magazynu, limity mocy, koszty alternatywne przyszłego zasilania domu i skutki cen ujemnych.
+- Prognozy mogą być niepewne; plan musi tolerować odchylenia i aktualizować się po istotnej zmianie danych.
 
-- Magazyn: 2 × BSLBATT LiFePO4, 51,2 V / 100 Ah / 5120 Wh.
-- Pojemność **nominalna wyliczona ze specyfikacji modułów:** 10,24 kWh.
-- Przyjęta w rozmowie użytkowa pojemność dla zakresu 20–100%: około 8 kWh; matematycznie 80% × 10,24 = **8,192 kWh przed stratami i ograniczeniami BMS**. Nie traktować 8,192 kWh jako zweryfikowanej dostępnej energii AC.
-- Przyjęty dotychczas zakres pracy: SOC 20–100%, z uwzględnieniem ograniczeń BMS/falownika.
-- **Brak wymogu utrzymywania osobnej rezerwy na zanik napięcia sieciowego.**
-- **Nie narzucać stałego docelowego SOC „na noc”** z poprzedniego projektu.
-- Koszt zużycia baterii musi być oszacowany w oparciu o parametry baterii, jej trwałość i koszt; użytkownik podał 19 000 DKK za komplet.
-- Bieżące sterowanie nie może naruszać limitów sprzętowych ani odbierać falownikowi fabrycznych zabezpieczeń.
+## Zatwierdzanie eksportu z baterii
 
-## 4. Ekonomika i ceny
+Propozycja pokazuje okres, energię kWh, szacowany **dodatkowy** wynik DKK po kosztach, SOC po operacji oraz przyjęte ceny/straty. Akcje: **Zatwierdź** / **Odrzuć**. Zgoda dotyczy tylko jednoznacznie identyfikowalnego planu, zakresu czasu i ilości; musi wygasnąć oraz zostać ponownie zweryfikowana tuż przed komendą. Brak odpowiedzi, zmiana planu albo nieważna zgoda = **zakaz eksportu z baterii**.
 
-- Sprzedaż i arbitraż oceniane **po wszystkich istotnych kosztach**, a nie po arbitralnym progu ceny spot (poprzedni próg 0,4 DKK/kWh **nie obowiązuje jako nowy wymóg**).
-- Uwzględnić rzeczywistą cenę **zakupu** z opłatami, sprawność magazynowania, koszt degradacji oraz rzeczywiste wynagrodzenie netto za **sprzedaż**.
-- W HA istnieją cena spot i rzeczywista cena zakupu z opłatami.
-- **Cena sprzedaży netto jest ustalona:** `cena_sprzedazy_netto_DKK_kWh = spotpris_DKK_kWh - 0,0215` (prowizja Vindstød 0,0215 DKK/kWh). Znane źródło spot: `sensor.energi_data_spotpris`. Nie ma wymogu osobnej encji — integracja może wyznaczać tę serię na bieżąco z danych spot. Ceny zakupu z pełnymi opłatami nie należy mylić z ceną sprzedaży.
-- Umowa / rozliczenia: **Elforbundet / Vindstød**, północna Jutlandia, operator sieci **N1**; Vindstød obsługuje również sprzedaż nadwyżek.
-- Dopuszcza się pobieranie danych zewnętrznych do lokalnego algorytmu.
+## Widoczność i mierzalność
 
-## 5. Zasady automatyzacji i akceptacji
+W HA prezentować na żywo aktualne pomiary, plan i jego ważność, docelowy SOC, zamiar źródła ładowania (PV/sieć), zamiar wykorzystania baterii (dom/eksport), decyzję o eksporcie PV, szacunkowy koszt/zysk, uzasadnienie, tryb pracy, stan sterowania i błędy. Planowane intencje odróżniać od rzeczywistych pomiarów. W pierwszej kolejności używać natywnych encji HA.
 
-**Sterowanie automatyczne:** działania niewymagające zgody użytkownika mogą wykonywać się samodzielnie, gdy przejdą sprawdzenie zasad ekonomicznych, dostępności danych, limitów falownika i magazynu.
-
-**Sprzedaż energii zgromadzonej w baterii:** wymaga **osobnego, wyraźnego zatwierdzenia**. Powiadomienie ma zawierać:
-- proponowane godziny i ilość energii (kWh);
-- przewidywany **dodatkowy** zysk netto w DKK i jego uzasadnienie (ceny zakupu/sprzedaży, straty, degradacja oraz utracona możliwość autokonsumpcji, jeżeli dotyczy);
-- prognozowany SOC po operacji i dalszy plan zapewnienia energii;
-- opcje „Zatwierdź” / „Odrzuć”.
-
-**Brak odpowiedzi to brak zgody.** Po upływie terminu ważności propozycja musi przestać być wykonalna; długość tego terminu jest szczegółem do ustalenia w projekcie UI.
-
-**Awaria algorytmu, braki danych lub utrata komunikacji:** system ma umożliwić **standardową, autonomiczną pracę fabrycznego sterowania falownika Deye**; sposób bezpiecznego powrotu trzeba dopiero ustalić i zweryfikować. Użytkownik nie chce funkcji backupu energetycznego.
-
-## 6. Architektura — twarde ograniczenia i elementy nieprzesądzone
-
-**Ustalono:**
-- Tworzymy **własną integrację `custom_components` Home Assistant**, rozwijaną w repozytorium `duckerdk/energy-copilot` i docelowo instalowaną przez HACS; kod Battery Controller to ewentualna inspiracja, nie zależność projektu.
-- Obliczenia i sterowanie **lokalnie**, na istniejącej infrastrukturze z Home Assistant; zewnętrzne prognozy i ceny są dozwolone.
-- Home Assistant jest dostępny w VM na serwerze.
-- Falownik Deye ma fabryczny harmonogram ładowania i rozładowania i obsługuje wszystkie wcześniej wymienione funkcje (deklaracja użytkownika).
-- Komunikacja falownika z HA **już działa** przez własny Modbus na ESP32 z **ESPHome/Wi-Fi**.
-- Warstwą sterowania nowego rozwiązania mają być **istniejące encje HA**; **bez ingerowania w firmware ESP32, rejestry Modbus lub sposób komunikacji**, o ile później użytkownik nie zmieni zakresu.
-- Źródłowy wykaz znanych identyfikatorów istnieje: [ENTITIES.md](../archive/energy-copilot-v5/docs/ENTITIES.md) i [config/entities.yaml](../archive/energy-copilot-v5/config/entities.yaml). Stanowi bazę mapowania, nie dowód aktualnej dostępności każdej encji.
-- Własny optymalizator ma publikować oprócz mocy także: **źródło ładowania, dynamiczny docelowy SOC, przeznaczenie rozładowania (dom / eksport), decyzję dotyczącą eksportu PV, harmonogram i uzasadnienie**. Aktualne prognozy i wyniki mają być dostępne na żywo w panelu HA, bez ręcznego eksportowania diagnostyki.
-- Nie ma obecnie dodatkowych zarządzalnych odbiorników; projekt ma być później rozszerzalny.
-
-**Do zaprojektowania:** konkretny algorytm i solver, prognoza zużycia, interwały planowania, kontrakty encji wyjściowych, harmonogram i bezpieczne wykonywanie decyzji przez encje HA. Decyzja o własnej integracji zastępuje wcześniejszy etap wyboru pomiędzy gotowymi optymalizatorami.
-
-## 7. Kryteria sukcesu i weryfikacja
-
-Główny KPI: **rzeczywisty końcowy koszt netto energii (DKK)** w porównywalnych okresach, z analizą skutków importu, eksportu, kosztów cykli i czynników zewnętrznych.
-
-Wskaźniki dodatkowe:
-- ilość importu z sieci [kWh];
-- **ważona energią** średnia cena zakupionej kWh [DKK/kWh] z opłatami;
-- energia wysłana do sieci [kWh], przychód netto i koszt jego osiągnięcia [DKK];
-- udział wykorzystanej lokalnie energii PV / autokonsumpcji;
-- throughput magazynu oraz oszacowany koszt jego degradacji;
-- liczba propozycji arbitrażu, decyzje użytkownika i rzeczywisty rezultat względem propozycji.
-
-Przed wdrożeniem: zweryfikować i przetestować własny algorytm na historycznych danych HA oraz porównać wynik z rzeczywistym scenariuszem bazowym z zachowaniem realistycznych możliwości sterowania. **Brak przyjętego jeszcze konkretnego progu minimalnej oszczędności**, np. w DKK/rok.
-
-## 8. Granica tej specyfikacji
-
-To komplet **uzgodnionych celów funkcjonalnych** z aktualnej serii pytań, nie komplet szczegółów implementacyjnych. Niewyjaśnione dane i testy przed implementacją zebrano w [OPEN_ITEMS.md](OPEN_ITEMS.md). Nie zmieniono encji, harmonogramów, integracji ani kodu.
+Sukces wymaga testu na danych historycznych oraz porównania z rzeczywistym scenariuszem bazowym; nie przypisywać całej zmiany rachunku działaniu optymalizatora bez uwzględnienia pogody, obciążenia i cen.

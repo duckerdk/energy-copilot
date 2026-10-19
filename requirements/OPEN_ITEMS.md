@@ -1,32 +1,30 @@
-# Energy Co-Pilot — otwarte kwestie przed implementacją
+# Blokery i decyzje do zamknięcia
 
-**Status:** lista otwartych kwestii **implementacyjnych / ekonomicznych**, nie nowa ankieta i nie uzgodnione decyzje użytkownika. Cele funkcjonalne zebrano już w [GOALS_AND_REQUIREMENTS.md](GOALS_AND_REQUIREMENTS.md). Nie należy wracać do potwierdzania ustaleń, które użytkownik już przekazał.
+Dokument zawiera **wyłącznie niepotwierdzone elementy**, nie powtarza ustalonych celów. Codex ma zamykać pozycje dowodem (źródło/odczyt/test), a nie zgadywaniem wartości. Brak punktów krytycznych blokuje **sterowanie**, nie blokuje implementacji monitoringu/dry-run.
 
-| Priorytet | Kwestia do ustalenia | Dlaczego potrzebna | Zasada |
-| --- | --- | --- | --- |
-| Krytyczny | **Weryfikacja aktualnych stanów, jednostek i atrybutów znanych encji HA** — zwłaszcza importu/eksportu, mocy baterii i prognoz cen | Bezpieczny kontrakt danych wejściowych własnej integracji | Punktem wyjścia jest **istniejący** [wykaz encji](../archive/energy-copilot-v5/docs/ENTITIES.md) i [rejestr YAML](../archive/energy-copilot-v5/config/entities.yaml); nie żądać ponownego tworzenia listy ani nie zmieniać ESPHome |
-| Krytyczny | **Sposób wykonania sterowań poprzez encje HA oraz fabryczny harmonogram Deye** | Zapewnienie wykonalności planu i powrotu do normalnej pracy po błędzie | Nie grzebać w Modbus ani firmware; nie polegać na starym sprzecznym znaczeniu `number.sun12k_maximum_battery_grid_charge_current` bez potwierdzenia skutku |
-| Wysoki | Obecna dostępność i szczegółowość prognoz PV z Forecast.Solar | Same „dziś/jutro” nie wystarczają do rozkładu godzinowego | Sprawdzić atrybuty HA / forecast API, nie zakładać danych z samego zrzutu |
-| Wysoki | Rozdzielczość i kompletność **wieloletniej** historii HA, rozkład importu, zużycia, eksportu, SOC | Symulacja i uczciwe porównanie rozwiązań | Standardowy Recorder / Energy Dashboard może udostępniać różne agregacje; wymaga sprawdzenia |
-| Wysoki | Efektywność AC↔bateria, ograniczenia mocy, BMS i minimalnego SOC | Poprawny bilans, ograniczenia harmonogramu, degradacja | Bez zgadywania wydajności i przeliczania 8 kWh na realny zasięg energetyczny |
-| Wysoki | Model kosztu degradacji przy koszcie kompletu 19 000 DKK i danych BSLBATT | Odmowa nieopłacalnych cykli | Ustalić trwałość, zakres pracy i metodę rozliczenia kosztu |
-| Wysoki | Procedura bezpiecznego oddania kontroli fabrycznemu Deye przy awarii aplikacji i sieci | Wymóg użytkownika: powrót do standardowej pracy falownika | Nie nadpisywać nieznanych bezpiecznych nastaw |
-| Średni | Źródło/prognoza profilu zużycia domu oraz rozdzielczość cen i prognoz | Dobry plan czasowy i właściwa optymalizacja | Dokonać porównania na danych HA |
-| Średni | Powiadomienie o sprzedaży z baterii, termin odpowiedzi, ponowna walidacja opłacalności | Nie dopuścić do nieautoryzowanego eksportu z magazynu | Każda sprzedaż z baterii tylko za zgodą; brak zgody = brak transakcji |
-| Średni | Kryterium testu względem **fabrycznego trybu Deye** i okres analizy | Udowodnienie niższego rachunku netto, a nie samej jakości prognozy | Raportować kWh, średnią cenę, przychody i koszty |
-| Niski | Sposób przyszłego dołączania sterowalnych odbiorników | Wymóg rozszerzalności | Bez implementowania teraz |
+## P0 — obowiązkowe przed rzeczywistymi poleceniami
 
-## Ustalenia zamknięte — nie pytać ponownie
+- [ ] **Odczyt kontraktu HA:** aktualne encje, jednostki, znaki, aktualność, dokładne atrybuty cen i prognoz, mapowanie import/eksport/bateria; opis w ENTITY_CONTRACT.md.
+- [ ] **Mapa zapisów Deye:** udowodnić fizyczny skutek każdej akcji ładowania z sieci/PV, eksportu, docelowego SOC, wymuszenia rozładowania i harmonogramu. Rozwiązać konflikt znaczenia number.sun12k_maximum_battery_grid_charge_current.
+- [ ] **Separacja źródeł eksportu:** udowodnić, że automatyczny eksport PV nie może niezamierzenie wywołać eksportu z baterii.
+- [ ] **Fail-safe bez dostępnego HA:** przetestować zachowanie aktywnych nastaw po przerwaniu integracji, Wi-Fi i całego HA; zapewnić niezależny, skuteczny powrót do uzgodnionego trybu fabrycznego lub nie zezwalać na automatykę.
+- [ ] **Limity urządzeń:** rzeczywisty SOC minimalny, moc/prąd/temperatura, BMS, ograniczenia importu/eksportu, częstotliwość zapisów i potwierdzenie wykonania.
+- [ ] **Test świadomie nadzorowany:** dopiero po punktach powyżej sprawdzić osobno każdy zapis i powrót do nastaw; bez automatycznego wykonywania przez Codexa.
 
-- **Model ceny sprzedaży Vindstød:** `spotpris - 0,0215 DKK/kWh`, na bazie `sensor.energi_data_spotpris`; prowizja 0,0215 DKK/kWh została ustalona z użytkownikiem. Do sprawdzenia pozostaje wyłącznie techniczna dostępność i struktura przyszłej serii cen spot, nie sama wysokość prowizji.
-- **Wykaz encji HA istnieje w repo:** [ENTITIES.md](../archive/energy-copilot-v5/docs/ENTITIES.md), [config/entities.yaml](../archive/energy-copilot-v5/config/entities.yaml). Wymagana jest jedynie kontrola bieżącej semantyki/atrybutów przed zapisami.
-- **Architektura:** własna integracja `custom_components` Home Assistant w `duckerdk/energy-copilot`, docelowo HACS; Battery Controller wyłącznie jako ewentualna inspiracja. Nie wybieramy ponownie gotowego optymalizatora.
+## P1 — wymagane do wiarygodnego planowania i kosztów
 
-## Zasady implementacji i weryfikacji
+- [ ] Weryfikacja godzinowej / 15-minutowej serii **cen zakupu z opłatami** i **spot**, dat, DST oraz kompletności taryf; w tym potwierdzenie na fakturze rozliczenia sprzedaży Vindstød (0,0215 DKK/kWh jako znana prowizja).
+- [ ] Godzinowy profil PV z Forecast.Solar, jego jakość i horyzont; nie polegać tylko na łącznych prognozach na dziś/jutro.
+- [ ] Historia zużycia, importu/eksportu i SOC o wystarczającej rozdzielczości; dane wieloletnie mogą być zagregowane.
+- [ ] Kalibracja sprawności magazynowania (AC↔bateria), modelu degradacji z kosztem kompletu 19 000 DKK, kosztu alternatywnego i prognozy zużycia.
+- [ ] Zdefiniować częstotliwość aktualizacji, horyzont/slot planu, minimalny wynik ekonomiczny i metodę porównania z bazową pracą Deye.
 
-1. Oddzielnie modelować końcową cenę zakupu z opłatami i **wyliczoną** cenę sprzedaży netto; wszystkie koszty w DKK.
-2. Projektować harmonogram, źródło ładowania, dynamiczny docelowy SOC, wykorzystanie rozładowania na dom/eksport, moce oraz panel z aktualizacją na żywo **wyłącznie przez interfejs encji HA**.
-3. Wymagać deterministycznej walidacji planu, symulacji, mechanizmu zatwierdzenia eksportu z magazynu i bezpiecznego powrotu do pracy standardowej po awarii.
-4. Testować na historycznych danych HA, a przed uruchomieniem poleceń potwierdzić bieżące działanie encji sterujących i ich zakresy.
+## P2 — UX i dystrybucja
 
-To lista otwartych kwestii przed **implementacją własnego rozwiązania**, a nie polecenie wdrożenia lub ingerowania w urządzenia.
+- [ ] Wybrać sposób zatwierdzania pojedynczych propozycji sprzedaży, timeout i obsługę restartu; nie przywiązywać integracji do konkretnego telefonu.
+- [ ] Uzgodnić zestaw natywnych encji oraz widok dashboardu w HA, bez budowania drugiej aplikacji.
+- [ ] Po powstaniu działającego pakietu: instrukcja instalacji, HACS, aktualizacji i odzyskiwania po błędzie.
+
+## Decyzje już podjęte — nie otwierać ponownie
+
+Integracja custom_components w HA; wykorzystanie istniejących encji i bez zmian w ESPHome/Modbus; minimalizacja rachunku netto; automatyczne opłacalne ładowanie z sieci **po spełnieniu P0**; każda celowa sprzedaż z baterii wymaga zgody; brak stałego SOC na noc i brak obowiązkowego backupu.
