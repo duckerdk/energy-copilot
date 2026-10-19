@@ -85,6 +85,8 @@ Horyzont cen: do końca najpóźniejszego kompletnego **opublikowanego** slotu. 
 
 W każdym slocie planu: zakres UTC, ceny, prognozy, rozbicie PV na dom/baterię/sieć/ograniczenie oraz baterii na dom/eksport, import i eksport sieci, SOC przed/po, koszt, warunki zgody i status wykonalności. Plan nie jest pojedynczym poleceniem mocy; **executor** mapuje zamiary na akcje zgodnie ze zweryfikowanym kontraktem.
 
+Implementacja i weryfikacja kolejności działań: [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md). Zasady prezentowania statusów: [HA_DASHBOARD.md](HA_DASHBOARD.md).
+
 ## Mapa akcji HA — do potwierdzenia, nie do zgadywania
 
 | Intencja | Znany identyfikator lub brak | Co trzeba potwierdzić |
