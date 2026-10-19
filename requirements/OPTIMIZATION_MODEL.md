@@ -1,3 +1,108 @@
-# Model optymalizacji
+# Model optymalizacji Energy Co-Pilot — specyfikacja dla programisty
 
-Dokumentacja matematyczna własnej integracji Energy Co-Pilot. Szczegóły modelu w przygotowaniu.
+**Status:** model projektowy, nieuruchomiony i nieskalibrowany. Celem jest deterministyczna minimalizacja kosztów energii; implementacja kodu nastąpi osobno.  
+**Powiązania:** [wymagania](GOALS_AND_REQUIREMENTS.md), [architektura](ARCHITECTURE.md), [kontrakt encji](ENTITY_CONTRACT.md), [blokery](OPEN_ITEMS.md).
+
+## 1. Czas i zasada planowania
+
+- Optymalizacja krocząca (MPC) z podstawowym krokiem `Δt = 0,25 h`; moc jest średnią w slocie [kW], energia to `P × Δt` [kWh].
+- **Horyzont cenowy jest zmienny**, zakończony ostatnim slotem z faktycznie opublikowaną ceną zakupu i sprzedaży. Nie tworzyć fikcyjnej prognozy cen po ostatnim opublikowanym slocie.
+- Zwykle przed publikacją około 13:00 mamy ceny do końca **dzisiejszej** doby; po opublikowaniu cen następnej doby mamy również **jutro 00:00–23:59**, czyli bezpośrednio po 13:00 około 35 h. O obecności jutra decydują kompletne timestampy danych, nie sam zegar: publikacja może się opóźnić.
+- Replanowanie co 15 min, po publikacji nowej doby cenowej oraz przy istotnej zmianie wejść; każda decyzja jest powiązana z wersją planu i okresem ważności.
+- Rozkład cen uwzględnia rzeczywistą rozdzielczość źródła (godzinowa/15-minutowa); nie interpolować cen ani nie tworzyć brakujących slotów. Obsłużyć 23/25 godzin przy zmianie DST w Europe/Copenhagen.
+
+## 2. Podstawowy bilans przepływów
+
+Przy instalacji PV połączonej z baterią po **DC** planujemy przepływy w każdym slocie w kW, wszystkie nieujemne:
+
+| Symbol | Znaczenie i strona pomiaru |
+| --- | --- |
+| `S` | Potencjalnie dostępna moc PV po DC (prognoza, nie pomiar produkcji ograniczonej) |
+| `s_b, s_h, s_x, s_c` | PV DC → bateria, PV DC → przetwornik AC dla domu, PV DC → AC na eksport, PV celowo niewykorzystane |
+| `g_h, g_b` | Sieć AC → dom, sieć AC → ładowanie baterii |
+| `b_h, b_x` | Bateria → dom AC, bateria → eksport AC |
+| `L` | Przewidywane zużycie domu po AC |
+| `E` | Energia w magazynie [kWh], według zweryfikowanego modelu SOC |
+
+Dla każdego slotu zachować:
+
+```text
+S = s_b + s_h + s_x + s_c
+L = η_pv_ac * s_h + g_h + b_h
+Grid_import = g_h + g_b
+Grid_export = η_pv_ac * s_x + b_x
+E_next = E + Δt*(η_pv_bat*s_b + η_grid_bat*g_b
+                  - (b_h + b_x)/η_bat_ac)
+```
+
+`η_pv_ac`, `η_pv_bat`, `η_grid_bat`, `η_bat_ac` są osobnymi, zależnymi od toru konwersji współczynnikami (ewentualnie funkcjami mocy). Nie zakładać, że energia do baterii po DC przechodzi przez tor AC. **Nie podwajać energii po DC** w wielkościach PV, AC i baterii.
+
+Ten opis to **logiczny bilans**. Model obliczeniowy musi zostać dopasowany do rzeczywistych ograniczeń współpracy PV, przetwornika i magazynu: dostępności równoległych przepływów, limitów mocy oraz pomiarów potwierdzonych w HA. Nie przyjmować, że każda kombinacja matematyczna jest wykonalna przez falownik.
+
+## 3. Ograniczenia fizyczne i uprawnienia
+
+- `E_min ≤ E ≤ E_max` wynika z dopuszczalnego SOC (roboczo 20–100% z pierwszeństwem limitów fizycznych/BMS). `E` to energia w baterii, a nie energia dostarczona na AC.
+- `η_pv_bat*s_b + η_grid_bat*g_b ≤ P_charge_max` i `b_h+b_x ≤ P_discharge_max`; ostatecznie dostosować definicje limitu do strony, na której są podawane przez encje.
+- Uwzględnić dopuszczalny prąd, SOC, temperaturę, limit sieci oraz ograniczenia mocy zależne od trybu i BMS.
+- Nie dopuszczać jednoczesnego ładowania i rozładowania baterii ani równoczesnego importu i eksportu przez jeden punkt sieciowy, chyba że faktyczna topologia i model taryfy dowodzą, że to poprawne.
+- `b_x = 0` w **wykonywalnym** planie bez osobnej, ważnej zgody na określoną sprzedaż energii z baterii; potencjalny zysk ze sprzedaży można wyliczyć w osobnym scenariuszu ofertowym.
+- `s_x` i `s_c` nie są automatycznie dostępne jako dowolne polecenia; możliwość eksportu/ograniczania produkcji wymaga zweryfikowanego kontraktu sterowania przez encje HA.
+- Brak wiarygodnego sterowania jednym z przepływów oznacza ograniczenie zbioru wykonalnych działań, a nie zastąpienie go „podobną” encją.
+
+## 4. Cel ekonomiczny
+
+Dla opublikowanych przedziałów minimalizować:
+
+```text
+J = Σ_t Δt * (Grid_import[t] * C_buy[t]
+             - Grid_export[t] * C_sell[t])
+    + Cost_degradation
+    + Terminal_energy_value_or_risk_penalty
+```
+
+- `C_buy[t]`: **końcowa zmienna** cena zakupu z opłatami [DKK/kWh].
+- `C_sell[t] = Spot[t] - 0,0215` [DKK/kWh], według ustalonej prowizji Vindstød; kompletność warunków rozliczenia wymaga kontroli na rachunku.
+- `Cost_degradation`: marginalne zużycie magazynu zależne od przepływu energii przez baterię; uwzględnia też ładowanie z PV. Model kosztu cyklu/żywotności wymaga kalibracji, nie zakładać z góry kosztu jednej kWh.
+- Straty energii są już reprezentowane przez sprawności w bilansie. **Nie doliczać tych samych strat ponownie jako ryczałtowej opłaty.**
+- Ceny ujemne, dodatni eksport, rezygnacja z przychodu przez magazynowanie i możliwy curtailment wynikają z powyższego bilansu.
+- Rozdzielać koszt fakturowy (import − eksport) od wewnętrznego kosztu degradacji i miary ryzyka.
+
+## 5. Dynamiczny cel SOC i koniec horyzontu
+
+- Docelowy SOC jest **wynikiem** wybranej trajektorii `E[t]`, nie sztywną liczbą. Np. 65% przed nocą może wyjść jako optimum, ale algorytm nie otrzymuje polecenia „zawsze 65%”.
+- Nie wolno zerować ekonomicznej wartości magazynu na końcu dostępnych cen: spowodowałoby to pozorne korzyści z opróżnienia baterii przed północą.
+- Poza horyzontem **nie prognozujemy nieopublikowanych cen**. Należy osobno modelować fizyczne potrzeby energetyczne po jego zakończeniu (prognoza zużycia minus realistyczna dostępność PV, niepewność i dopuszczalny SOC), aby wyznaczyć dynamiczny warunek rezerwy/karę końcową. Jej ekonomiczna waga i sposób wyznaczania wymagają sprawdzenia na danych historycznych; nie tworzyć arbitralnej stałej rezerwy.
+- Replanowanie po faktycznej publikacji nowych cen aktualizuje całą trajektorię i cel SOC.
+
+## 6. Wyjście i zasady wykonania
+
+Dla każdego slotu udostępnić: początek/koniec, ceny, prognozę `S` i `L`, osiem przepływów, `Grid_import` i `Grid_export`, SOC przed/po, koszt, oszacowanie ryzyka oraz przesłanki decyzji. Bieżące wyjścia: zamierzony tryb (PV/sieć/mieszany, dom/eksport), moc, docelowy SOC, prognozy, stan dostępności danych i identyfikator planu.
+
+**Harmonogram jest intencją, nie poleceniem.** Oddzielny executor przekłada wykonalne decyzje na zweryfikowane encje HA; bez zgody nie zezwala na celowy eksport z magazynu. Gdy aktualny stan i pomiar odbiegają od planu, trzeba przeliczyć plan lub przejść do bezpiecznej strategii określonej w [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## 7. Prognoza PV i dane ocenzurowane przez sterowanie
+
+W historii odróżniać potencjalną moc PV od rzeczywiście pozyskanej i celowo ograniczonej; pełna bateria i eksport OFF mogą sprawić, że pomiar nie odzwierciedli pogody. **Nie obniżać automatycznie prognozy po porównaniu 60 kWh prognozy z 35 kWh produkcji przy ograniczeniu eksportu.** Do kalibracji używać wersji prognozy zapisanej przed danym okresem i przedziałów bez ograniczenia; podejrzane wyłączyć z bezpośredniej oceny. Szczegółowa reguła i test akceptacyjny: [ARCHITECTURE.md](ARCHITECTURE.md#wiarygodność-prognoz-pv-przy-ograniczeniu-produkcji).
+
+## 8. Minimalne testy akceptacyjne modelu
+
+1. Tożsamość bilansów PV, domu, sieci i baterii dla każdego slotu; brak energii „znikąd” oraz poprawne kW × h → kWh.
+2. Prognoza wysokiej produkcji jutro i małego zużycia nocą może skutkować celem SOC **niższym niż 100%**, bez sztywnego ustawienia 65%.
+3. Ładowanie z sieci tylko gdy poprawia oczekiwany wynik po kosztach, sprawności i degradacji.
+4. Płatny eksport PV może być korzystniejszy niż bieżące magazynowanie, jeśli później pojawi się tańsza możliwość ładowania.
+5. Brak zgody na eksport z baterii: `b_x=0` w planie wykonywalnym, niezależnie od prognozy zysku z eksportu.
+6. Publikacja kolejnej doby około 13:00 poszerza plan do końca następnej doby; brak publikacji nie tworzy cen „na 48h”.
+7. Ostatni slot znanych cen nie może sztucznie wymuszać wyzerowania magazynu; brakującą przyszłą cenę oznaczyć jako nieznaną.
+8. Ujemne ceny, niekompletne sloty cenowe, niedokładność PV, DST, ograniczenie eksportu, zmiana planu i niekompletne sygnały.
+9. Przypadek PV 60 kWh / pomiar 35 kWh z ograniczeniem: brak fałszywego błędu prognozy −25 kWh.
+
+## 9. Parametry wymagające danych i kalibracji
+
+- Dokładne mapowanie przepływów i punktów pomiaru HA po DC i AC.
+- Zakresy i faktyczne skutki encji sterujących, łącznie z eksportem i trybami magazynu.
+- Rzeczywiste sprawności przy różnej mocy, limity mocy/prądów i rzeczywisty zakres SOC.
+- Funkcja kosztu degradacji na podstawie kosztu 19 000 DKK i trwałości baterii.
+- Statystyczny model błędów PV/zużycia i końcowy warunek energetyczny przy nieopublikowanych cenach.
+- Weryfikacja wyniku kosztowego na danych historycznych, bez zakładania nieistniejących cen.
+
+Nie wybierać implementacji solvera ani nie wysyłać poleceń sprzętowych, dopóki nie zostaną określone realne ograniczenia i przeprowadzone testy.
