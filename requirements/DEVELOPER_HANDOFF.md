@@ -33,7 +33,9 @@ Lokalną, własną integrację Home Assistant (`custom_components/energy_copilot
 | 11 | [BACKTEST_VALIDATION.md](BACKTEST_VALIDATION.md) | Testy na historii bez przyszłych danych i uczciwy benchmark finansowy |
 | 12 | [CALIBRATION_POLICY.md](CALIBRATION_POLICY.md) | Zasady weryfikacji sprawności, degradacji i prognoz — wartości startowe nie są pomiarami |
 | 13 | [HA_READONLY_CAPTURE.md](HA_READONLY_CAPTURE.md) | Jednorazowa lista aktualnych encji i jednostek HA; bez sterowania |
-| 14 | [OPEN_ITEMS.md](OPEN_ITEMS.md) | Aktualne P0/P1/P2 — nie udawać, że wszystkie są już rozwiązane |
+| 14 | [HA_ENTITY_SNAPSHOT_2026-10-19.md](HA_ENTITY_SNAPSHOT_2026-10-19.md) | Wynik tego odczytu: potwierdzone ID, bilans, niezweryfikowane sterowania i konflikty |
+| 15 | [HA_TIMESERIES_CAPTURE.md](HA_TIMESERIES_CAPTURE.md) | Wąski odczyt przyszłych cen i profilu PV z atrybutów źródeł |
+| 16 | [OPEN_ITEMS.md](OPEN_ITEMS.md) | Aktualne P0/P1/P2 — nie udawać, że wszystkie są już rozwiązane |
 
 Jeżeli dokumenty zawierają sprzeczność, nie rozwiązywać jej przez arbitralne założenie: zgłosić konkretny fragment, zaproponować rozwiązanie i zaktualizować po potwierdzeniu.
 
