@@ -57,6 +57,8 @@ Test każdej **akcji zapisu** wymaga dodatkowo odrębnej, świadomie nadzorowane
 **Nie wykonywać takich testów zapisu przez Codexa ani automatycznie.** Brak jednej kluczowej funkcji blokuje odpowiednią automatyzację; nie zastępować jej inną, podobnie nazwaną encją.
 
 
+Aktualne stany, jednostki i źródła należy odczytać według [HA_READONLY_CAPTURE.md](HA_READONLY_CAPTURE.md); listy historycznych nazw nie zastępują odczytu.
+
 ## Kontrakt logiczny wejść
 
 **Zasada:** nazwy ról poniżej są wewnętrznymi kluczami optymalizatora, **nie** nazwami istniejących encji. Każdą rolę użytkownik mapuje przez UI na istniejące źródło HA; przed wykorzystaniem normalizator sprawdza jednostkę, znaczenie, aktualność i źródło. Nie zgadywać identyfikatorów.
