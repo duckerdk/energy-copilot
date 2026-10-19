@@ -96,6 +96,8 @@ W historii odróżniać potencjalną moc PV od rzeczywiście pozyskanej i celowo
 8. Ujemne ceny, niekompletne sloty cenowe, niedokładność PV, DST, ograniczenie eksportu, zmiana planu i niekompletne sygnały.
 9. Przypadek PV 60 kWh / pomiar 35 kWh z ograniczeniem: brak fałszywego błędu prognozy −25 kWh.
 
+Pełne dane liczbowe, warunki testów i oczekiwane wyniki opisano w [TEST_SCENARIOS.md](TEST_SCENARIOS.md). Scenariusze z idealizowanymi sprawnościami służą testowaniu bilansów i wyborów, a nie kalibracji realnej instalacji.
+
 ## 9. Parametry wymagające danych i kalibracji
 
 - Dokładne mapowanie przepływów i punktów pomiaru HA po DC i AC.
