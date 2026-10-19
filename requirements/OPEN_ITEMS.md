@@ -6,7 +6,7 @@ Dokument zawiera **wyłącznie niepotwierdzone elementy**, nie powtarza ustalony
 
 **Ustalone projektowo, bez oczekiwania na dalsze decyzje użytkownika:** kontrakt wejść/wyjść, sposób fizycznej walidacji komend, priorytety fail-safe i tryb monitor/dry-run opisują [ENTITY_CONTRACT.md](ENTITY_CONTRACT.md) i [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md). Punkty poniżej dotyczą **dowodów z aktualnego HA i realnego sprzętu**, nie wyboru algorytmu.
 
-- [ ] **Odczyt kontraktu HA:** aktualne encje, jednostki, znaki, aktualność, dokładne atrybuty cen i prognoz, mapowanie import/eksport/bateria; opis w ENTITY_CONTRACT.md.
+- [ ] **Odczyt kontraktu HA:** zweryfikować aktualność, jednostki, atrybuty prognoz i przypisanie fizycznych torów. Znamy 11 nazw z prototypu oraz 8 dodatkowych z logu HA (historyczne, bez potwierdzenia obecnej dostępności). Jednorazowy odczyt: [HA_READONLY_CAPTURE.md](HA_READONLY_CAPTURE.md). Rejestr: [ENTITY_CONTRACT.md](ENTITY_CONTRACT.md).
 - [ ] **Mapa zapisów Deye:** udowodnić fizyczny skutek każdej akcji ładowania z sieci/PV, eksportu, docelowego SOC, wymuszenia rozładowania i harmonogramu. Rozwiązać konflikt znaczenia number.sun12k_maximum_battery_grid_charge_current.
 - [ ] **Separacja źródeł eksportu:** udowodnić, że automatyczny eksport PV nie może niezamierzenie wywołać eksportu z baterii.
 - [ ] **Fail-safe bez dostępnego HA:** przetestować zachowanie aktywnych nastaw po przerwaniu integracji, Wi-Fi i całego HA; zapewnić niezależny, skuteczny powrót do uzgodnionego trybu fabrycznego lub nie zezwalać na automatykę.
