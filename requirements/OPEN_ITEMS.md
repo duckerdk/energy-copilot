@@ -4,6 +4,8 @@ Dokument zawiera **wyłącznie niepotwierdzone elementy**, nie powtarza ustalony
 
 ## P0 — obowiązkowe przed rzeczywistymi poleceniami
 
+**Ustalone projektowo, bez oczekiwania na dalsze decyzje użytkownika:** kontrakt wejść/wyjść, sposób fizycznej walidacji komend, priorytety fail-safe i tryb monitor/dry-run opisują [ENTITY_CONTRACT.md](ENTITY_CONTRACT.md) i [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md). Punkty poniżej dotyczą **dowodów z aktualnego HA i realnego sprzętu**, nie wyboru algorytmu.
+
 - [ ] **Odczyt kontraktu HA:** aktualne encje, jednostki, znaki, aktualność, dokładne atrybuty cen i prognoz, mapowanie import/eksport/bateria; opis w ENTITY_CONTRACT.md.
 - [ ] **Mapa zapisów Deye:** udowodnić fizyczny skutek każdej akcji ładowania z sieci/PV, eksportu, docelowego SOC, wymuszenia rozładowania i harmonogramu. Rozwiązać konflikt znaczenia number.sun12k_maximum_battery_grid_charge_current.
 - [ ] **Separacja źródeł eksportu:** udowodnić, że automatyczny eksport PV nie może niezamierzenie wywołać eksportu z baterii.
@@ -16,7 +18,7 @@ Dokument zawiera **wyłącznie niepotwierdzone elementy**, nie powtarza ustalony
 - [ ] Weryfikacja godzinowej / 15-minutowej serii **cen zakupu z opłatami** i **spot**, dat, DST oraz kompletności taryf; w tym potwierdzenie na fakturze rozliczenia sprzedaży Vindstød (0,0215 DKK/kWh jako znana prowizja).
 - [ ] Godzinowy profil PV z Forecast.Solar, jego jakość i horyzont; nie polegać tylko na łącznych prognozach na dziś/jutro. **Weryfikacja prognozy musi odróżniać rzeczywistą produkcję od potencjalnej produkcji w okresach curtailment**: potrzebne są sygnały ograniczania/MPPT lub wiarygodne przesłanki oznaczające przedziały jako nieodpowiednie do kalibracji. Brak pomiaru potencjału nie pozwala obliczać „utraconych kWh” jako różnicy od prognozy.
 - [ ] Historia zużycia, importu/eksportu i SOC o wystarczającej rozdzielczości; dane wieloletnie mogą być zagregowane.
-- [ ] Kalibracja sprawności magazynowania (AC↔bateria), modelu degradacji z kosztem kompletu 19 000 DKK, kosztu alternatywnego i prognozy zużycia. Zapewnić migawki prognoz do testów `walk-forward` i ocenę reprezentatywności danych bez curtailment.
+- [ ] **Zebrać dane do kalibracji** sprawności torów AC/DC, rzeczywistego kosztu marginalnego degradacji i prognozy zużycia. **Metoda i założenia rozstrzygnięte** w [CALIBRATION_POLICY.md](CALIBRATION_POLICY.md): diagnostyczne sprawności 0,9487/0,9487 są założeniem, nie dowodem; EFC/model ekonomiczny jawnie zależą od danych o trwałości, nie od stałej z sufitu. Zapewnić migawki prognoz do testów `walk-forward` i ocenę reprezentatywności bez curtailment.
 - [ ] Sprawdzić praktyczną częstotliwość replanowania i jakość slotów 15-minutowych, **skalibrować wartość kontynuacyjną energii końcowej** i symulowany baseline Deye metodą `walk-forward` ([FORECAST_POLICY.md](FORECAST_POLICY.md), [BACKTEST_VALIDATION.md](BACKTEST_VALIDATION.md)). **Uzgodniony horyzont: do końca faktycznie opublikowanych cen**, bez arbitralnych 48 godzin; około 13:00 dochodzą ceny kolejnej doby, jeśli źródło je faktycznie udostępni.
 
 Dokument matematyczny: [OPTIMIZATION_MODEL.md](OPTIMIZATION_MODEL.md). Scenariusze akceptacyjne: [TEST_SCENARIOS.md](TEST_SCENARIOS.md). Kontrakt wykonawcy: [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md). Przekazanie programiście: [DEVELOPER_HANDOFF.md](DEVELOPER_HANDOFF.md).
