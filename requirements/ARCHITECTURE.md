@@ -28,6 +28,16 @@ Przed jakimkolwiek zapisem wymagane: zgodne i świeże wejścia, potwierdzone se
 
 Eksport z PV i z baterii musi być rozróżniany na poziomie sprzętowym. Jeżeli przełącznik eksportu działa globalnie i nie można zapobiec celowemu eksportowi z baterii bez zgody, funkcja automatycznego eksportu również pozostaje zablokowana, dopóki nie ma skutecznej separacji.
 
+## Wiarygodność prognoz PV przy ograniczeniu produkcji
+
+Wprowadzamy rozróżnienie: `PV_available` (potencjalna produkcja przy rzeczywistej pogodzie), `PV_actual` (faktycznie uzyskana energia, w tym przepływ DC do baterii, gdy pomiar go uwzględnia) oraz `PV_curtailed` (niewyprodukowana energia wskutek limitów). Podczas ograniczenia `PV_available` nie jest bezpośrednio mierzalne. Różnica `prognoza - pomiar` **nie jest** miarą `PV_curtailed`.
+
+Każdy interwał otrzymuje status `uncurtailed`, `curtailed_confirmed` albo `curtailment_unknown`. Pełna bateria i wyłączony eksport są przesłanką podejrzenia, nie dowodem wartości ograniczenia. Migawkę prognozy archiwizować wraz z czasem publikacji i okresem ważności **przed** pojawieniem się rzeczywistego wyniku. Jakość prognozy potencjalnej produkcji oceniać wyłącznie w kompletnych, zweryfikowanych przedziałach `uncurtailed`; przedziały podejrzane i ograniczone nie mogą automatycznie pogarszać statystyk. Jeśli dane nie obejmują reprezentatywnie słonecznych dni, zgłosić niską pewność kalibracji — nie wyliczać fałszywych percentyli.
+
+Przykład akceptacyjny: prognoza 60 kWh, pomiar 35 kWh, w ciągu dnia pełna bateria i zablokowany eksport. Wynik **nie może** brzmieć „prognoza pomyliła się o 25 kWh”, dopóki nie potwierdzono, ile produkcji ograniczono. Bez niezależnych pomiarów/skalibrowanego modelu niewyprodukowanej energii nie wolno jej odtwarzać z prognozy.
+
+Model optymalizacji powinien planować na podstawie potencjalnie dostępnej energii PV i jawnie dopuszczać jej ograniczenie; nie uczyć się z historii jako „niskiej produkcji” wtedy, kiedy produkcja była tłumiona. Wymaga to sprawdzenia bilansu AC/DC i sygnałów limitów/MPPT przez kontrakt encji.
+
 ## Minimalny plan testów
 
 - **Matematyka:** kW × h → kWh, znaki przepływów, sprawność, marginalny koszt cyklu, ceny ujemne, brakujące/zdublowane sloty, 23/25 godzin przy DST.
