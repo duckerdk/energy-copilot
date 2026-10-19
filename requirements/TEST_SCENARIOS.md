@@ -38,7 +38,7 @@ Podstawa: [OPTIMIZATION_MODEL.md](OPTIMIZATION_MODEL.md), [GOALS_AND_REQUIREMENT
 
 ### PHY-05 — Względna sprawność torów, bez podwójnego liczenia strat
 
-**Dane:** bateria start `E_min`; import 1 kWh AC do baterii przy `η_grid_bat = 0,90`, następnie rozładowanie tej samej energii przy `η_bat_ac = 0,90`; inne przepływy = 0.  
+**Dane:** bateria start `E_min`; w pierwszej godzinie import 1 kWh AC do baterii przy `η_grid_bat = 0,90`; w drugiej godzinie dom zużywa 0,81 kWh, pokryte w całości z baterii przy `η_bat_ac = 0,90`; brak PV, eksportu i pozostałych przepływów.  
 **Oczekiwane:** przyrost energii w baterii `0,900 kWh`, później oddana energia AC `0,810 kWh`, strata całkowita `0,190 kWh` względem importu; SOC na końcu = SOC na początku. Koszt strat istnieje poprzez przepływy i ceny, nie jako drugi, niezależny narzut do rachunku.
 
 ### PHY-06 — Brak fizycznej pętli import/eksport
