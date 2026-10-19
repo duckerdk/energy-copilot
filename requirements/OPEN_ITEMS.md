@@ -19,12 +19,12 @@ Dokument zawiera **wyłącznie niepotwierdzone elementy**, nie powtarza ustalony
 - [ ] Kalibracja sprawności magazynowania (AC↔bateria), modelu degradacji z kosztem kompletu 19 000 DKK, kosztu alternatywnego i prognozy zużycia.
 - [ ] Sprawdzić praktyczną częstotliwość replanowania i jakość slotów 15-minutowych, model końcowej wartości magazynu przy nieopublikowanych cenach oraz metodę porównania z bazową pracą Deye. **Uzgodniony horyzont: do końca faktycznie opublikowanych cen**, bez arbitralnych 48 godzin; około 13:00 dochodzą ceny kolejnej doby, jeśli źródło je faktycznie udostępni.
 
-Dokument matematyczny: [OPTIMIZATION_MODEL.md](OPTIMIZATION_MODEL.md). Scenariusze akceptacyjne: [TEST_SCENARIOS.md](TEST_SCENARIOS.md).
+Dokument matematyczny: [OPTIMIZATION_MODEL.md](OPTIMIZATION_MODEL.md). Scenariusze akceptacyjne: [TEST_SCENARIOS.md](TEST_SCENARIOS.md). Kontrakt wykonawcy: [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md). Przekazanie programiście: [DEVELOPER_HANDOFF.md](DEVELOPER_HANDOFF.md).
 
 ## P2 — UX i dystrybucja
 
-- [ ] Wybrać sposób zatwierdzania pojedynczych propozycji sprzedaży, timeout i obsługę restartu; nie przywiązywać integracji do konkretnego telefonu.
-- [ ] Uzgodnić zestaw natywnych encji oraz widok dashboardu w HA, bez budowania drugiej aplikacji.
+- [ ] Zweryfikować implementację zatwierdzania pojedynczych propozycji w natywnym HA; **projektowo ustalone**: przyciski w panelu, identyfikator planu/propozycji, jawny `expires_at`, brak przenoszenia zgody po zmianie planu i brak jej wznowienia po restarcie. Dokładny czas ważności, interakcje z wyłączonym HA oraz kanał powiadomień wymagają testów.
+- [ ] Wdrożeniowo zatwierdzić listę konkretnych encji i wygląd dashboardu; **specyfikacja funkcjonalna jest gotowa** w [HA_DASHBOARD.md](HA_DASHBOARD.md) i opiera się na natywnym HA, bez drugiej aplikacji.
 - [ ] Po powstaniu działającego pakietu: instrukcja instalacji, HACS, aktualizacji i odzyskiwania po błędzie.
 
 ## Decyzje już podjęte — nie otwierać ponownie
