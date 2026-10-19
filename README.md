@@ -9,6 +9,7 @@
 - [Kontrakt encji HA](requirements/ENTITY_CONTRACT.md) — historyczne identyfikatory, braki i warunki walidacji.
 - [Architektura i bezpieczeństwo](requirements/ARCHITECTURE.md) — **jak** budować i testować rozwiązanie.
 - [Model optymalizacji](requirements/OPTIMIZATION_MODEL.md) — bilans PV/sieć/dom/bateria, koszty, dynamiczny SOC, zmienny horyzont znanych cen, walidacja prognozy przy curtailment.
+- [Scenariusze testowe](requirements/TEST_SCENARIOS.md) — 29 przypadków z danymi wejściowymi i wynikami akceptacji, w tym dynamiczny SOC, opłacalność, curtailment, ceny o 13:00 i zgoda na eksport baterii.
 - [Blokery wdrożenia](requirements/OPEN_ITEMS.md) — co wymaga sprawdzenia przed rzeczywistym sterowaniem.
 - [AGENTS.md](AGENTS.md) — wiążące instrukcje robocze dla Codexa.
 
