@@ -31,8 +31,8 @@ Lokalną, własną integrację Home Assistant (`custom_components/energy_copilot
 | 9 | [FORECAST_POLICY.md](FORECAST_POLICY.md) | Niepewność prognoz, nieantycypacyjność i wartość SOC na końcu opublikowanych cen |
 | 10 | [DECISION_LOGGING.md](DECISION_LOGGING.md) | Log każdej decyzji i powód wyboru widoczne od pierwszego uruchomienia |
 | 11 | [BACKTEST_VALIDATION.md](BACKTEST_VALIDATION.md) | Testy na historii bez przyszłych danych i uczciwy benchmark finansowy |
-| 11a | [CALIBRATION_POLICY.md](CALIBRATION_POLICY.md) | Zasady weryfikacji sprawności, degradacji i prognoz — wartości startowe nie są pomiarami |
-| 12 | [OPEN_ITEMS.md](OPEN_ITEMS.md) | Aktualne P0/P1/P2 — nie udawać, że wszystkie są już rozwiązane |
+| 12 | [CALIBRATION_POLICY.md](CALIBRATION_POLICY.md) | Zasady weryfikacji sprawności, degradacji i prognoz — wartości startowe nie są pomiarami |
+| 13 | [OPEN_ITEMS.md](OPEN_ITEMS.md) | Aktualne P0/P1/P2 — nie udawać, że wszystkie są już rozwiązane |
 
 Jeżeli dokumenty zawierają sprzeczność, nie rozwiązywać jej przez arbitralne założenie: zgłosić konkretny fragment, zaproponować rozwiązanie i zaktualizować po potwierdzeniu.
 
@@ -85,7 +85,7 @@ Nie rozpoczynać kodowania na podstawie samej decyzji o kompletności dokumentac
 
 **Audyt dokumentów (2026-10-19):**
 - Sprawdzenie odwołań względnych między plikami Markdown: **brak zerwanych odwołań do plików**.
-- Testy opisane w dokumentacji: **37** scenariuszy PHY/ECO/SOC/TIME/PVQ/SAFE/MAP + **12** EXE + **11** UI + **10** LOG + **10** UNC + **12** BKT = **92** przypadki specyfikacyjne.
+- Testy opisane w dokumentacji: **37** scenariuszy PHY/ECO/SOC/TIME/PVQ/SAFE/MAP + **12** EXE + **11** UI + **10** LOG + **10** UNC + **12** BKT + **7** CAL = **99** przypadków specyfikacyjnych.
 - Nowe testy **ECO-08 i ECO-09** weryfikują rachunek marginalny i porównanie opłacalności bez dobierania celu 65% z góry; ECO-08 przewiduje wynik **+0,4152 DKK** przy jawnie określonych stratach i degradacji. To wzorzec analityczny, nie wynik pracy kodu.
 - Nadal **nieweryfikowane** są: szczegóły torów fizycznych i encji, dokładna cena zakupu z opłatami, realne krzywe sprawności, koszt degradacji, historyczne migawki prognoz, funkcja terminalnej wartości energii i niezależny fail-safe. Zapisanie wzorów **nie zamyka** tych kwestii.
 - Testy zapisano jako przypadki do zaimplementowania; dopóki nie powstanie kod, nie należy ich nazywać „wykonanymi”.
