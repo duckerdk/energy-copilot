@@ -1,6 +1,6 @@
 # Kontrakt encji Home Assistant
 
-**Status: WYŁĄCZNIE HISTORYCZNE ID, niezweryfikowane w bieżącym HA.** Zapis pochodzi z prototypu v5.1 (2025) i późniejszych korekt. Żadne z poniższych ID nie jest dowodem rzeczywistego znaczenia ani zdatności do zapisu. W integracji wybór encji przez UI i walidację, bez sztywnego uzależnienia od tych nazw.
+**Status: część identyfikatorów i stanów potwierdzona odczytem HA z 19.10.2026, pozostałe historyczne.** Szczegółowy aktualny odczyt, bilans i lista sterowań: [HA_ENTITY_SNAPSHOT_2026-10-19.md](HA_ENTITY_SNAPSHOT_2026-10-19.md). Sam fakt istnienia encji i jej wartość nie są dowodem semantyki fizycznej ani bezpiecznego skutku zapisu. W integracji wybór źródeł przez UI i walidacja jednostek oraz punktu pomiaru.
 
 ## Znane historycznie identyfikatory
 
@@ -38,9 +38,35 @@ W logu Home Assistant z **03.08.2026** (nie z bieżącego odczytu stanów) wyst�
 
 **Ograniczenie:** log potwierdza użycie tych nazw w sierpniu 2026, lecz **nie** dostarcza aktualnej listy encji, sposobu ich działania, serii cen ani zdolności zapisu. Wymagany jest bieżący odczyt `state` + istotnych `attributes` w HA.
 
+## Zweryfikowane istniejące role z pliku wynik.txt (odczyt 19.10.2026)
+
+Wymagane normalizacje i stan faktyczny:
+
+| Rola | Encja | Odczyt i znaczenie |
+| --- | --- | --- |
+| PV | `sensor.pv_sum` | 3034 W; suma `sun12k_pv1_power` 2387 W + `sun12k_pv2_power` 647 W |
+| Pobór domu | `sensor.home_energy_consumption` | 583 W; `sun12k_load_totalpower` = 532 W to **odrębne** wskazanie |
+| Moc sieci netto | `sensor.sun12k_total_grid_power` | −2470 W, spójne z eksportem w tym stanie; do sprawdzenia znak w okresach importu |
+| Moc baterii | `sensor.sun12k_battery_output_power` | +19 W, w tym stanie spójne z dodatnią mocą oddawaną do bilansu, ale brak testu obu kierunków |
+| SOC | `sensor.sun12k_battery_capacity` | 97% |
+| Prąd i napięcie baterii | `sensor.sun12k_battery_output_current`, `sensor.sun12k_battery_voltage` | 0,35 A / 56,69 V; sprawdzić znak i punkt pomiaru |
+| Cena spot | `sensor.energi_data_spotpris` | 1,75508376559425 DKK/kWh |
+| Cena zakupu — kandydat | `sensor.energi_data_service` | 2,23828751559425 DKK/kWh; kompletność opłat i profil przyszły **niepotwierdzone** |
+| Produkcja PV dziś | `sensor.sun12k_daily_production` | 23,5 kWh; sprawdzić reset i DC/AC |
+| Ładowanie/rozładowanie dziś | `sensor.sun12k_today_charge_of_the_battery`, `sensor.sun12k_today_discharge_of_the_battery` | 8,6 kWh / 1,2 kWh; strona pomiaru nieznana |
+| Prognoza PV | `sensor.energy_production_today`, `sensor.energy_production_tomorrow`, `sensor.energy_production_today_remaining` | 15,865 / 7,536 / 4,431 kWh; nie zastępują godzinowych slotów |
+
+Kontrola jednej migawki: **3034 W PV + 19 W bateria = 583 W dom + 2470 W eksport = 3053 W**; to weryfikacja spójności arytmetycznej, nie walidacja całego modelu AC/DC. Stan `last_updated` nie musi być timestampem ostatniej raportowanej próbki; do oceny świeżości potrzebna jest semantyka aktualizacji źródła lub `last_reported`.
+
+**Bieżące encje Deye potwierdzone jako istniejące, ale NIE jako bezpieczne funkcje zapisu:** `switch.sun12k_solar_sell`, `switch.sun12k_grid_charge`, `switch.sun12k_time_of_use`, sześć `switch.sun12k_time_point_N_charge_enable`; `number.sun12k_maximum_battery_charge_current`, `number.sun12k_maximum_battery_discharge_current`, `number.sun12k_maximum_battery_grid_charge_current`; po sześć `number.sun12k_time_point_N_start`, `_power`, `_capacity`. Udokumentowane przez HA min/max prądów ±16 777 220 A **są niewiarygodne jako granice sprzętowe**.
+
+**Możliwy konflikt sterowania:** `switch.battery_controller_optimization_enabled = on`, `select.battery_controller_control_mode = hybrid`; przed przejęciem kontroli przez wykonawcę Energy Co-Pilot ustalić pojedynczego właściciela zapisu. W `dry_run` niczego nie wyłączać.
+
+Więcej szczegółów i zastrzeżeń: [HA_ENTITY_SNAPSHOT_2026-10-19.md](HA_ENTITY_SNAPSHOT_2026-10-19.md).
+
 ## Nieznane, lecz wymagane do planowania i wykonania
 
-- ID mocy importu i eksportu, mocy/prądu ładowania i rozładowania, ich **znaków i jednostek** oraz liczników energii [kWh] do weryfikacji kosztów.
+- **Częściowo ustalone ID mocy i liczników:** znamy `sun12k_total_grid_power`, `sun12k_battery_output_power`, liczniki energii dziennej i całkowitej. Nadal trzeba potwierdzić **konwencję znaków w obu kierunkach**, stronę AC/DC, świeżość pomiaru, przejścia import/eksport i ładowanie/rozładowanie; nie przyjmować, że jeden bilans w stanie eksportowym jest kompletną kalibracją.
 - Godzinowa / kwartalna seria cen zakupu i sprzedaży z kompletnymi timestampami; profil PV w slotach; prognoza zużycia.
 - **Produkcja PV i curtailment:** potwierdzić, czy encja mocy/energii PV obejmuje również ładowanie po DC; jeśli dostępne, wskazać sygnał aktywnego ograniczenia produkcji (limit eksportu, MPPT, status curtailment) i zweryfikować jego znaczenie. Pełna bateria + wyłączony eksport to jedynie przesłanki; nie dają pomiaru niewyprodukowanych kWh. Migawki prognoz muszą mieć czas pobrania i daty/sloty ważności, aby porównanie z późniejszą produkcją nie wykorzystywało zaktualizowanej prognozy.
 - ID i znaczenie sterowań **docelowym SOC, limitem mocy ładowania, wymuszonym rozładowaniem, kierunkiem eksportu z baterii, harmonogramem Deye i przywróceniem trybu fabrycznego**. Nie wiadomo, czy HA udostępnia wszystkie te funkcje.
