@@ -14,6 +14,7 @@
 - [Panel Home Assistant](requirements/HA_DASHBOARD.md) — widok pomiarów, planu, kosztów, SOC, zgód i diagnostyki; 10 testów UI.
 - [Rejestr decyzji](requirements/DECISION_LOGGING.md) — wymagane od pierwszego rozruchu ceny, prognozy, koszty, porównanie alternatyw i historia w HA.
 - [Niepewność i wartość końcowa SOC](requirements/FORECAST_POLICY.md) — scenariusze prognoz, statystyka błędów i brak fikcyjnych przyszłych cen.
+- [Kalibracja i degradacja](requirements/CALIBRATION_POLICY.md) — jawne założenia sprawności, metoda pomiarów i marginalny koszt cyklu; brak udawania pomiarów.
 - [Walidacja historyczna](requirements/BACKTEST_VALIDATION.md) — test walk-forward bez wiedzy o przyszłości oraz uczciwa metoda liczenia korzyści.
 - [Przekazanie programiście](requirements/DEVELOPER_HANDOFF.md) — kolejność dokumentów, etapy M1–M6 i warunki odbioru.
 - [Blokery wdrożenia](requirements/OPEN_ITEMS.md) — co wymaga sprawdzenia przed rzeczywistym sterowaniem.
