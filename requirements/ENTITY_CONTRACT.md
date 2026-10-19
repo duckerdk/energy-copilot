@@ -20,6 +20,24 @@
 
 **Konflikt krytyczny:** oryginalna logika opisuje number.sun12k_maximum_battery_grid_charge_current jako limit ładowania **z sieci**, a późniejsza korekta użytkownika opisywała ograniczenie ładowania **z PV** (historyczne wartości 1 A / 40 A). Nazwa encji nie rozstrzyga semantyki. Żadnej z tych wartości nie wolno przyjąć jako bezpiecznej ani jako sposobu wyłączenia ładowania. Wymagane sprawdzenie rzeczywistej funkcji, zakresu min/max/step, priorytetów oraz skutku przy obu kierunkach przepływu energii.
 
+
+## Dodatkowe identyfikatory z archiwalnego logu HA
+
+W logu Home Assistant z **03.08.2026** (nie z bieżącego odczytu stanów) występują również poniższe entity_id. Traktować je jako **istniejące historycznie kandydaty do mapowania**, a nie potwierdzenie obecnej dostępności, aktualności, jednostki lub semantyki. Nie są to polecenia zapisu.
+
+| Entity ID z logu | Sugerowana rola do weryfikacji |
+| --- | --- |
+| `sensor.sun12k_daily_energy_bought` | Dzienna zakupiona energia kWh; sprawdzić reset i punkt pomiaru |
+| `sensor.sun12k_daily_energy_sold` | Dzienna sprzedana energia kWh; sprawdzić reset i punkt pomiaru |
+| `sensor.sun12k_daily_energy_bought_cost` | Historyczny koszt zakupu dziennego; sprawdzić walutę, opłaty i sposób naliczania |
+| `sensor.sun12k_daily_energy_sold_compensation` | Historyczny przychód z eksportu; sprawdzić prowizję i taryfę |
+| `sensor.sun12k_daily_production` | Dzienna produkcja PV; czy uwzględnia DC→bateria i curtailment |
+| `sensor.sun12k_total_pv_production` | Narastająca produkcja PV; w logu **ostrzeżenie o niezgodności `state_class=measurement` z `device_class=energy`** |
+| `sensor.sun12k_today_charge_of_the_battery` | Dzienna energia ładowania magazynu; sprawdzić jednostkę, straty i źródła PV/sieć |
+| `sensor.sun12k_today_discharge_of_the_battery` | Dzienna energia rozładowania magazynu; sprawdzić stronę DC/AC |
+
+**Ograniczenie:** log potwierdza użycie tych nazw w sierpniu 2026, lecz **nie** dostarcza aktualnej listy encji, sposobu ich działania, serii cen ani zdolności zapisu. Wymagany jest bieżący odczyt `state` + istotnych `attributes` w HA.
+
 ## Nieznane, lecz wymagane do planowania i wykonania
 
 - ID mocy importu i eksportu, mocy/prądu ładowania i rozładowania, ich **znaków i jednostek** oraz liczników energii [kWh] do weryfikacji kosztów.
