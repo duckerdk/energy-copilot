@@ -111,3 +111,27 @@ Pełne dane liczbowe, warunki testów i oczekiwane wyniki opisano w [TEST_SCENAR
 - Weryfikacja wyniku kosztowego na danych historycznych, bez zakładania nieistniejących cen — metodyka [BACKTEST_VALIDATION.md](BACKTEST_VALIDATION.md). Każda decyzja musi mieć odtwarzalne uzasadnienie w [DECISION_LOGGING.md](DECISION_LOGGING.md).
 
 Nie wybierać implementacji solvera ani nie wysyłać poleceń sprzętowych, dopóki nie zostaną określone realne ograniczenia i przeprowadzone testy.
+
+
+## 10. Kontrakt matematyczny rozwiązania i diagnostyki
+
+Model implementacyjny jest optymalizacją **wielookresową z bilansem i ograniczeniami**, a nie heurystyką progów cen/SOC. Rozwiązanie deterministyczne w wersji bazowej; scenariuszowe przy dostępnej, wiarygodnej kalibracji niepewności.
+
+**Warunki konieczne dla każdego slotu:**
+
+- Bilans `S = s_b + s_h + s_x + s_c` i `L = η_pv_ac · s_h + g_h + b_h`, z nieujemnymi strumieniami i jawnie wybranymi torami AC/DC.
+- Bilans SOC: `E_next = E + Δt · (η_pv_bat·s_b + η_grid_bat·g_b − (b_h+b_x)/η_bat_ac)`.
+- Granice `E_min ≤ E ≤ E_max` we wszystkich chwilach pośrednich i na końcu, moc ładowania ≤ `2,5 kW`, rozładowania ≤ `5 kW` **tylko jako aktualnie zadeklarowane ograniczenia projektu**, a przed realnymi zapisami zgodnie z potwierdzoną stroną DC/AC i ograniczeniami urządzenia.
+- Ograniczenie jednoczesnego ładowania i rozładowania: suma wejść do baterii może być dodatnia tylko przy zerowych wyjściach w tym samym slocie. Implementacja może użyć binarnej zmiennej trybu (`0/1`) i ograniczeń typu `charge ≤ P_charge_max·z`, `discharge ≤ P_discharge_max·(1-z)`, o ile taki model odpowiada topologii falownika.
+- Brak jednoczesnego importu i eksportu przez jeden punkt przyłącza, jeśli nie udokumentowano ich fizycznej i taryfowej odrębności; analogiczna binarna zmienna kierunku sieci.
+- Eksport baterii `b_x` w planie **wykonywalnym** wynosi 0 bez ważnej zgody konkretnego planu. Ewentualny plan z eksportem ma status `proposal_only`, aż przejdzie ponowną walidację zgody i fizycznej zdolności działania.
+- Nie wolno optymalizować przepływów niedostępnych w istniejącej instalacji tak, jakby można było je sterować. Planner może pokazać ekonomiczny **idealny** wariant, ale musi oddzielnie liczyć najlepszy **realnie wykonalny** wariant i status brakujących zdolności.
+- W modelu scenariuszowym pierwsza akcja w bieżącym okresie musi być taka sama we wszystkich przyszłych scenariuszach, zanim napłyną kolejne obserwacje. Nieantycypacyjność dotyczy również zmian cen i przyszłego SOC.
+
+**Funkcja celu i znak stanu końcowego:** `J = koszt_importu − przychód_eksportu + koszt_degradacji + kara_ryzyka − wartość_kontynuacyjna(E_end)`. Czynniki te nie są wzajemnie zamienne; raportować składniki osobno. Wycena terminalna jest szacunkiem statystycznym wartości opcji, a nie dopisaną prognozą cen po horyzoncie. Jej metodologia: [FORECAST_POLICY.md](FORECAST_POLICY.md).
+
+**Rozstrzyganie remisów:** jeśli dwa poprawne plany mają koszt ekonomiczny równoważny w granicach błędu obliczeń i niepewności, preferować w kolejności: plan bez dodatkowego cyklu i zbędnego przełączania, plan z mniejszą liczbą poleceń, stabilniejszy względem poprzedniego planu. Nie wolno z tego robić „magicznej stałej” mogącej odwrócić realną, wiarygodną korzyść w DKK.
+
+**Wynik solvera:** status `optimal`, `feasible_not_proven_optimal`, `infeasible`, `timeout` lub `invalid_input`, wyceniony cel, ograniczenia aktywne, naruszenia bilansu, warianty porównawcze i czas obliczeń. Gdy optimum nieudowodnione, **nie** przedstawiać go jako „najtańszy możliwy plan”. Brak rozwiązania lub naruszenie ograniczeń daje `plan_status = blocked` i brak akcji wykonawczej. Dla porównania ekonomicznego alternatywy muszą mieć ten sam stan początkowy, wyceny i warunki końcowe; stosować [DECISION_LOGGING.md](DECISION_LOGGING.md).
+
+**Weryfikacja niezależna od solvera:** po obliczeniu ponownie przeliczyć z wyjścia bilanse PV, domu, sieci i magazynu oraz koszt, łączną sprawność i ograniczenia uprawnień. Zapisany plan z zerowym numerycznym naruszeniem w solverze, lecz niespójny w zewnętrznej kontroli, **nie jest wykonalny**.
