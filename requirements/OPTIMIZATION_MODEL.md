@@ -106,7 +106,7 @@ Pełne dane liczbowe, warunki testów i oczekiwane wyniki opisano w [TEST_SCENAR
 - Dokładne mapowanie przepływów i punktów pomiaru HA po DC i AC.
 - Zakresy i faktyczne skutki encji sterujących, łącznie z eksportem i trybami magazynu.
 - Rzeczywiste sprawności przy różnej mocy, limity mocy/prądów i rzeczywisty zakres SOC.
-- Funkcja kosztu degradacji na podstawie kosztu 19 000 DKK i trwałości baterii.
+- Funkcja kosztu degradacji: sposób oceny EFC i warianty wrażliwości w [CALIBRATION_POLICY.md](CALIBRATION_POLICY.md). Niewiadomą jest kalibracja fizyczna i trwałość, nie sama definicja obliczeń.
 - Statystyczny model błędów PV/zużycia i końcowy warunek energetyczny przy nieopublikowanych cenach.
 - Weryfikacja wyniku kosztowego na danych historycznych, bez zakładania nieistniejących cen — metodyka [BACKTEST_VALIDATION.md](BACKTEST_VALIDATION.md). Każda decyzja musi mieć odtwarzalne uzasadnienie w [DECISION_LOGGING.md](DECISION_LOGGING.md).
 
