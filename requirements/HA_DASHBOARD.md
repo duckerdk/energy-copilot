@@ -87,6 +87,7 @@ Widok pokazuje **ostatnią decyzję wraz z cenami, prognozami, SOC, planowaną m
 - `UI-08`: błąd potwierdzenia komendy — status `uncertain`, nie sukces działania.
 - `UI-09`: ujemna cena sprzedaży — widoczny znak i wartość, bez ukrywania ujemnego przychodu.
 - `UI-10`: po jesiennej zmianie czasu — osobne punkty dla obu wystąpień lokalnej 02:00.
+- `UI-11`: historia decyzji pokazuje rzeczywistą przesłankę ekonomiczną i alternatywę, także dla `idle`/`blocked`, oraz osobno stan wykonania.
 
 ## 9. Warunek odbioru
 
