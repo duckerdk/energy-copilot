@@ -1,0 +1,3 @@
+# Polityka prognozowania
+
+Wersja robocza.
