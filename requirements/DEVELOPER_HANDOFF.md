@@ -28,7 +28,10 @@ Lokalną, własną integrację Home Assistant (`custom_components/energy_copilot
 | 6 | [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md) | Kolejność zapisu, potwierdzenie, zgody, konflikty i fail-safe |
 | 7 | [HA_DASHBOARD.md](HA_DASHBOARD.md) | Prezentacja planu, pomiarów, kosztów, propozycji i diagnostyki |
 | 8 | [TEST_SCENARIOS.md](TEST_SCENARIOS.md) | 35 szczegółowych scenariuszy obliczeń i mapowania; dodatkowo testy EXE i UI w dokumentach tematycznych |
-| 9 | [OPEN_ITEMS.md](OPEN_ITEMS.md) | Aktualne P0/P1/P2 — nie udawać, że wszystkie są już rozwiązane |
+| 9 | [FORECAST_POLICY.md](FORECAST_POLICY.md) | Niepewność prognoz, nieantycypacyjność i wartość SOC na końcu opublikowanych cen |
+| 10 | [DECISION_LOGGING.md](DECISION_LOGGING.md) | Log każdej decyzji i powód wyboru widoczne od pierwszego uruchomienia |
+| 11 | [BACKTEST_VALIDATION.md](BACKTEST_VALIDATION.md) | Testy na historii bez przyszłych danych i uczciwy benchmark finansowy |
+| 12 | [OPEN_ITEMS.md](OPEN_ITEMS.md) | Aktualne P0/P1/P2 — nie udawać, że wszystkie są już rozwiązane |
 
 Jeżeli dokumenty zawierają sprzeczność, nie rozwiązywać jej przez arbitralne założenie: zgłosić konkretny fragment, zaproponować rozwiązanie i zaktualizować po potwierdzeniu.
 
@@ -38,9 +41,9 @@ Jeżeli dokumenty zawierają sprzeczność, nie rozwiązywać jej przez arbitral
 | --- | --- | --- |
 | **M1** | Szkielet integracji, config/options flow, obsługa HA setup/unload, diagnostyka | Integracja uruchamia się w HA, nie wykonuje żadnego zapisu sprzętowego; testy jednostkowe |
 | **M2** | Mapowanie ról na encje, normalizacja cen/prognoz/AC/DC, walidacja czasu, jednostek i jakości | Testy MAP/TIME/PHY przechodzą; niedostępne dane są jawne |
-| **M3** | Planner MPC, bilans i koszt, dynamiczny SOC, kalibracja prognoz z curtailment, symulator | Testy PHY/ECO/SOC/PVQ, referencja ekonomiczna, przejrzyste wyjaśnienia |
-| **M4** | Sensory/atrybuty i natywny dashboard HA, propozycje sprzedaży i status | Testy UI, czytelne planowane vs faktyczne przepływy, bez ręcznego eksportowania JSON |
-| **M5** | Historia, symulacja kosztu bazowego vs z planem, testy regresyjne, aktualizacja dokumentacji | Działają testy porównania na reprezentatywnych danych; brak niesprawdzonych deklaracji oszczędności |
+| **M3** | Planner MPC, bilans i koszt, dynamiczny SOC, kalibracja prognoz z curtailment, symulator i **rejestr KAŻDEJ decyzji od startu** | Testy PHY/ECO/SOC/PVQ/UNC/LOG, porównywalna alternatywa i konkretne liczby w przyczynie decyzji |
+| **M4** | Sensory/atrybuty i natywny dashboard HA, propozycje sprzedaży, status i historia decyzji | Testy UI/LOG, bieżące i dawne powody każdej decyzji w HA, bez ręcznego eksportowania JSON |
+| **M5** | Historia, walk-forward (bez wiedzy o przyszłości), baseline Deye, testy regresyjne, aktualizacja dokumentacji | Testy BKT, jawna niepewność i porównywalny końcowy SOC; brak niesprawdzonych deklaracji oszczędności |
 | **M6** | Opcjonalny executor po P0, osobna zgoda na aktywację funkcji i nadzorowany test fizyczny | Każda akcja ma własną kartę, odczyt zwrotny, pełny fail-safe i przechodzi EXE; użytkownik uruchamia świadomie |
 
 **M1–M5 mogą być realizowane przed kompletnym P0** bez sztucznego blokowania rozwoju projektu. **M6 nie może** zostać uruchomiony na podstawie samej dokumentacji lub nazw encji.
@@ -62,10 +65,10 @@ Punkty 1–5 i 7 wpływają na jakość planu; punkt 6 i sprzętowy fail-safe **
 ## 5. Przekazanie do wdrożenia — definicja ukończenia
 
 - Dokumentacja, pliki konfiguracji i zależności są spójne; wszystkie nowe założenia mają źródło i status „potwierdzone / modelowe / niepotwierdzone”.
-- Każdy przypadek z [TEST_SCENARIOS.md](TEST_SCENARIOS.md) ma automatyczny test `PASS/FAIL` albo udokumentowany `BLOCKED`; brak nieudokumentowanych wyjątków.
+- Każdy przypadek z [TEST_SCENARIOS.md](TEST_SCENARIOS.md) oraz testy LOG, UNC i BKT w dokumentach tematycznych mają automatyczny test `PASS/FAIL` albo udokumentowany `BLOCKED`; brak nieudokumentowanych wyjątków.
 - Scenariusze EXE i UI z ich specyfikacji mają testy na danych symulowanych i uzasadniony wynik; nie mylić testu fikcyjnych encji z walidacją rzeczywistego urządzenia.
 - Raport symulacji oddziela koszt faktury, degradację, ryzyko, prognozę i wykonanie; rzetelnie odnosi się do scenariusza bazowego.
-- Operator widzi w HA powód aktualnej decyzji, horyzont dostępnych cen, status danych i zgody; żadna akceptacja nie jest domyślna.
+- Operator widzi w HA **powód każdej decyzji i jej historię**, liczby wejściowe, alternatywę, wynik DKK, horyzont dostępnych cen, status danych i zgody; żadna akceptacja nie jest domyślna.
 - Zmiany w kodzie nie nadpisują ograniczeń i nie wydają komend sprzętowych bez wcześniej zatwierdzonej zdolności.
 - Nie deklarować pełnej „gotowości do automatyki”, dopóki nie zostaną zamknięte P0 i przeprowadzone nadzorowane testy fizyczne.
 
