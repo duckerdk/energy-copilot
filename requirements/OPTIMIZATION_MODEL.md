@@ -57,7 +57,8 @@ Dla opublikowanych przedziałów minimalizować:
 J = Σ_t Δt * (Grid_import[t] * C_buy[t]
              - Grid_export[t] * C_sell[t])
     + Cost_degradation
-    + Terminal_energy_value_or_risk_penalty
+    + Risk_penalty
+    - Terminal_continuation_value(E_end)
 ```
 
 - `C_buy[t]`: **końcowa zmienna** cena zakupu z opłatami [DKK/kWh].
@@ -70,8 +71,8 @@ J = Σ_t Δt * (Grid_import[t] * C_buy[t]
 ## 5. Dynamiczny cel SOC i koniec horyzontu
 
 - Docelowy SOC jest **wynikiem** wybranej trajektorii `E[t]`, nie sztywną liczbą. Np. 65% przed nocą może wyjść jako optimum, ale algorytm nie otrzymuje polecenia „zawsze 65%”.
-- Nie wolno zerować ekonomicznej wartości magazynu na końcu dostępnych cen: spowodowałoby to pozorne korzyści z opróżnienia baterii przed północą.
-- Poza horyzontem **nie prognozujemy nieopublikowanych cen**. Należy osobno modelować fizyczne potrzeby energetyczne po jego zakończeniu (prognoza zużycia minus realistyczna dostępność PV, niepewność i dopuszczalny SOC), aby wyznaczyć dynamiczny warunek rezerwy/karę końcową. Jej ekonomiczna waga i sposób wyznaczania wymagają sprawdzenia na danych historycznych; nie tworzyć arbitralnej stałej rezerwy.
+- Nie wolno zerować ekonomicznej wartości magazynu na końcu dostępnych cen: spowodowałoby to pozorne korzyści z opróżnienia baterii przed północą. **Kontynuacyjna wartość energii jest odejmowana od kosztu celu**, nie dodawana jako opłata. Szczegółowa definicja: [FORECAST_POLICY.md](FORECAST_POLICY.md).
+- Poza horyzontem **nie publikujemy cen nieopublikowanych**. Fizyczne potrzeby energetyczne oraz historycznie skalibrowana, wyraźnie niepewna wartość kontynuacyjna mają zapobiegać sztucznemu rozładowaniu przy końcu listy cen; to **nie jest** prognoza ceny po północy ani arbitralna stała rezerwa SOC. Gdy kalibracja jest niewystarczająca, podawać zakres/niepewność i unikać dodatkowych cykli o niewiarygodnym zysku. Szczegóły: [FORECAST_POLICY.md](FORECAST_POLICY.md).
 - Replanowanie po faktycznej publikacji nowych cen aktualizuje całą trajektorię i cel SOC.
 
 ## 6. Wyjście i zasady wykonania
@@ -83,6 +84,8 @@ Dla każdego slotu udostępnić: początek/koniec, ceny, prognozę `S` i `L`, os
 ## 7. Prognoza PV i dane ocenzurowane przez sterowanie
 
 W historii odróżniać potencjalną moc PV od rzeczywiście pozyskanej i celowo ograniczonej; pełna bateria i eksport OFF mogą sprawić, że pomiar nie odzwierciedli pogody. **Nie obniżać automatycznie prognozy po porównaniu 60 kWh prognozy z 35 kWh produkcji przy ograniczeniu eksportu.** Do kalibracji używać wersji prognozy zapisanej przed danym okresem i przedziałów bez ograniczenia; podejrzane wyłączyć z bezpośredniej oceny. Szczegółowa reguła i test akceptacyjny: [ARCHITECTURE.md](ARCHITECTURE.md#wiarygodność-prognoz-pv-przy-ograniczeniu-produkcji).
+
+**Nieantycypacyjność:** jeśli przyszła pogoda ma kilka możliwych scenariuszy, pierwsza akcja w bieżącym slocie musi być identyczna w każdym z nich, ponieważ ich przyszły wynik nie jest jeszcze znany. Porównania alternatyw wymagają tego samego startu SOC, horyzontu i zasad wyceny końcowego stanu. Szczegóły: [FORECAST_POLICY.md](FORECAST_POLICY.md).
 
 ## 8. Minimalne testy akceptacyjne modelu
 
@@ -105,6 +108,6 @@ Pełne dane liczbowe, warunki testów i oczekiwane wyniki opisano w [TEST_SCENAR
 - Rzeczywiste sprawności przy różnej mocy, limity mocy/prądów i rzeczywisty zakres SOC.
 - Funkcja kosztu degradacji na podstawie kosztu 19 000 DKK i trwałości baterii.
 - Statystyczny model błędów PV/zużycia i końcowy warunek energetyczny przy nieopublikowanych cenach.
-- Weryfikacja wyniku kosztowego na danych historycznych, bez zakładania nieistniejących cen.
+- Weryfikacja wyniku kosztowego na danych historycznych, bez zakładania nieistniejących cen — metodyka [BACKTEST_VALIDATION.md](BACKTEST_VALIDATION.md). Każda decyzja musi mieć odtwarzalne uzasadnienie w [DECISION_LOGGING.md](DECISION_LOGGING.md).
 
 Nie wybierać implementacji solvera ani nie wysyłać poleceń sprzętowych, dopóki nie zostaną określone realne ograniczenia i przeprowadzone testy.
