@@ -37,3 +37,75 @@ Przypadek testowy jakości PV: prognoza 60 kWh, pomiar 35 kWh, część dnia pe�
 Test każdej **akcji zapisu** wymaga dodatkowo odrębnej, świadomie nadzorowanej procedury na urządzeniu: stan początkowy, dozwolone wartości, wywołana usługa HA, rzeczywisty odczyt zwrotny i reakcja na błąd, reset/restart i utratę komunikacji. Samo HTTP 200 lub zmiana stanu encji nie potwierdza skutku fizycznego.
 
 **Nie wykonywać takich testów zapisu przez Codexa ani automatycznie.** Brak jednej kluczowej funkcji blokuje odpowiednią automatyzację; nie zastępować jej inną, podobnie nazwaną encją.
+
+
+## Kontrakt logiczny wejść
+
+**Zasada:** nazwy ról poniżej są wewnętrznymi kluczami optymalizatora, **nie** nazwami istniejących encji. Każdą rolę użytkownik mapuje przez UI na istniejące źródło HA; przed wykorzystaniem normalizator sprawdza jednostkę, znaczenie, aktualność i źródło. Nie zgadywać identyfikatorów.
+
+| Rola | Znormalizowane dane | Status mapowania i walidacja |
+| --- | --- | --- |
+| `spot_price` | DKK/kWh, czas obowiązywania | Historyczne `sensor.energi_data_spotpris`; sprawdzić taryfę DK1, jednostki, daty |
+| `spot_price_slots` | `start_utc, end_utc, value_dkk_kwh` | Przyszłe rzeczywiście opublikowane spot, bez uzupełniania fikcyjnymi godzinami |
+| `buy_price_slots` | Takie same przedziały, cena **końcowa** z opłatami | HA udostępnia cenę końcową wg użytkownika; historyczne `sensor.energi_data_service` jest kandydatem dla prognozy cen, lecz komplet taryfy i format trzeba zweryfikować |
+| `sell_price_slots` | DKK/kWh, wyliczana | `spot_price_slots - 0,0215 DKK/kWh` (ustalona prowizja Vindstød); osobna encja nie jest konieczna |
+| `battery_soc` | Procent oraz energia z jawnie przyjętej pojemności | Historyczne `sensor.sun12k_battery_capacity`; zakres SOC, aktualność, dostępna energia vs nominalna |
+| `battery_charge_power` / `battery_discharge_power` | Dwie nieujemne moce [kW] z ustaloną stroną AC/DC | Pomiary istnieją wg użytkownika; identyfikatory jeszcze nie zapisane w bieżącym rejestrze; znak i fizyczny punkt pomiaru krytyczne |
+| `grid_import_power` / `grid_export_power` | Dwie nieujemne moce [kW] na punkcie przyłącza | Pomiary istnieją wg użytkownika, nazwy w bieżącym rejestrze nieznane |
+| `pv_actual_power` | kW, jawnie DC lub AC | Historyczne `sensor.pv_sum`; potwierdzić, czy obejmuje ładowanie baterii po DC; nie liczyć tego dwa razy |
+| `house_load_power` | kW na AC, bez ładowania baterii | Historyczne `sensor.home_energy_consumption`; zweryfikować definicję |
+| `pv_forecast_slots` | kW lub kWh na każdy slot, z czasem wydania i horyzontem | Forecast.Solar; historyczne `sensor.energy_production_today` i `sensor.energy_production_tomorrow` pokazują dobowe sumy, ale samym sumom brakuje rozkładu godzinowego |
+| `house_load_forecast_slots` | kW średnie na slot, czas i jakość | Do opracowania na bazie historii HA, bez przecieku przyszłych danych |
+| `curtailment_status` | `uncurtailed` / `curtailed_confirmed` / `curtailment_unknown` | Potrzebny zweryfikowany sygnał ograniczenia PV lub jawna klasyfikacja niepewności; pełna bateria i eksport OFF nie dowodzą ilości straconych kWh |
+
+**Granice baterii:** 10,24 kWh to suma nominalna; zakres SOC 20–100% reprezentuje nominalnie 8,192 kWh między granicami, **nie** gwarantowaną energię dostarczoną po AC.
+
+### Schemat pojedynczego slotu
+
+Każda próbka prognozy i ceny: `start_utc`, `end_utc` (koniec wyłączny), `value`, `unit`, `source`, `obtained_at_utc`; prognoza historyczna także `issued_at_utc` i opcjonalny status jakości. Czas Europe/Copenhagen jest do prezentacji, obliczenia i dopasowanie przedziałów w UTC, obsługa 23/25 godzin w dni zmiany czasu. Cena godzinowa może zostać jawnie przypisana do czterech kwadransów tylko w granicach **znanego** okresu obowiązywania; nie interpolować brakującej ceny.
+
+Horyzont cen: do końca najpóźniejszego kompletnego **opublikowanego** slotu. Zwykle około 13:00 dochodzi jutrzejsza doba; nie zakładać, że sama godzina 13:00 oznacza publikację, ani nie tworzyć prognozy ceny na 48 godzin. Prognozy PV i zużycia mogą wykraczać poza horyzont cen na potrzeby oszacowania niepewności rezerwy energii, ale nie do kalkulacji transakcji po nieznanych cenach.
+
+## Kontrakt logiczny wyjść optymalizatora
+
+**Poniższe nazwy są roboczym schematem wyniku planera, a nie fizycznymi encjami sterującymi.** Wyniki prezentuje warstwa HA (sensory i atrybuty planu); stabilne `entity_id` nowych encji zostaną dobrane podczas implementacji.
+
+| Wyjście | Semantyka |
+| --- | --- |
+| `plan_id`, `generated_at`, `valid_until`, `price_horizon_end` | Wersja planu, czas UTC i zakres rzeczywiście znanych cen |
+| `plan_status` | `valid` / `partial` / `blocked` / `expired`; nie używać częściowego planu do automatycznego sterowania |
+| `charge_source` | `pv` / `grid` / `mixed` / `none` — zamierzony udział źródeł, nie potwierdzony przepływ |
+| `charge_power_kw`, `discharge_power_kw` | Osobne nieujemne moce; zakaz jednoczesnego ładowania i rozładowania baterii w planie wykonawczym |
+| `discharge_destination` | `home` / `export` / `mixed` / `none`; bez zgody nie wolno celowo eksportować energii z baterii |
+| `target_soc_pct`, `soc_forecast_pct` | Dynamiczny cel i przyszła trajektoria SOC, **nie** twarda stała SOC |
+| `pv_export_intent`, `pv_curtailment_intent` | Intencja eksportu PV lub ograniczenia produkcji, bez założenia że istnieje fizyczna regulacja |
+| `grid_import_kw`, `grid_export_kw`, `pv_flow_kw` | Zaplanowane przepływy, oddzielone od pomiarów |
+| `expected_net_cost_dkk`, `expected_degradation_dkk`, `expected_risk_dkk` | Oddzielne koszty fakturowe i wewnętrzne; strat konwersji nie liczyć podwójnie |
+| `decision_reason`, `data_quality`, `missing_capabilities` | Uzasadnienie, jakość wejścia i blokery dla konkretnej intencji |
+
+W każdym slocie planu: zakres UTC, ceny, prognozy, rozbicie PV na dom/baterię/sieć/ograniczenie oraz baterii na dom/eksport, import i eksport sieci, SOC przed/po, koszt, warunki zgody i status wykonalności. Plan nie jest pojedynczym poleceniem mocy; **executor** mapuje zamiary na akcje zgodnie ze zweryfikowanym kontraktem.
+
+## Mapa akcji HA — do potwierdzenia, nie do zgadywania
+
+| Intencja | Znany identyfikator lub brak | Co trzeba potwierdzić |
+| --- | --- | --- |
+| Zezwól na ładowanie z sieci | `switch.sun12k_grid_charge` — historyczne | Czy `on/off` rzeczywiście steruje tylko tą funkcją i w jakim trybie |
+| Ogranicz ładowanie | `number.sun12k_maximum_battery_grid_charge_current` — **sporne znaczenie** | PV/sieć, jednostki A, min/max/step, skutek i zakres przed jakimkolwiek zapisem |
+| Zezwól na eksport | `switch.sun12k_solar_sell` — historyczne | Czy zezwala na eksport z PV i baterii, co robi `off`, jaki jest odczyt skutku |
+| Docelowy SOC / minimalny SOC | **Brak potwierdzonego ID** | Rozdzielić życzenie planisty od ustawienia ochronnego sprzętu |
+| Wymuś rozładowanie na potrzeby domu | **Brak potwierdzonego ID** | Możliwość wykonania bez eksportu z baterii |
+| Eksport energii z baterii | **Brak osobnego potwierdzonego sterowania** | Izolacja od PV, zgoda na konkretny plan, kWh, czas, brak zgody = brak eksportu |
+| Harmonogram i priorytety sterowania | **Brak potwierdzonych ID** | Priorytety i trwałość zapisanych wartości; konflikt z własnym planistą |
+| Przywróć pracę standardową | **Brak zweryfikowanej ścieżki** | Bezpieczny wynik także przy braku HA/Wi-Fi, bez polegania na samym zapisie w encji |
+
+### Karta weryfikacji działania pojedynczej akcji
+
+Przed implementacją executor każda operacja wymaga jawnego rekordu: `logical_action`, istniejące `entity_id`, domena i usługa HA, dopuszczalne wartości i jednostka, stan przed, warunki, oczekiwany **fizyczny** rezultat, niezależny odczyt zwrotny, timeout, procedura anulowania i bezpieczny stan po błędzie. Z nazwy encji nie wywodzić jej sprzętowego znaczenia.
+
+**Sekwencja:** sprawdź aktualność planu i danych → zweryfikuj dostępne sterowanie i zgodę → zweryfikuj limit → wywołaj usługę HA → odczytaj efekt fizyczny → oznacz `confirmed` albo `failed`. Brak któregokolwiek krytycznego warunku oznacza blokadę tej akcji, nie zastąpienie nieznanej funkcji inną encją.
+
+### Granica gotowości
+
+- **Dokument wystarcza do implementacji:** konfiguracji wyboru encji, odczytów, normalizacji, tworzenia planu, prezentacji, diagnostyki i trybu dry-run.
+- **Nie wystarcza jeszcze do uruchomienia automatycznych poleceń:** szczególnie dynamicznego SOC jako nastawy sprzętu, rozdziału PV/baterii w eksporcie i gwarancji bezpiecznego powrotu po utracie HA. To wymagania walidacyjne, a nie prośba o ponowne przekazanie już udokumentowanych 11 nazw.
+- Niedostępne lub nieudowodnione sterowanie oznacza w wyniku planera `missing_capabilities` i plan niewykonalny w tej części — nie arbitralny zamiennik komendy.
