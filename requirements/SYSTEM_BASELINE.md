@@ -1,6 +1,6 @@
 # Instalacja i dostępność danych
 
-**Źródło:** informacje przekazane przez użytkownika; nie wykonano odczytu ani zapisu w działającym HA. **Potwierdzenie użytkownika ≠ weryfikacja techniczna.**
+**Źródło:** dane instalacji przekazane przez użytkownika oraz **odczyt aktualnych encji HA z 19.10.2026** ([HA_ENTITY_SNAPSHOT_2026-10-19.md](HA_ENTITY_SNAPSHOT_2026-10-19.md)). Nie wykonano żadnego testu zapisów ani fizycznej kalibracji. Samo istnienie encji ≠ potwierdzenie działania sterowania.
 
 | Element | Stan |
 | --- | --- |
@@ -17,7 +17,7 @@
 | Ceny | Energi Data Service i istniejące encje HA; atrybuty przyszłych cen **niezweryfikowane** |
 | Historia | Recorder / Energy; użytkownik ma historię z kilku lat, rozdzielczość i kompletność **niezweryfikowane** |
 
-Użytkownik potwierdził osobne pomiary mocy importu, eksportu, ładowania i rozładowania baterii, lecz ich aktualne **entity_id nie są znane**. Fabryczny harmonogram i możliwość wymuszonego rozładowania istnieją wg użytkownika; nie znamy odpowiednich usług/encji, ograniczeń ani potwierdzeń wykonania.
+W zrzucie potwierdzono m.in. `sensor.sun12k_total_grid_power` (−2470 W przy eksporcie), `sensor.sun12k_battery_output_power` (+19 W), `sensor.pv_sum` (3034 W), `sensor.home_energy_consumption` (583 W) i `sensor.sun12k_battery_capacity` (97%). Bilans chwilowy zgadza się arytmetycznie, ale kierunki znaków i punkty pomiarowe przy innych trybach **wymagają testu**. Fabryczny harmonogram i możliwość wymuszonego rozładowania istnieją wg użytkownika; nie znamy odpowiednich usług/encji, ograniczeń ani potwierdzeń wykonania.
 
 Nie przyjmować bez pomiarów: sprawności AC↔bateria, wydajności PV, temperatury ogniw, limitów BMS, dopuszczalnych prądów, przepływu baterii do sieci, semantyki sterowań czy dokładności prognoz. Dane ze zrzutów ekranu dotyczą chwili wykonania, nie są stałymi instalacji.
 
