@@ -19,7 +19,7 @@ Dokument zawiera **wyłącznie niepotwierdzone elementy**, nie powtarza ustalony
 - [ ] Kalibracja sprawności magazynowania (AC↔bateria), modelu degradacji z kosztem kompletu 19 000 DKK, kosztu alternatywnego i prognozy zużycia.
 - [ ] Sprawdzić praktyczną częstotliwość replanowania i jakość slotów 15-minutowych, model końcowej wartości magazynu przy nieopublikowanych cenach oraz metodę porównania z bazową pracą Deye. **Uzgodniony horyzont: do końca faktycznie opublikowanych cen**, bez arbitralnych 48 godzin; około 13:00 dochodzą ceny kolejnej doby, jeśli źródło je faktycznie udostępni.
 
-Dokument matematyczny do testów i implementacji: [OPTIMIZATION_MODEL.md](OPTIMIZATION_MODEL.md).
+Dokument matematyczny: [OPTIMIZATION_MODEL.md](OPTIMIZATION_MODEL.md). Scenariusze akceptacyjne: [TEST_SCENARIOS.md](TEST_SCENARIOS.md).
 
 ## P2 — UX i dystrybucja
 
