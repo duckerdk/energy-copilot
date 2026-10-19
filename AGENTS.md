@@ -12,8 +12,8 @@ Nie modyfikuj ESPHome, rejestrów Modbus, firmware, istniejących automatyzacji 
 
 1. Szkielet integracji: manifest, config flow, translations, entry setup/unload, testy. **Bez aktywnego sterowania**.
 2. Konfigurowalne mapowanie istniejących encji HA i walidacja typów, jednostek, atrybutów, znaków mocy, aktualności i prognoz.
-3. Deterministyczny silnik danych, model kosztów, plan, diagnostyka oraz encje prezentujące wyniki. Domyślnie tryb **monitor/dry-run**.
-4. Testy z fikcyjnymi encjami i zanonimizowanymi, legalnie udostępnionymi danymi historycznymi; bez wywołania usług sterujących.
+3. Deterministyczny silnik danych, model kosztów, plan, diagnostyka oraz encje prezentujące wyniki. **Od pierwszego dry-run obowiązkowy rejestr podstaw KAŻDEJ decyzji zgodny z requirements/DECISION_LOGGING.md**, widoczny w HA: ceny, prognozy, koszt alternatyw, decyzja, powód i status. Domyślnie tryb **monitor/dry-run**.
+4. Testy z fikcyjnymi encjami i zanonimizowanymi, legalnie udostępnionymi danymi historycznymi; walidacja `walk-forward` bez przyszłych prognoz, z zachowaniem ograniczenia PV (curtailment), zgodnie z requirements/BACKTEST_VALIDATION.md. Bez wywołania usług sterujących.
 5. Dopiero po spełnieniu blokad opisanych w OPEN_ITEMS.md przygotuj osobny, możliwy do włączenia przez użytkownika moduł wykonawczy. **Nie włączaj go samodzielnie**.
 
 ## Niezmienniki
