@@ -1,0 +1,3 @@
+# Odczyt HA
+
+Wersja robocza.
