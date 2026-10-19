@@ -92,6 +92,8 @@ Propozycja określa: `proposal_id`, `plan_id`, okres UTC, `expires_at`, maksymal
 
 Przycisk STOP w HA wstrzymuje nowe akcje i może użyć **tylko sprawdzonej** procedury zatrzymania. Nie jest sprzętowym wyłącznikiem awaryjnym. Obsługa ponownego uruchomienia po awarii wymaga rekoncyliacji, a nie bezwarunkowego wznowienia.
 
+**Audyt:** wszystkie walidacje, próby wywołania HA, potwierdzenia fizyczne, błędy i anulowania powiązać przez `action_id` z `decision_id` i `plan_id` w [DECISION_LOGGING.md](DECISION_LOGGING.md). Nie logować samej zmiany encji jako potwierdzonego fizycznego rezultatu.
+
 ## 8. Testy (na encjach fikcyjnych, nie na instalacji)
 
 - `EXE-01` stary plan tuż przed zapisem → brak wywołania HA.
