@@ -1,14 +1,16 @@
 # Energy Co-Pilot — nowa koncepcja
 
-**Stan: zebrano i zapisano cele oraz wymagania funkcjonalne (15.10.2026).** Nie wybrano jeszcze technologii, nie napisano nowego sterownika i nie zmieniano Home Assistant ani falownika.
+**Stan na 19.10.2026:** zatwierdzono opracowanie **własnej integracji Home Assistant** jako optymalizatora Energy Co-Pilot. Trwa specyfikacja; kodu nowej integracji nie napisano, nie zmieniano Home Assistant ani sterowania urządzeniami.
 
 ## Aktualne założenia (obowiązujące)
 
 - [Cele i wymagania funkcjonalne](requirements/GOALS_AND_REQUIREMENTS.md) — **minimalizacja końcowego rachunku netto w DKK**, dodatkowe KPI, decyzje automatyczne i sprzedaż z baterii wyłącznie za zgodą.
 - [Istniejąca instalacja i dane](requirements/SYSTEM_BASELINE.md) — Deye SUN-12K-SP04LP3-EU, 2× BSLBATT, ESPHome/HA, ceny z Energi Data Service oraz PV Forecast.Solar.
-- [Otwarte kwestie techniczne](requirements/OPEN_ITEMS.md) — w szczególności cena netto sprzedaży Vindstød, weryfikacja mapowania encji i szczegółowość prognoz.
+- [Otwarte kwestie techniczne](requirements/OPEN_ITEMS.md) — walidacja mapowania i semantyki encji, prognoz, bezpiecznych sterowań i kalkulacji.
 
-**Istotny brak:** HA ma cenę spot i finalną cenę zakupu, **ale nie ma ceny sprzedaży netto**. Nie można rzetelnie ocenić opłacalności sprzedaży przed wyznaczeniem tego parametru. Potrzebne dane ekonomiczne zostaną ustalone w kolejnym etapie, bez zgadywania.
+**Ustalona cena sprzedaży netto Vindstød (DKK/kWh):** `spotpris - 0,0215`. Źródło ceny spot: `sensor.energi_data_spotpris`; prowizja Vindstød: **0,0215 DKK/kWh** (wartość ustalona z użytkownikiem). Osobna encja ceny sprzedaży nie jest wymagana — wartość można obliczać w integracji. Ceny zakupu i sprzedaży muszą pozostać rozdzielone w optymalizacji.
+
+**Znany wykaz encji HA jest już w repozytorium:** [opis i znaczenie encji](archive/energy-copilot-v5/docs/ENTITIES.md) oraz [rejestr YAML](archive/energy-copilot-v5/config/entities.yaml). To źródła mapowania na start, nie potwierdzenie aktualnych stanów wszystkich encji; nie prosić ponownie o przekazanie zapisanej listy.
 
 ## Archiwum wcześniejszego projektu
 
@@ -22,6 +24,8 @@
 
 Nie usunięto nic z HA ani serwera. Nie modyfikowano ESPHome, Modbus, rejestrów ani konfiguracji Deye.
 
-## Następny etap
+## Zatwierdzona architektura i następny etap
 
-Porównać dostępne **lokalne** rozwiązania zgodnie z nowymi wymaganiami. Nie wybierać rozwiązania ani nie implementować przed potwierdzeniem faktycznych możliwości integracji, metody kalkulacji ceny eksportu i bezpieczeństwa sterowania.
+Rozwijamy **własną integrację `custom_components` dla Home Assistant**, docelowo dystrybuowaną przez HACS, w tym repozytorium. Kod Battery Controller może służyć wyłącznie jako inspiracja, a nie gotowa warstwa sterowania. Integracja korzysta z **encji HA jako wejść i wyjść**; nie wymaga zmian w ESPHome, Modbus ani firmware. Wyznacza harmonogram, dynamiczny docelowy SOC, decyzje ładowania z PV/sieci, wykorzystania baterii na dom lub eksport (eksport z baterii tylko po zatwierdzeniu) oraz udostępnia **panel HA aktualizowany na żywo**. Nazwy wyjść i szczegółowa realizacja są robocze.
+
+Następny etap: doprecyzować kontrakt istniejących encji, model ekonomiczny, algorytm i bezpieczne wykonanie poleceń. **Nie wdrażać sterowania przed walidacją**.
