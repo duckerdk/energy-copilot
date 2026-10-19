@@ -8,6 +8,7 @@
 - [Instalacja i źródła danych](requirements/SYSTEM_BASELINE.md) — ustalone fakty i ich stopień potwierdzenia.
 - [Kontrakt encji HA](requirements/ENTITY_CONTRACT.md) — historyczne identyfikatory, braki i warunki walidacji.
 - [Architektura i bezpieczeństwo](requirements/ARCHITECTURE.md) — **jak** budować i testować rozwiązanie.
+- [Model optymalizacji](requirements/OPTIMIZATION_MODEL.md) — bilans PV/sieć/dom/bateria, koszty, dynamiczny SOC, zmienny horyzont znanych cen, walidacja prognozy przy curtailment.
 - [Blokery wdrożenia](requirements/OPEN_ITEMS.md) — co wymaga sprawdzenia przed rzeczywistym sterowaniem.
 - [AGENTS.md](AGENTS.md) — wiążące instrukcje robocze dla Codexa.
 
