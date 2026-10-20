@@ -25,7 +25,7 @@ Alternatywą jest ręczne skopiowanie katalogu `custom_components/energy_copilot
 | SOC | `sensor.sun12k_battery_capacity` |
 | Ceny zakupu / sprzedaży | `sensor.energi_data_service` / `sensor.energi_data_spotpris` |
 
-PV1/PV2 nie są źródłami danych integracji. Poprawne, dostępne `sensor.pv_sum=0 W` pozostaje ważne także bez nocnych aktualizacji. Dodatnia moc PV oraz pozostałe bieżące pomiary podlegają sprawdzaniu aktualności; `unknown`, `unavailable`, błędne jednostki i nieprawidłowe wartości są odrzucane. Asynchroniczne raportowanie czujników nie jest samo w sobie błędem wejścia. Rzeczywiste awarie oraz powroty źródeł po awarii nadal są kontrolowane.
+PV1/PV2 nie są źródłami danych integracji. Poprawne, dostępne stany wszystkich pomiarów — w tym dodatnie PV, `0 W`, SOC, napięcie, prąd i liczniki dzienne — pozostają ważne nawet bez wielogodzinnych aktualizacji. Sam wiek `last_reported`/`last_updated` nie jest dowodem awarii ani heartbeat sprzętu. Jawne `unknown`, `unavailable`, błędne jednostki, wartości i nieprawidłowe czasy przyszłe nadal są odrzucane. Asynchroniczne raportowanie czujników nie jest samo w sobie błędem wejścia. Rzeczywiste awarie oraz powroty źródeł po awarii nadal są kontrolowane.
 
 Ujemne, ale poprawne i zweryfikowane kontekstowo odczyty `home` są na potrzeby obliczeń normalizowane do `max(0, home)`, również w historii. Nie zmienia to encji HA ani surowych danych. Braków, luk Recorder i niewiarygodnych szablonów po awarii **nie wolno** zastępować zerami.
 
