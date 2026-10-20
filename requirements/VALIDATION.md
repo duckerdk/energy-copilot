@@ -21,7 +21,7 @@
 | MTR-02 | `home_energy_consumption` ma liczbę z `float(0)` dla niedostępnego źródła | `invalid_input` także historycznie |
 | MTR-03 | `sensor.pv_sum=3034 W` | PV DC=3034 W; brak zależności od PV1/PV2 |
 | MTR-04 | 15–40s rozrzutu świeżych raportów Modbus, skoki wejść, opóźniony dom | Dom as-of zachowany; różnica czasu raportów sama nie degraduje wejść; rzeczywisty `home_context_lag` nadal ostrzega |
-| MTR-05 | Stały natywny `pv_sum=0` i dom >300 s | Zachowane bez alarmu z powodu wieku zera; `unknown`/`unavailable` blokują |
+| MTR-05 | Stałe przez wiele godzin PV=0 i dodatnie PV, dom, sieć i bateria | Zachowane bez odrzucenia z powodu wieku stanu; `unknown`/`unavailable` blokują |
 | MTR-06 | Awaria i powrót PV/grid/battery, reload/unload | Stary dom blokowany, listener bez wycieku |
 | MTR-07 | Syntetyczne 30min odczytów i limity okna | Liczniki przyjęć/odrzuceń i percentyle poprawne, bez surowych W; weryfikacja rzeczywistego okna HA osobno w OPEN_ITEMS |
 | PVF-01 | brak/nieznana odpowiedź Forecast.Solar | Diagnostyka, bez wymyślonej prognozy |
@@ -29,7 +29,7 @@
 | LOAD-01 | historia Recorder z zamaskowanym zerem składowej | Odrzucenie slota z uczenia i backtestu |
 | LOAD-02 | ważne liczbowe ujemne home, pozostałe źródła poprawne | `max(0, home)` w bieżących danych i całce odcinkowej; kwadrans zachowany, jawne agregaty czasu/liczby/kWh korekt |
 | MTR-08 | Świeży dom zgodny / rozbieżny z sumą PV/grid/battery | Alert `derived_sum_time_uncertain` przy rozbieżności |
-| MTR-09 | Niezmieniony natywny szablon `pv_sum` starszy niż 300 s | Dostępne zero PV akceptowane bez ostrzeżenia o wieku; dodatnia przeterminowana moc odrzucana |
+| MTR-09 | Wszystkie wymagane i opcjonalne role bez zmian przez 1–48 h | Zachowane z oryginalnym znacznikiem, bez sztucznego heartbeat; nieudostępniona/nieważna wartość odrzucana |
 | MTR-10 | `pv_sum` unknown/unavailable i recovery | Nie odzyskiwać danych z zamaskowanego zera |
 | QUALITY-01 | wyłącznie historyczne/informacyjne ograniczenia M2 | `Input quality=valid` dla wymaganych bieżących wejść, wszystkie ostrzeżenia zachowane, brak deklaracji gotowości planera |
 | DIAG-01 | szczegółowy audyt lokalny zawiera próbki gospodarstwa | domyślny eksport recent/backfill tylko z agregatami, bez `events`, `home_w`, `source_w`; lokalny audyt bez zmian |
@@ -56,8 +56,10 @@ Każde `decision_id`, `plan_id`, start i ważność, dane wejściowe oraz ich we
 
 **Odbiór:** wymienić dokładnie testy uruchomione, testy nieuruchomione, brakujące dowody i zmiany. Nie ogłaszać przejścia M6 po samym zaliczeniu Markdown CI.
 
-## Regresja 0.1.6
-- Dostępny `sensor.pv_sum=0 W` bez raportu przez 8 godzin, świeży grid/battery/home: przyjęte wejścia, brak `measurement_time_skew`, brak `pv_template_time_unverified`.
-- Dodatnie PV starsze niż 300 s, `unknown`, `unavailable`, nieprawidłowa jednostka: odrzucone.
+## Regresja braku zmian HA
+- Wszystkie role pomiarowe, także SOC, dodatnie PV, napięcie/prąd i liczniki dzienne: ważna liczba bez raportu przez 1, 8 lub 48 godzin nie wywołuje sama `Degraded`.
+- `unknown`, `unavailable`, `NaN`, błędna jednostka, nieprawidłowy zakres, przyszły czas ponad 10 s: odrzucone również przy starym stanie.
+- Awaria i recovery źródła pośredniczącego w bilansie domu: stare numeryczne `home` pozostaje zablokowane do właściwego raportu po odzyskaniu.
+- Niespójna opcjonalna kontrola mocy bateria vs. V×I: ostrzeżenie o nieatomowym pomiarze, nie fałszywe `Degraded` głównego odczytu.
 - Różne czasy poprawnych raportów nie są błędem synchronizacji. Wykryta awaria/recovery i rzeczywista rozbieżność wartości domu nadal wymagają weryfikacji.
 - Brak prognozy w nocy nie degraduje wejść, a brak danych o zmierzchu pozostaje jawny, bez dopisywania Wh.
