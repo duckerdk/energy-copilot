@@ -40,7 +40,7 @@ Po utracie HA, internetu albo źródła cen przełącznik Deye może pozostać *
 
 - Użytkownik **upoważnił Co-Pilota do samodzielnego podejmowania decyzji o eksporcie PV**; docelowy wykonawca używa `switch.sun12k_solar_sell` przez usługę HA `switch.turn_on`/`switch.turn_off`, bez ręcznej zgody na każdy slot.
 - Ta autonomia **nie oznacza zgody na celowe eksportowanie energii z baterii**. Taki eksport nadal wymaga osobnej, ważnej zgody na dany plan, limit i czas.
-- Przed aktywacją zapisów live upewnić się, że włączenie `switch.sun12k_solar_sell` nie powoduje niezamierzonego eksportu z baterii. Brak potwierdzonej separacji ogranicza funkcję wykonawczą, ale **nie unieważnia reguły biznesowej**.
+- **Potwierdzenie użytkownika 20.10.2026:** w obecnej konfiguracji `switch.sun12k_solar_sell` zezwala wyłącznie na eksport nadwyżki PV, natomiast sprzedaż z baterii jest wyłączona. Jest to stan konfiguracji, nie niezależna gwarancja dla innych nastaw TOU. Przed aktywacją zapisów live zweryfikować fizycznie separację oraz zachowanie ON/OFF; przy zmianie nastaw mogących włączyć eksport baterii wymagane ponowne sprawdzenie. Brak takiej weryfikacji ogranicza funkcję wykonawczą, ale **nie unieważnia reguły biznesowej**.
 - Deye **zachowuje ostatnie nastawy po awarii HA**. Dla `OFF` jest to przede wszystkim ryzyko ekonomiczne (utracony eksport), dla `ON` trzeba uwzględnić możliwość przepływu z baterii przy innych nastawach TOU. Przed automatycznymi zapisami obowiązuje kontrakt bezpieczeństwa [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md).
 - **Zgoda na autonomię projektową nie jest poleceniem wykonania teraz usług na HA**. Monitor/dry-run mogą od razu symulować tę politykę; fizyczny executor włączamy tylko po odrębnej zgodzie na uruchomienie i testach P0.
 
