@@ -9,5 +9,5 @@
   "issue_tracker": "https://github.com/duckerdk/energy-copilot/issues",
   "after_dependencies": ["forecast_solar", "recorder"],
   "requirements": [],
-  "version": "0.1.5"
+  "version": "0.1.6"
 }
