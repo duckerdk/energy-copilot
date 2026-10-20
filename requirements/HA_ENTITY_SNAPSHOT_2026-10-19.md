@@ -56,24 +56,16 @@
 | `number.sun12k_time_point_[1..6]_power` | 4000, 4000, 4002, 4500, 4000, 4000 W | Moc związana z TOU, nie potwierdzona możliwość precyzyjnego sterowania realną mocą baterii |
 | `number.sun12k_time_point_[1..6]_capacity` | 20% (wszystkie) | Jak falownik interpretuje cele/granice SOC w tych przedziałach |
 
-**Wykryta wada metadanych:** trzy regulatory maksymalnego prądu (`maximum_battery_charge_current`, `maximum_battery_discharge_current`, `maximum_battery_grid_charge_current`) reklamują w HA **min = −16 777 220 A / max = +16 777 220 A**, czyli zakres ewidentnie nieprzydatny do określenia bezpieczeństwa. Do realnego sterowania obowiązkowa osobna walidacja dopuszczalnych wartości sprzętu/BMS i ograniczenie w executorze; **nie** używać automatycznie `min/max` z tych encji.
+**Wada metadanych HA i rozstrzygnięcie użytkownika z 20.10.2026:** trzy regulatory prądu podają w HA **min = −16 777 220 A / max = +16 777 220 A**. Energy Co-Pilot nie korzysta z tych granic. Ustalono własne domknięte zakresy **0–50 A** (`maximum_battery_charge_current`), **0–100 A** (`maximum_battery_discharge_current`) i **0–50 A** (`maximum_battery_grid_charge_current`). To limity logiczne, nie dowód możliwości sprzętu; przed zapisami nadal weryfikujemy fizyczną reakcję, w szczególności znaczenie 0 A. Dokładne wymagania: [ENTITY_CONTRACT.md](ENTITY_CONTRACT.md#limity-prądów-ustalone-przez-użytkownika--obowiązujące-dla-energy-co-pilot).
 
-## 4. Konflikt z istniejącą integracją Battery Controller
+## 4. Pozostałości po Battery Controller — ignorować
 
-Zrzut potwierdza:
-- `switch.battery_controller_optimization_enabled = on`,
-- `select.battery_controller_control_mode = hybrid`,
-- `number.battery_controller_manual_power_setpoint = 0 W`,
-- `sensor.battery_controller_battery_setpoint = 0 W`.
-
-Nie wiadomo, czy ta integracja rzeczywiście zapisuje obecnie w Deye; jednak przed udzieleniem wyłączności executorowi Energy Co-Pilot trzeba wyeliminować **równoległe niekontrolowane sterowanie tymi samymi nastawami**. Na etapie dokumentacyjnym niczego nie wyłączać. W trybie monitor/dry-run obecność innego kontrolera jest dozwolona, ale powinna być wskazana w diagnostyce, aby właściwie interpretować historyczną pracę.
-
-**Uwaga o walucie:** Battery Controller publikuje m.in. `sensor.battery_controller_estimated_savings` w **EUR**, `number.battery_controller_degradation_cost` w **EUR/cycle**; nie przenosić tych wielkości do obliczeń w DKK bez udokumentowanego przeliczenia oraz walidacji semantyki.
+W odczycie z 19.10.2026 występowały encje `switch.battery_controller_optimization_enabled`, `select.battery_controller_control_mode` i inne z prefiksem `battery_controller`. **Użytkownik wyjaśnił 20.10.2026, że są to nieaktywne pozostałości po starej integracji.** Nie traktować ich jako działającego kontrolera, blokera, źródła danych ani narzędzia sterowania. Energy Co-Pilot używa zweryfikowanych encji `sun12k_*` i innych wskazanych źródeł HA, a nie wyników starego Battery Controller. Konflikt dotyczy wyłącznie **rzeczywiście aktywnego** zewnętrznego wykonawcy, jeśli taki zostanie zaobserwowany.
 
 ## 5. Co TEN odczyt rozstrzyga, a czego nie
 
 **Ustalone:** istnienie wielu potrzebnych encji, ich jednostki, obecne stany i dwie wewnętrzne kontrole bilansu (MPPT→PV i PV+bateria→dom+eksport). Znamy bieżące wartości spot, kandydata ceny zakupu, baterii, PV, domu i mocy eksportu.
 
-**Nadal nieustalone na podstawie `wynik.txt`:** struktura i kompletność **przyszłych cen kupna/spot** (szablon nie eksportował atrybutów); godzinowe sloty Forecast.Solar; wiarygodność punktów pomiaru DC/AC przy ładowaniu i rozładowaniu; finalne opłaty na fakturze; realne limity BMS; odpowiedzialność kontrolerów za zapisy; osobne i mierzalne polecenie eksportu **z baterii**; przywrócenie trybu po utracie HA.
+**Nadal nieustalone na podstawie `wynik.txt`:** struktura i kompletność **przyszłych cen kupna/spot** (szablon nie eksportował atrybutów); godzinowe sloty Forecast.Solar; wiarygodność punktów pomiaru DC/AC przy ładowaniu i rozładowaniu; finalne opłaty na fakturze; realne limity BMS; ewentualne rzeczywiście aktywne obce sterowanie zapisami; osobne i mierzalne polecenie eksportu **z baterii**; przywrócenie trybu po utracie HA.
 
 **Wniosek bezpieczeństwa:** **nie** włączać sprzętowego executora na podstawie tego zrzutu. Następnym źródłem dowodowym są wyłącznie atrybuty konkretnie zidentyfikowanych źródeł cen i prognoz. Testy akcji wymagają osobnego, świadomie nadzorowanego kroku.
