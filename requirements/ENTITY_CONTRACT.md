@@ -117,7 +117,7 @@ Implementacja i weryfikacja kolejności działań: [EXECUTION_CONTRACT.md](EXECU
 | Ogranicz ładowanie baterii, w tym z PV | `number.sun12k_maximum_battery_charge_current` | Projektowo: ogólny limit 0–50 A; przed realnym zapisem wymagany test skutku przez encję HA |
 | Ogranicz ładowanie z sieci | `number.sun12k_maximum_battery_grid_charge_current` | Projektowo: dodatkowy limit 0–50 A; przed realnym zapisem wymagany test skutku przez encję HA |
 | Ogranicz rozładowanie baterii | `number.sun12k_maximum_battery_discharge_current` | Projektowo: 0–100 A; przed realnym zapisem wymagany test skutku przez encję HA |
-| Zezwól na eksport | `switch.sun12k_solar_sell` — historyczne | Czy zezwala na eksport z PV i baterii, co robi `off`, jaki jest odczyt skutku |
+| Zezwól na eksport | `switch.sun12k_solar_sell` | Użytkownik potwierdził 20.10.2026: w obecnej konfiguracji zezwala na eksport wyłącznie nadwyżki PV; eksport baterii jest wyłączony. Efekt ON/OFF i izolację po zmianie TOU sprawdzić przed live |
 | Docelowy SOC / minimalny SOC | **Brak potwierdzonego ID** | Rozdzielić życzenie planisty od ustawienia ochronnego sprzętu |
 | Wymuś rozładowanie na potrzeby domu | **Brak potwierdzonego ID** | Możliwość wykonania bez eksportu z baterii |
 | Eksport energii z baterii | **Brak osobnego potwierdzonego sterowania** | Izolacja od PV, zgoda na konkretny plan, kWh, czas, brak zgody = brak eksportu |
