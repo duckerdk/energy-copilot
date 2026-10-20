@@ -22,12 +22,12 @@ Drugorzędne KPI: import kWh, ważona wolumenem średnia cena zakupu DKK/kWh, ek
 | Ładowanie z sieci na późniejszą odsprzedaż | Dozwolone ekonomicznie, ale **sam eksport z baterii wymaga zgody** |
 | Sterowanie dodatkowymi odbiornikami | Poza MVP |
 
-Nie obowiązują historyczne: próg sprzedaży 0,4 DKK/kWh, sztywna rezerwa nocna, stały docelowy SOC, zakup tylko bez PV ani konieczność pełnej baterii wieczorem. Docelowy SOC może zmieniać się dynamicznie. Zadeklarowane granice SOC: 20–100%; faktyczne ograniczenia BMS/falownika mają pierwszeństwo. Użytkownik nie wymaga rezerwy na blackout.
+**Nowa obowiązująca decyzja:** minimalna cena eksportu PV wynosi **0,40 DKK/kWh bezpośrednio z `sensor.energi_data_spotpris`** i Co-Pilot sam steruje `switch.sun12k_solar_sell` po zatwierdzeniu trybu live; [polityka eksportu](PV_EXPORT_POLICY.md). Nie obowiązują historyczne: sztywna rezerwa nocna, stały docelowy SOC, zakup tylko bez PV ani konieczność pełnej baterii wieczorem. Docelowy SOC może zmieniać się dynamicznie. Zadeklarowane granice SOC: 20–100%; faktyczne ograniczenia BMS/falownika mają pierwszeństwo. Użytkownik nie wymaga rezerwy na blackout.
 
 ## Cena i opłacalność
 
-- **Zakup:** końcowa zmienna cena zakupu udostępniona w HA; użytkownik potwierdził uwzględnienie **wszystkich opłat i taryf**. Co-Pilot nie dolicza ich ponownie. Pozostaje sprawdzić strukturę przyszłej serii i daty.
-- **Sprzedaż — reguła przekazana przez użytkownika:** netto = cena spot − **0,0215 DKK/kWh** prowizji Vindstød. Sprawdzić na rzeczywistych rozliczeniach, czy jest to komplet wszystkich zmiennych obciążeń; nie dopowiadać innych kwot.
+- **Zakup:** cena z `sensor.energi_data_service` **bez żadnych modyfikacji**; format przyszłych cen jest już udokumentowany w [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md).
+- **Sprzedaż:** cena z `sensor.energi_data_spotpris` **bez żadnych modyfikacji**. Co-Pilot nie zajmuje się prowizjami, podatkami ani taryfami — cen używa dokładnie takich, jakie HA podaje. Automatyczny eksport PV dozwolony od **0,40 DKK/kWh** (wartość włącznie), zakaz poniżej progu. Szczegóły: [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md).
 - Ocena ładowania/rozładowania obejmuje sprawność w obie strony, koszt zużycia magazynu, limity mocy, koszty alternatywne przyszłego zasilania domu i skutki cen ujemnych.
 - Prognozy mogą być niepewne; plan musi tolerować odchylenia i aktualizować się po istotnej zmianie danych.
 
