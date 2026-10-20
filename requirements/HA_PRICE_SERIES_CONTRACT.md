@@ -7,15 +7,15 @@
 | Znaczenie | Encja HA | Wartość planera |
 | --- | --- | --- |
 | Końcowa cena zakupu **ze wszystkimi opłatami i taryfami** | `sensor.energi_data_service` | `raw_today[*].price` / `raw_tomorrow[*].price` [DKK/kWh] |
-| Cena sprzedaży netto (prowizja już uwzględniona) | `sensor.energi_data_spotpris` | `raw_today[*].price` / `raw_tomorrow[*].price` [DKK/kWh] |
-| Zasada rozliczenia eksportu | Bez dodatkowych obliczeń | **C_sell = cena z `sensor.energi_data_spotpris` bez odejmowania prowizji**; polityka eksportu [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md) |
+| Cena sprzedaży (bez korekt) | `sensor.energi_data_spotpris` | `raw_today[*].price` / `raw_tomorrow[*].price` [DKK/kWh] |
+| Cena wykorzystywana do planowania | Bez obliczeń pomocniczych | **`C_sell = cena z sensor.energi_data_spotpris`**, bez modyfikacji; [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md) |
 | Bieżąca cena diagnostyczna | Atrybut `current_price` obu encji | Wartość o większej precyzji niż lista godzinowa; nie zastępuje pełnego szeregu |
 | Publikacja jutra | `tomorrow_valid` w **każdej** encji | Akceptuj jutro dopiero, gdy źródło ją oznaczyło jako dostępną **i** lista jest poprawna |
 | Kolejny termin odświeżenia źródła | `next_data_update` | Informacja diagnostyczna, **nie** pewny czas publikacji jutra ani sygnał pojawienia się nowych cen |
 | Metadane | `currency`, `region_code`, `unit_of_measurement` | Oczekiwane `DKK`, `DK1`, `DKK/kWh`; błąd jednostki/regionu blokuje użycie |
 | Rozkład składników ceny zakupu | `net_operator`, `tariffs` (w tym `additional_tariffs`) | Wyłącznie diagnostyka. **Nie dodawać żadnej z tych kwot po raz drugi** do `raw_*.price` |
 
-**Nie wyliczać ceny zakupu ze spot + taryfy ani nie odejmować prowizji z ceny sprzedaży.** Użytkownik potwierdził, że `sensor.energi_data_service` już publikuje ostateczną cenę. Odmienna cena zakupu i spot jest oczekiwana. `state_class: total`, `unit: kWh` i `device_class: monetary` są metadanymi encji; planner waliduje szczególnie `currency` i `unit_of_measurement`, **nie** traktuje ceny jako licznika narastającego.
+**Nie przeliczać cen z obu encji HA. Co-Pilot nie zajmuje się prowizjami, podatkami ani taryfami.** Użytkownik potwierdził, że `sensor.energi_data_service` już publikuje ostateczną cenę. Odmienna cena zakupu i spot jest oczekiwana. `state_class: total`, `unit: kWh` i `device_class: monetary` są metadanymi encji; planner waliduje szczególnie `currency` i `unit_of_measurement`, **nie** traktuje ceny jako licznika narastającego.
 
 ## 2. Format — potwierdzony na rzeczywistym odczycie
 
@@ -33,7 +33,7 @@ Atrybuty obu encji:
 
 Wybrane potwierdzone pary godzinowe (ilustracyjne **migawki danych z 20.10**, nie stałe programu):
 
-| Czas lokalny | Zakup końcowy DKK/kWh | Cena sprzedaży w HA, netto DKK/kWh | Cena sprzedaży użyta przez planner DKK/kWh |
+| Czas lokalny | Cena zakupu z HA DKK/kWh | Cena sprzedaży z HA DKK/kWh | Cena sprzedaży w plannerze DKK/kWh |
 | --- | ---: | ---: | ---: |
 | 08:00 | 2.406 | 1.922 | 1.922 |
 | 13:00 | 1.838 | 1.355 | 1.355 |
@@ -62,16 +62,16 @@ Wejście: **dwa** bieżące stany HA oraz ich atrybuty. Parser jest deterministy
 
 `C_buy[t] = buy_raw_price[t]` (wszystkie opłaty już zawarte).
 
-`C_sell[t] = spot_raw_price[t]` (**już netto z HA**; brak dodatkowego potrącenia). Próg samodzielnego eksportu PV: `C_sell[t] >= 0.40 DKK/kWh` według [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md).
+`C_sell[t] = spot_raw_price[t]` (**dokładnie wartość z encji HA**, bez przeliczeń). Próg samodzielnego eksportu PV: `C_sell[t] >= 0.40 DKK/kWh` według [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md).
 
 Nawet jeśli `C_sell[t]` jest ujemna, zachować jej znak. Rachunek za zakup, przychód ze sprzedaży i koszt degradacji pozostają odrębnymi pozycjami funkcji celu. Nie przeliczać samych danych z atrybutu `tariffs` na drugą dopłatę.
 
-Przykład **chwilowy** z atrybutów `current_price` (nie z serii zaokrąglonej): zakup `2.405502871680312 DKK/kWh`, sprzedaż netto **bezpośrednio z HA** `1.9222991216803123 DKK/kWh`. Różnica zakupu do sprzedaży około `0,4832 DKK/kWh` nie jest dodatkową prowizją do naliczenia. Próg eksportu `0,40` porównujemy **bezpośrednio** z wartością sprzedaży w HA.
+Przykład **chwilowy** z atrybutów `current_price` (nie z serii zaokrąglonej): zakup `2.405502871680312 DKK/kWh`, sprzedaż **bezpośrednio z HA** `1.9222991216803123 DKK/kWh`. Obie wartości przechodzą do planera bez korekt. Próg eksportu `0,40` porównujemy **bezpośrednio** z wartością sprzedaży w HA.
 
 ## 5. Scenariusze testowe mappera (symulacja, nie uruchomione)
 
 - `PRICE-01`: `raw_today` z 24 godzinami, `raw_tomorrow = null`, `tomorrow_valid = false` → 24 godziny cen dla danej doby; brak jutra nie jest błędem.
-- `PRICE-02`: godzina 08:00 20.10, zakup 2,406, sprzedaż netto z HA 1,922 → `C_sell = 1,922 DKK/kWh` z **zaokrąglonej serii**, bez naliczania prowizji ani taryfy.
+- `PRICE-02`: godzina 08:00 20.10, zakup 2,406, sprzedaż z HA 1,922 → `C_sell = 1,922 DKK/kWh` z serii, bez modyfikacji.
 - `PRICE-03`: `current_price` 2,405502871680312 i 1,9222991216803123 vs seria 2,406 i 1,922 → kontrola spójności PASS w granicy precyzji listy, brak fikcyjnej korekty szeregu.
 - `PRICE-04`: zakup ma `tomorrow_valid=true`, spot jeszcze `false` → brak kompletnego wspólnego planu transakcji na jutro.
 - `PRICE-05`: obie flagi `true`, ale jedna lista `raw_tomorrow` jest `null` → jutro nie jest gotowe do planowania.
@@ -80,7 +80,7 @@ Przykład **chwilowy** z atrybutów `current_price` (nie z serii zaokrąglonej):
 - `PRICE-08`: w czasie DST lokalna doba 23/25 h → parser akceptuje poprawne 23/25 rekordów, nie narzuca 24.
 - `PRICE-09`: dwie lokalne godziny 02:00 przy jesiennej zmianie czasu, różne offsety → pozostają **dwoma** poprawnymi slotami UTC.
 - `PRICE-10`: brak godziny wewnątrz `raw_today` → oznaczenie luki, bez imputacji i arbitrażu na nieznanej cenie.
-- `PRICE-11`: cena sprzedaży netto z HA −0,10 → cena sprzedaży −0,10 DKK/kWh; nie odejmować niczego i nie obcinać do zera.
+- `PRICE-11`: cena sprzedaży z HA −0,10 → `C_sell = −0,10 DKK/kWh`; zachować bez modyfikacji.
 - `PRICE-12`: niepoprawna waluta, region, jednostka, timestamp bez offsetu lub `price=NaN` → odrzucenie danych z kodem przyczyny.
 - `PRICE-13`: po przejściu z 23:59 na 00:00 aktualizuje się horyzont przy użyciu odpowiadających nowemu dniu list HA, bez zachowania przestarzałego `raw_today` jako przyszłej ceny.
 - `PRICE-14`: wśród atrybutów zakupu są `tariffs` i `additional_tariffs` → wynik ceny wciąż równy `raw_*.price`, brak podwójnego naliczenia.
