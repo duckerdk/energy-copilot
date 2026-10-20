@@ -13,7 +13,7 @@ Powiązania: [ENTITY_CONTRACT.md](ENTITY_CONTRACT.md), [OPTIMIZATION_MODEL.md](O
 - **Backtester:** odrębnie ocenia idealny plan energetyczny, plan **wykonywalny samą regulacją prądu** przy stałym TOU oraz opcjonalny plan z dynamicznym TOU. Nie raportować oszczędności idealnego planu jako oszczędności osiągalnych.
 - **Executor:** zawsze używa wyłącznie encji HA i natywnych usług HA, nigdy bezpośredniego Modbus/rejestrów lub modyfikacji ESPHome.
 
-Wynik: **preferencja current-first**, nie definitywne stwierdzenie, że TOU nie jest potrzebne. Wykorzystanie TOU wynika z *brakującej zdolności i policzonej korzyści*, nie z założenia, że wszystkie harmonogramy należy nadpisywać.
+Wynik: **preferencja current-first** dla prądów + **autonomiczne zezwolenie na eksport PV** według [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md), nie definitywne stwierdzenie, że TOU nie jest potrzebne. Wykorzystanie TOU wynika z *brakującej zdolności i policzonej korzyści*, nie z założenia, że wszystkie harmonogramy należy nadpisywać.
 
 ## 2. Potwierdzone obserwacje użytkownika — odróżnić od hipotez
 
@@ -41,7 +41,7 @@ Projektowo, zgodnie z decyzją użytkownika, przyjmujemy semantykę encji odpowi
 | TOU włącz/wyłącz | `switch.sun12k_time_of_use` | **Domyślnie bez zapisów w current-first**; obecny stan i harmonogram zawsze uwzględnić w modelu |
 | Zezwolenie Grid Charge w okresie TOU | `switch.sun12k_time_point_1_charge_enable` … `_6_charge_enable` | Może współdecydować o ładowaniu z sieci w danych okresach; **nie** stanowi sterowania PV |
 | Czas / moc / SOC dla okresów TOU | `number.sun12k_time_point_1_start` … `_6_start`, `_1_power` … `_6_power`, `_1_capacity` … `_6_capacity` | Są to **nastawy trwałego harmonogramu**; bez osobnego, bezpiecznego mechanizmu publikacji nie używać do bieżących korekt |
-| Zezwolenie na eksport | `switch.sun12k_solar_sell` | Nie utożsamiać zezwolenia eksportu PV z rozdzieleniem PV/baterii; brak zgody na celowy eksport baterii nadal obowiązuje |
+| Autonomiczne zezwolenie na eksport PV | `switch.sun12k_solar_sell` | **Cena z `sensor.energi_data_spotpris` >= 0,40 DKK/kWh → ON; poniżej → OFF**, bez korekt ceny. Użytkownik upoważnił do samodzielnego sterowania po uruchomieniu live, ale nie do eksportu baterii bez osobnej zgody. [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md) |
 
 **Ważne:** wartości prądu w amperach ograniczają dopuszczalny pobór/oddawanie po stronie baterii. Przy napięciu około 56 V limit **5 A odpowiada orientacyjnie 0,28 kW po stronie DC**, nie jest poleceniem ładowania stałą mocą 280 W ani gwarancją dodatkowego eksportu 280 W. Aktualne napięcie, BMS, SOC, dostępne PV, obciążenie i falownik determinują przepływ.
 
@@ -117,7 +117,7 @@ Metryki: `net_cost_dkk`, eksport PV kWh, ograniczona produkcja PV (jedynie przy 
 - `CTRL-09`: zamiana slotów 23:30→00:00 i następnego 00:00→05:00 z nieustalonym formatem → dynamiczny zapis TOU zablokowany; nie zakładać poprawnej obsługi granicy doby.
 - `CTRL-10`: siedem zmian ekonomicznie uzasadnionych w dobie → nie przypisywać ich automatycznie sześciu TOU; porównać dokładność obecnej konfiguracji current-first i możliwej kompresji.
 - `CTRL-11`: usługa HA ustawiła limit, ale PV jest niedostępne albo SOC wynosi 100% → **nastawa jest przyjęta, lecz nie wymusza przepływu**; brak ładowania nie stanowi błędu wykonania. Osobno: jeśli w warunkach umożliwiających ładowanie nowy limit został przekroczony lub odczyt nastawy się nie zmienił, zgłosić niespójność.
-- `CTRL-12`: przy dodatniej cenie sprzedaży PV, pełnej baterii i eksporterze PV wyłączonym/braku potwierdzonej separacji baterii → nie zakładać automatycznego, bezpiecznego eksportu PV.
+- `CTRL-12`: dodatnia cena sprzedaży PV **poniżej 0,40 DKK/kWh** → automatyczne zezwolenie OFF nawet przy pełnej baterii; przy cenie powyżej progu brak fizycznej separacji baterii blokuje niebezpieczną akcję live, lecz nie symulację.
 - `CTRL-13`: istniejące osierocone encje `battery_controller.*` → ignorowane jako źródła, sterowania i blokady.
 - `CTRL-14`: current-first i TOU mają te same koszty netto w granicach niepewności **prognoz i kosztów**, nie niepewności precyzji wykonania nastawy; current-first wymaga mniej trwałych zmian → preferować current-first.
 - `CTRL-15`: próba aktualizacji sześciu TOU kończy się na trzecim polu → brak raportu `success`, procedura przetestowanego odzyskiwania, brak nowych kroków.
