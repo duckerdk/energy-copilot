@@ -69,7 +69,7 @@ async def test_setup_poll_unload_and_remove(hass, populated_hass, entry, freezer
         assert coordinator.data.flows_kw["pv_dc"] == 3.034
         assert len(coordinator.data.prices) == 1
         state = hass.states.get("sensor.energy_co_pilot_input_quality")
-        assert state is not None and state.state == "degraded"
+        assert state is not None and state.state == "valid"
         assert state.attributes["read_only"] is True
         assert {i.code for i in coordinator.data.issues} >= {
             "recorder_unavailable",
