@@ -10,9 +10,7 @@ async def test_real_ha_states_can_remain_unchanged_for_eight_hours(
     hass, populated_hass, entry, freezer
 ):
     zone = ZoneInfo("Europe/Copenhagen")
-    midnight = NOW.astimezone(zone).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    midnight = NOW.astimezone(zone).replace(hour=0, minute=0, second=0, microsecond=0)
     prices = [
         {"hour": (midnight + timedelta(hours=hour)).isoformat(), "price": 0.4}
         for hour in range(48)
@@ -54,6 +52,4 @@ async def test_real_ha_states_can_remain_unchanged_for_eight_hours(
         "daily_discharge",
     }
     assert not any(issue.code == "stale_input" for issue in coordinator.data.issues)
-    assert (
-        hass.states.get("sensor.energy_co_pilot_input_quality").state == "valid"
-    )
+    assert hass.states.get("sensor.energy_co_pilot_input_quality").state == "valid"
