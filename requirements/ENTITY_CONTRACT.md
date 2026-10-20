@@ -21,7 +21,7 @@ Przyjmujemy, że **właściwe encje wykonują właściwe funkcje**. To **założ
 | Rola | Historyczne ID | Wymagane sprawdzenie |
 | --- | --- | --- |
 | Cena spot teraz | sensor.energi_data_spotpris | Waluta, DKK/kWh, bieżący stan, czas |
-| Prognoza cen / zakup z opłatami | sensor.energi_data_service | Czy zawiera pełną cenę zakupu i przyszłe sloty; atrybuty, jednostki, daty |
+| Cena zakupu z opłatami | sensor.energi_data_service | **Pełne opłaty/taryfy już w HA wg użytkownika**; zweryfikować strukturę przyszłych slotów, daty i walutę |
 | SOC | sensor.sun12k_battery_capacity | Czy to SOC %, 0–100, aktualność |
 | Moc PV | sensor.pv_sum | W czy kW; znak; aktualność |
 | Moc domu | sensor.home_energy_consumption | W czy kW; definicja; aktualność |
@@ -65,7 +65,7 @@ Wymagane normalizacje i stan faktyczny:
 | SOC | `sensor.sun12k_battery_capacity` | 97% |
 | Prąd i napięcie baterii | `sensor.sun12k_battery_output_current`, `sensor.sun12k_battery_voltage` | 0,35 A / 56,69 V; sprawdzić znak i punkt pomiaru |
 | Cena spot | `sensor.energi_data_spotpris` | 1,75508376559425 DKK/kWh |
-| Cena zakupu — kandydat | `sensor.energi_data_service` | 2,23828751559425 DKK/kWh; kompletność opłat i profil przyszły **niepotwierdzone** |
+| Cena zakupu końcowa | `sensor.energi_data_service` | 2,23828751559425 DKK/kWh w odczycie; **opłaty i taryfy potwierdzone przez użytkownika**, profil przyszły do odczytu |
 | Produkcja PV dziś | `sensor.sun12k_daily_production` | 23,5 kWh; sprawdzić reset i DC/AC |
 | Ładowanie/rozładowanie dziś | `sensor.sun12k_today_charge_of_the_battery`, `sensor.sun12k_today_discharge_of_the_battery` | 8,6 kWh / 1,2 kWh; strona pomiaru nieznana |
 | Prognoza PV | `sensor.energy_production_today`, `sensor.energy_production_tomorrow`, `sensor.energy_production_today_remaining` | 15,865 / 7,536 / 4,431 kWh; nie zastępują godzinowych slotów |
@@ -123,7 +123,7 @@ Energy Co-Pilot stosuje **własne zakresy dozwolonych nastaw w amperach**, całk
 | --- | --- | --- |
 | `spot_price` | DKK/kWh, czas obowiązywania | Historyczne `sensor.energi_data_spotpris`; sprawdzić taryfę DK1, jednostki, daty |
 | `spot_price_slots` | `start_utc, end_utc, value_dkk_kwh` | Przyszłe rzeczywiście opublikowane spot, bez uzupełniania fikcyjnymi godzinami |
-| `buy_price_slots` | Takie same przedziały, cena **końcowa** z opłatami | HA udostępnia cenę końcową wg użytkownika; historyczne `sensor.energi_data_service` jest kandydatem dla prognozy cen, lecz komplet taryfy i format trzeba zweryfikować |
+| `buy_price_slots` | Takie same przedziały, cena **końcowa** z opłatami | Użytkownik potwierdził, że ceny zakupu w HA uwzględniają wszystkie opłaty i taryfy: **nie naliczać drugi raz**. Potwierdzić tylko dostępność i format przyszłej serii |
 | `sell_price_slots` | DKK/kWh, wyliczana | `spot_price_slots - 0,0215 DKK/kWh` (ustalona prowizja Vindstød); osobna encja nie jest konieczna |
 | `battery_soc` | Procent oraz energia z jawnie przyjętej pojemności | Historyczne `sensor.sun12k_battery_capacity`; zakres SOC, aktualność, dostępna energia vs nominalna |
 | `battery_charge_power` / `battery_discharge_power` | Dwie nieujemne moce [kW] z ustaloną stroną AC/DC | Pomiary istnieją wg użytkownika; identyfikatory jeszcze nie zapisane w bieżącym rejestrze; znak i fizyczny punkt pomiaru krytyczne |
