@@ -41,6 +41,16 @@ Dla każdej operacji stworzyć rekord:
 
 Działanie złożone wymaga potwierdzenia, że **zestaw** akcji rzeczywiście realizuje zamierzony przepływ. `charge_power_kw = 2` nie może zostać „zrealizowane” samym włączeniem przełącznika grid charge. Podobnie globalne zezwolenie na eksport nie dowodzi bezpiecznego rozdzielenia PV i baterii.
 
+### Własne granice prądu Energy Co-Pilot
+
+Dla trzech regulatorów Deye executor stosuje **twarde zakresy polityki użytkownika** (włącznie): `number.sun12k_maximum_battery_charge_current` **0–50 A**, `number.sun12k_maximum_battery_discharge_current` **0–100 A**, `number.sun12k_maximum_battery_grid_charge_current` **0–50 A**. HA reklamuje błędne metadane ±16 777 220 A — **nie** wolno ich używać do wyznaczenia granic. Pełna tabela: [ENTITY_CONTRACT.md](ENTITY_CONTRACT.md#limity-prądów-ustalone-przez-użytkownika--obowiązujące-dla-energy-co-pilot).
+
+- Limity dotyczą docelowych wartości parametrów *prądowych* w A; nie zastępują limitów BMS, mocy falownika, temperatury ani definicji źródła ładowania.
+- Każda żądana nastawa spoza przedziału jest **odrzucana** i logowana z kodem `CURRENT_LIMIT_OUT_OF_RANGE`. Nie robić cichego `clamp` i nie wysyłać polecenia.
+- `0 A` jest dozwolone w polityce, ale dopóki nie zweryfikowano skutku fizycznego wartości 0 i jej dopuszczalności przez Deye, **nie wysyłać** jej do urządzenia. „Zero” nie oznacza automatycznie „wyłącz ładowanie”.
+- Przed zmianą prądu moduł musi mieć status `validated_write`, potwierdzoną jednostkę, bezpieczne wartości, pomiar zwrotny i sposób wyjścia. Żadne z tych ograniczeń nie aktywuje automatyki samo.
+- Encje `battery_controller.*` są zgodnie z wyjaśnieniem użytkownika osieroconymi pozostałościami i **nie służą do blokowania** Energy Co-Pilot, rozpoznawania konfliktów ani wyznaczania nastaw. Jedynie realnie zaobserwowany inny aktywny wykonawca może stanowić konflikt.
+
 ## 4. Sekwencja pojedynczej akcji
 
 1. **Snapshot i lock:** jedyny wykonawca operacji uzyskuje blokadę, zapisuje `plan_id`, `action_id`, slot UTC, wersję mapowania, bieżące pomiary i stan urządzenia.
