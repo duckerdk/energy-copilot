@@ -6,7 +6,7 @@
 
 ## 1. Źródło pełnego profilu
 
-**Preferowana droga:** natywna akcja Home Assistant `forecast_solar.get_forecast` zwracająca dane w odpowiedzi (response data). Co-Pilot pobiera ją przez **wewnętrzne API usług HA**, bez połączenia do zewnętrznego Forecast.Solar, bez osobnego klienta HTTP i bez modyfikowania integracji Forecast.Solar.
+**Preferowana droga (warunkowa):** `forecast_solar.get_forecast` to **akcja/usługa Home Assistant, NIE encja** — szuka się jej w **Narzędzia deweloperskie → Akcje**, nie w Stanach. Jest opisana w oficjalnej dokumentacji, ale **nie potwierdziliśmy jej dostępności w HA użytkownika**. Zanim Codex oprze na niej prognozę, musi sprawdzić obecność akcji w aktualnej instalacji i w razie braku przewidzieć inne zweryfikowane źródło. Akcja zwraca dane w odpowiedzi (response data). Co-Pilot pobiera ją przez **wewnętrzne API usług HA**, bez połączenia do zewnętrznego Forecast.Solar, bez osobnego klienta HTTP i bez modyfikowania integracji Forecast.Solar.
 
 | Element | Znaczenie |
 | --- | --- |
