@@ -1,45 +1,37 @@
 # Energy Co-Pilot
 
-**Status (2026-10-19): specyfikacja, bez kodu integracji.** Projekt nowej, lokalnej integracji Home Assistant (custom_components/energy_copilot), docelowo możliwej do instalacji przez HACS. W repo nie ma jeszcze działającego optymalizatora.
+**Status: specyfikacja, brak kodu integracji i wykonanych testów.** Docelowo lokalna integracja Home Assistant `custom_components/energy_copilot` (opcjonalnie HACS). Niniejsze repo **nie steruje falownikiem**.
 
-## Dokumentacja obowiązująca
+## Cel i granice
 
-- [Cele i reguły biznesowe](requirements/GOALS_AND_REQUIREMENTS.md) — **co** system ma osiągnąć.
-- [Instalacja i źródła danych](requirements/SYSTEM_BASELINE.md) — ustalone fakty i ich stopień potwierdzenia.
-- [Kontrakt encji HA](requirements/ENTITY_CONTRACT.md) — historyczne identyfikatory, braki i warunki walidacji.
-- [Architektura i bezpieczeństwo](requirements/ARCHITECTURE.md) — **jak** budować i testować rozwiązanie.
-- [Model optymalizacji](requirements/OPTIMIZATION_MODEL.md) — bilans PV/sieć/dom/bateria, koszty, dynamiczny SOC, zmienny horyzont znanych cen, walidacja prognozy przy curtailment.
-- [Scenariusze testowe](requirements/TEST_SCENARIOS.md) — 40 przypadków z danymi i kryteriami akceptacji: bilans, koszty, dynamiczny SOC, ceny, curtailment, bezpieczeństwo i mapowanie encji HA.
-- [Strategia sterowania prąd/TOU](requirements/CONTROL_STRATEGY.md) — preferowany current-first, trwałość nastaw, ograniczenia sześciu okien TOU i 16 testów porównania.
-- [Algorytm regulatora prądu](requirements/CURRENT_CONTROLLER_MODEL.md) — dokładne przeliczenia A↔kW, sterowanie 15-minutowe, ograniczenia TOU/SOC, 20 testów CUR.
-- [Wykonawca HA](requirements/EXECUTION_CONTRACT.md) — kontrakt poleceń, weryfikacja skutków, zgody, stany i awarie; 12 dodatkowych testów EXE.
-- [Panel Home Assistant](requirements/HA_DASHBOARD.md) — widok pomiarów, planu, kosztów, SOC, zgód i diagnostyki; 10 testów UI.
-- [Rejestr decyzji](requirements/DECISION_LOGGING.md) — wymagane od pierwszego rozruchu ceny, prognozy, koszty, porównanie alternatyw i historia w HA.
-- [Niepewność i wartość końcowa SOC](requirements/FORECAST_POLICY.md) — scenariusze prognoz, statystyka błędów i brak fikcyjnych przyszłych cen.
-- [Kalibracja i degradacja](requirements/CALIBRATION_POLICY.md) — jawne założenia sprawności, metoda pomiarów i marginalny koszt cyklu; brak udawania pomiarów.
-- [Jednorazowy odczyt HA](requirements/HA_READONLY_CAPTURE.md) — wyłącznie odczytowy raport bieżących encji i jednostek, nie test sterowania.
-- [Wynik odczytu HA z 19.10.2026](requirements/HA_ENTITY_SNAPSHOT_2026-10-19.md) — potwierdzone obecne ID, bilans PV/bateria/dom/sieć, kandydaci sterowań i ryzyka.
-- [Potwierdzony kontrakt cen HA](requirements/HA_PRICE_SERIES_CONTRACT.md) — `raw_today/raw_tomorrow`, `tomorrow_valid`, DST, taryfy, parser i 18 testów PRICE.
-- [Kontrakt godzinowej prognozy PV](requirements/PV_FORECAST_CONTRACT.md) — natywna akcja HA `forecast_solar.get_forecast`, odpowiedź `wh_period`/`watts`, normalizacja i 18 testów PVF.
-- [Prognoza zużycia domu](requirements/LOAD_FORECAST_CONTRACT.md) — profil poboru z historii Recorder, punkt pomiarowy, DST i 16 testów LOAD.
-- [Kontrakt pomiarów i bilansu](requirements/MEASUREMENT_CONTRACT.md) — rzeczywiste encje PV/sieć/bateria/dom, znaki i źródła pochodne, integracja kWh, 22 testy MTR.
-- [Polityka automatycznego eksportu PV](requirements/PV_EXPORT_POLICY.md) — cena z HA bez korekt, próg 0,40 DKK/kWh, zezwolenie przez `switch.sun12k_solar_sell` i 20 testów PVE.
-- [Archiwalny szablon diagnostyki HA](requirements/HA_TIMESERIES_CAPTURE.md) — opcjonalny; **nie** jest wymagany do pobrania cen ani prognoz.
-- [Walidacja historyczna](requirements/BACKTEST_VALIDATION.md) — test walk-forward bez wiedzy o przyszłości oraz uczciwa metoda liczenia korzyści.
-- [Przekazanie programiście](requirements/DEVELOPER_HANDOFF.md) — kolejność dokumentów, etapy M1–M6 i warunki odbioru.
-- [Blokery wdrożenia](requirements/OPEN_ITEMS.md) — co wymaga sprawdzenia przed rzeczywistym sterowaniem.
-- [AGENTS.md](AGENTS.md) — wiążące instrukcje robocze dla Codexa.
+Minimalizować koszt netto energii w DKK przy uwzględnieniu strat i kosztu dodatkowych cykli baterii. Oddzielać koszt rachunku, koszt degradacji, plan ekonomiczny, wykonalność w Deye i fizyczny rezultat.
 
-## Decyzje podstawowe
+- Jedyny interfejs danych i ewentualnego sterowania: istniejące encje oraz natywne usługi Home Assistant. Bez bezpośredniego Modbus, ESPHome, firmware lub dodatkowego serwera.
+- Zakup: `sensor.energi_data_service`; sprzedaż: `sensor.energi_data_spotpris`. Używać kwot HA **bez korekt podatków, taryf ani prowizji**.
+- Autonomiczne zezwolenie na eksport **PV**, po dopuszczeniu trybu live: `switch.sun12k_solar_sell` od **0,40 DKK/kWh**. To nie jest zgoda na eksport baterii; brak potwierdzonej separacji blokuje zapis.
+- Celowe oddanie energii **z baterii** do sieci wymaga osobnej, ważnej zgody na konkretną propozycję.
+- Tryb początkowy: **monitor/dry-run**, bez zapisów. Nastawy Deye pozostają po zaniku HA, dlatego test niezależnego zabezpieczenia jest warunkiem automatyki.
 
-- Priorytet: najniższy **końcowy koszt netto** energii (DKK), a nie największa autokonsumpcja.
-- Planowanie lokalnie; istniejące encje HA jako wejścia i kanał poleceń. Nie zmieniać ESPHome, Modbus, firmware.
-- Ładowanie z sieci może działać automatycznie **dopiero po walidacji toru sterowania**.
-- Celowe rozładowanie baterii na eksport wymaga indywidualnej, ważnej zgody użytkownika.
-- **Domyślnie tylko odczyt i symulacja.** Brak danych, zatwierdzonego mapowania lub bezpiecznego powrotu = zakaz zapisu.
-- **Własne granice prądu regulatorów Deye (polityka Co-Pilot): 0–50 A ładowanie, 0–100 A rozładowanie, 0–50 A grid charge**; nie korzystać z błędnych granic encji HA. Wartość 0 A nie oznacza potwierdzonego fizycznego wyłączenia.
-- **Źródła cen bez przeliczeń:** zakup `sensor.energi_data_service`, sprzedaż `sensor.energi_data_spotpris`. Co-Pilot nie zajmuje się prowizjami, podatkami ani taryfami. Eksport PV włączany automatycznie od 0,40 DKK/kWh wartości z HA; [polityka eksportu](requirements/PV_EXPORT_POLICY.md).
+## Dokumenty — czytaj selektywnie
 
-## Historia
+| Zakres | Źródło normatywne |
+| --- | --- |
+| Cel i instalacja | [GOALS_AND_REQUIREMENTS](requirements/GOALS_AND_REQUIREMENTS.md), [SYSTEM_BASELINE](requirements/SYSTEM_BASELINE.md) |
+| Wejścia i jakość danych | [ENTITY_CONTRACT](requirements/ENTITY_CONTRACT.md), [MEASUREMENT_CONTRACT](requirements/MEASUREMENT_CONTRACT.md), [HA_PRICE_SERIES_CONTRACT](requirements/HA_PRICE_SERIES_CONTRACT.md), [PV_FORECAST_CONTRACT](requirements/PV_FORECAST_CONTRACT.md), [LOAD_FORECAST_CONTRACT](requirements/LOAD_FORECAST_CONTRACT.md) |
+| Matematyka i niepewność | [OPTIMIZATION_MODEL](requirements/OPTIMIZATION_MODEL.md), [FORECAST_POLICY](requirements/FORECAST_POLICY.md), [CALIBRATION_POLICY](requirements/CALIBRATION_POLICY.md) |
+| Sterowanie i bezpieczeństwo | [ARCHITECTURE](requirements/ARCHITECTURE.md), [CONTROL_STRATEGY](requirements/CONTROL_STRATEGY.md), [CURRENT_CONTROLLER_MODEL](requirements/CURRENT_CONTROLLER_MODEL.md), [EXECUTION_CONTRACT](requirements/EXECUTION_CONTRACT.md), [PV_EXPORT_POLICY](requirements/PV_EXPORT_POLICY.md) |
+| Prezentacja i walidacja | [DECISION_LOGGING](requirements/DECISION_LOGGING.md), [HA_DASHBOARD](requirements/HA_DASHBOARD.md), [TEST_SCENARIOS](requirements/TEST_SCENARIOS.md), [BACKTEST_VALIDATION](requirements/BACKTEST_VALIDATION.md) |
+| Dowody i nierozwiązane kwestie | [HA_ENTITY_SNAPSHOT_2026-10-19](requirements/HA_ENTITY_SNAPSHOT_2026-10-19.md) (historyczny odczyt), [OPEN_ITEMS](requirements/OPEN_ITEMS.md) |
 
-Dokumenty prototypu v1–v5 i listy sprzątania starego serwera wycofano z bieżącego drzewa: opisywały inne rozwiązanie i zawierały duplikaty oraz sprzeczne wskazówki. **Pozostają odzyskiwalne z historii Git.** Jedyne istotne historyczne identyfikatory i ostrzeżenia przeniesiono do bieżących wymagań.
+**Wskazówki dla Codexa:** [AGENTS.md](AGENTS.md). Dokumenty z `requirements/` zawierają **przypadki testowe do napisania**, a nie wyniki testów. Ustalonym nazwom encji nie wolno przypisywać fizycznej funkcji bez sprawdzenia.
+
+## Kolejność wdrożenia
+
+1. **M1 — fundament:** manifest, config/options flow, tłumaczenia, setup/unload i testy; zero wywołań sterujących.
+2. **M2 — wejścia:** mapowanie, parser cen, prognozy PV, historia zużycia, jakość czasu/znaków/jednostek.
+3. **M3 — plan:** model fizyczny, ekonomia, dry-run, porównanie alternatyw i rejestr każdej decyzji.
+4. **M4 — HA UX:** encje, panel, widoczne przyczyny, zgody i historia decyzji.
+5. **M5 — walidacja:** deterministyczne testy i backtest walk-forward bez przyszłych danych, z kontrolą curtailment.
+6. **M6 — opcjonalne polecenia:** wyłącznie po zamknięciu właściwych P0 z [OPEN_ITEMS](requirements/OPEN_ITEMS.md), fizycznych testach i świadomym włączeniu przez użytkownika.
+
+**Odbiór każdej iteracji:** podać zmienione pliki, testy naprawdę uruchomione, testy zablokowane, założenia i aktualne P0/P1. Nie podawać wyników symulacji jako oszczędności osiągniętych na instalacji.
