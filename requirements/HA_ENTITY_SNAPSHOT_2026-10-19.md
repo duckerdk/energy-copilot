@@ -35,7 +35,7 @@
 ## 2. Kontrola spójności jednego odczytu
 
 - Dwa pomiary PV: **2387 W + 647 W = 3034 W** — dokładnie tyle co `sensor.pv_sum`. Dobre potwierdzenie agregacji odczytów obu MPPT w chwili zrzutu.
-- Równanie przykładowego bilansu **3034 W PV + 19 W baterii = 583 W domu + 2470 W eksportu = 3053 W** zamyka się **numerycznie**. Zgodność jest silną wskazówką przyjętej konwencji znaków, ale **nie** dowodzi wszystkich torów AC/DC, poprawności pomiaru przy ładowaniu i importowaniu ani stałości konwencji.
+- Równanie przykładowego bilansu **3034 W PV + 19 W baterii = 583 W domu + 2470 W eksportu = 3053 W** zamyka się **numerycznie**. **Uwaga metodologiczna:** trzeba sprawdzić, czy `home_energy_consumption` nie jest *wyliczony* z pozostałych sensorów; wówczas równanie byłoby tautologią. Nie dowodzi niezależności pomiarów, poprawności torów AC/DC ani znaków podczas importu i ładowania. Kontrakt: [MEASUREMENT_CONTRACT.md](MEASUREMENT_CONTRACT.md).
 - Odczyty pochodzą z różnych chwil (PV/dom około 13:24:14 UTC, eksport około 13:24:11 UTC, bateria około 13:24:09 UTC). W kontrolerze należy wymagać synchronizacji/tolerancji czasu, nie wymuszać idealnego bilansu z asynchronicznych próbek.
 - Prognoza PV „dziś” = 15,865 kWh, a zarejestrowana produkcja = 23,5 kWh. **Odchylenie jest naturalną możliwością prognozowania, nie automatycznym błędem systemu**. Do oceny jakości potrzeba odpowiadających sobie czasów/profili, migawek prognoz i informacji o curtailment, nie wymagać 100% zgodności.
 - `last_updated` to czas zmiany stanu/atrybutów HA, **nie musi być** czasem ostatniej telemetrii z urządzenia. Starsza data SOC lub sterowania nie dowodzi samodzielnie, że czujnik przestał działać; potrzebny `last_reported` lub równoważny sygnał nowej próbki, jeśli dostępny.
