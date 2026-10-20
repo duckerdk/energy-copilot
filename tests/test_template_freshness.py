@@ -120,6 +120,21 @@ def test_unchanged_native_pv_and_home_keep_real_timestamp_and_uncertainty():
     assert quality_report(issues)["input_state"] == "valid"
 
 
+@pytest.mark.parametrize("pv_w", [0, 3034])
+def test_old_native_pv_and_home_with_matching_sum_remain_valid(pv_w):
+    states = {
+        "pv": make_state("pv", pv_w, at=NOW - timedelta(hours=9)),
+        "grid": make_state("grid", 1200, at=NOW - timedelta(hours=3)),
+        "battery": make_state("battery", 1000, at=NOW - timedelta(hours=12)),
+        "home": make_state("home", pv_w + 2200, at=NOW - timedelta(hours=9)),
+    }
+    values, _, issues = measurements(
+        states, NOW, derived_templates={"pv": (), "home": ("pv", "grid", "battery")}
+    )
+    assert all(role in values for role in states)
+    assert quality_report(issues)["input_state"] == "valid"
+
+
 def test_stable_zero_non_native_pv_is_accepted():
     states = {r: make_state(r) for r in ("pv", "grid", "battery", "home")}
     states["pv"] = make_state("pv", 0, at=NOW - timedelta(hours=8))
@@ -128,14 +143,15 @@ def test_stable_zero_non_native_pv_is_accepted():
     assert Issue("stale_input", "pv") not in issues
 
 
-def test_old_home_must_match_pv_sum_grid_battery():
+def test_old_home_reports_value_mismatch_without_time_based_rejection():
     states = {r: make_state(r) for r in ("pv", "grid", "battery", "home")}
     states["home"] = make_state("home", 12345, at=NOW - timedelta(hours=2))
     values, _, issues = measurements(
         states, NOW, derived_templates={"home": ("pv", "grid", "battery")}
     )
-    assert "home" not in values
-    assert Issue("derived_value_inconsistent", "home") in issues
+    assert values["home"].value == 12345
+    assert Issue("derived_sum_time_uncertain", "home") in issues
+    assert quality_report(issues)["input_state"] == "uncertain"
 
 
 def test_pv_recovery_needs_new_template_report():
