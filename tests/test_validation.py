@@ -44,10 +44,39 @@ def test_measurement_validation(role, value, unit, code):
         measurement(role, make_state(role, value, unit=unit), NOW)
 
 
-@pytest.mark.parametrize("age", [timedelta(minutes=6), -timedelta(seconds=11)])
-def test_stale_or_future(age):
+@pytest.mark.parametrize(
+    "role",
+    [
+        "pv",
+        "grid",
+        "battery",
+        "home",
+        "soc",
+        "voltage",
+        "current",
+        "grid_alternative",
+        "daily_pv",
+        "daily_charge",
+        "daily_discharge",
+    ],
+)
+@pytest.mark.parametrize("hours", [1, 8, 48])
+def test_unchanged_live_measurements_do_not_expire(role, hours):
+    sample = measurement(role, make_state(role, at=NOW - timedelta(hours=hours)), NOW)
+    assert sample.at == NOW - timedelta(hours=hours)
+
+
+@pytest.mark.parametrize("role", ["pv", "grid", "battery", "home", "soc", "daily_pv"])
+def test_future_timestamp_still_rejected(role):
     with pytest.raises(ValueError, match="stale_input"):
-        measurement("pv", make_state("pv", at=NOW - age), NOW)
+        measurement(role, make_state(role, at=NOW + timedelta(seconds=11)), NOW)
+
+
+@pytest.mark.parametrize("role", ["pv", "grid", "battery", "home", "soc"])
+@pytest.mark.parametrize("bad", ["unknown", "unavailable", "nan"])
+def test_old_invalid_state_never_becomes_valid(role, bad):
+    with pytest.raises(ValueError, match="invalid_input"):
+        measurement(role, make_state(role, bad, at=NOW - timedelta(hours=12)), NOW)
 
 
 @pytest.mark.parametrize(
