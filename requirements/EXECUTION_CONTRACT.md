@@ -95,6 +95,18 @@ Propozycja określa: `proposal_id`, `plan_id`, okres UTC, `expires_at`, maksymal
 - Jeśli nie da się niezależnie pomierzyć energii eksportowanej **z baterii**, nie można egzekwować limitu zgody → eksport baterii zablokowany.
 - Gdy następuje utrata zgody podczas aktywnego eksportu, należy **zakończyć go wcześniej zweryfikowanym sposobem i potwierdzić stan fizyczny**. Jeśli brak takiego sposobu, funkcji tej w ogóle nie dopuszczać.
 
+### Klasy ryzyka trwałej nastawy po utracie HA
+
+Wg użytkownika **wszystkie** nastawy Deye z HA pozostają zapisane po zaniku HA. Executor musi klasyfikować każdą akcję przed aktywacją:
+
+| Klasa | Przykład | Wymóg przy utracie HA |
+| --- | --- | --- |
+| `persistent_limit` — fizycznie bezpieczne maksimum | Zweryfikowany limit ładowania baterii, np. niski limit PV | **Dopuszczalne tylko po wykazaniu**, że trwała wartość nie powoduje fizycznego niebezpieczeństwa; brak przyszłej korekty może oznaczać **koszt ekonomiczny**, logowany osobno, nie domniemaną awarię BMS |
+| `requires_autonomous_end` — działanie ograniczone czasem lub energią | Celowe ładowanie sieciowe w tanich godzinach, zatwierdzony eksport baterii | Wymaga **sprzętowo samodzielnego, przetestowanego zakończenia** bez HA i mechanizmu kontroli energii; nie polegać na jutrzejszym `switch.turn_off` |
+| `multi_setting_persistent` — złożona nastawa | Zmiana sześciu przedziałów TOU | Wymaga bezpiecznego pośredniego i końcowego stanu oraz analizy powtórzenia harmonogramu po północy i następnego dnia |
+
+**Interpretacja wymogu fail-safe:** nie oznacza konieczności mechanicznego resetu wszystkich bezpiecznych limitów przy zaniku HA. Oznacza dowiedzenie, że **fizyczny stan utrzymywany bez HA** pozostaje dopuszczalny i chroniony niezależnie przez falownik/BMS. Dla cykli zależnych od zakończenia w określonym czasie ten warunek nie jest spełniony samym ograniczeniem prądu. Brak stosownego dowodu blokuje tylko daną klasę działania. Sposób porównywania strategii: [CONTROL_STRATEGY.md](CONTROL_STRATEGY.md).
+
 ## 7. Anulowanie, konflikt, restart i awaria
 
 | Zdarzenie | Działanie |
