@@ -73,6 +73,18 @@ jobs:
 
           Fix #5 Forecast.Solar interval semantics: Wh belongs to the interval ending at its timestamp, including the final short sunset period. Preserve the original energy of a partially elapsed interval and do not invent nighttime zeros. Add per-quarter Recorder rejection reasons, negative-home auditing, RecorderRuns context and Python report/change timestamps. Preserve but quarantine old normalized forecast history whose original end-indexed Wh is unavailable. Full synthetic/anonymized regression suite; no private household history, no price changes and no inverter commands.
           EOF_ISSUE5
+          elif [ "$RELEASE_TAG" = "v0.1.3" ]; then
+            cat >> /tmp/energy-copilot-release-notes.md <<'EOF_M2_POLICY'
+
+          M2 read-only update from PR #7:
+          - Apply the approved max(0, home_raw) policy to valid current inputs and Recorder subintervals. Keep HA source entities unchanged. Missing/unavailable sources, invalid units, source-recovery uncertainty and recording gaps remain missing data.
+          - Retain complete corrected quarters and expose aggregate correction counts, duration and raw/effective energy. Keep observed partial energy separate without interpolation across gaps.
+          - Input quality describes required current inputs; historical/informational warnings remain visible without permanently degrading healthy inputs. Planner readiness and physical AC/DC consumption remain unverified.
+          - Default diagnostics export aggregates only; detailed local home samples are opt-in and redacted from standard recent/backfill exports.
+          - Classify solar-night/daylight/twilight from the selected Forecast.Solar location without inventing forecast zeros. Preserve end-indexed Wh and decision-time availability.
+
+          Validation: 213 automated tests; Ruff, formatting, documentation, tag/manifest/source checks and reproducible package validation. Anonymized/synthetic regressions are not a replay or an accuracy claim for the private HA installation. No inverter commands or M3-M6 implementation.
+          EOF_M2_POLICY
           fi
           gh release create "$RELEASE_TAG" \
             /tmp/energy-copilot-release/energy_copilot.zip \
