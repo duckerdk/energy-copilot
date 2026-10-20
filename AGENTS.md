@@ -16,6 +16,8 @@ Buduj **niestandardową integrację Home Assistant** w custom_components/energy_
 4. Testy z fikcyjnymi encjami i zanonimizowanymi, legalnie udostępnionymi danymi historycznymi; walidacja `walk-forward` bez przyszłych prognoz, z zachowaniem ograniczenia PV (curtailment), zgodnie z requirements/BACKTEST_VALIDATION.md. Bez wywołania usług sterujących.
 5. Dopiero po spełnieniu blokad opisanych w OPEN_ITEMS.md przygotuj osobny, możliwy do włączenia przez użytkownika moduł wykonawczy. **Nie włączaj go samodzielnie**.
 
+**Sterowanie w czasie:** przeczytaj [requirements/CONTROL_STRATEGY.md](requirements/CONTROL_STRATEGY.md). Bazowy translator planu używa istniejących encji HA do regulowania **limitów** prądu; zachowuje zastany TOU, dopóki nie udowodniono korzyści i bezpieczeństwa dynamicznego przepisywania okien. Same limity A nie realizują bezpośrednio mocy kW ani celu SOC. Każda nastawa Deye zostaje po utracie HA — uwzględnij to w planie i testach. Nie programuj zmian TOU według każdej ceny kwadransowej.
+
 ## Niezmienniki
 
 - Nie utożsamiaj eksportu PV ze sprzedażą z baterii; przełącznik zezwolenia na eksport nie dowodzi kontroli źródła eksportowanej energii.
