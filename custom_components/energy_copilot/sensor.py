@@ -47,6 +47,7 @@ class InputQualitySensor(CoordinatorEntity, SensorEntity):
             "issue_codes": sorted({issue.code for issue in data.issues}),
             "issue_categories": self.coordinator.quality["categories"],
             "quality_scope": self.coordinator.quality["quality_scope"],
+            "forecast_state": self.coordinator.quality["forecast_state"],
             "load_profile_readiness": self.coordinator.quality[
                 "load_profile_readiness"
             ],
