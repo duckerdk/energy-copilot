@@ -20,7 +20,7 @@
 | `monitor` | Odczyt pomiarów, diagnostyka; zero zapisów |
 | `dry_run` | Symulacja i publikacja planu; zero zapisów |
 | `supervised_test` | Jeden jawnie zatwierdzony test pojedynczej, zweryfikowanej funkcji ze sprawdzonym sposobem powrotu |
-| `automatic_non_export` | Tylko potwierdzone bezpieczne funkcje nieeksportujące baterii po P0 |
+| `automatic_non_export` | Po P0 również autonomiczne `switch.sun12k_solar_sell` ON/OFF na podstawie ceny z HA i progu **0,40 DKK/kWh**; **nie** uprawnia do eksportu baterii [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md) |
 | `automatic_with_approved_export` | Jak wyżej, dodatkowo w granicach ważnej zgody na konkretny eksport baterii |
 
 Wzrost uprawnień **nie następuje automatycznie po restarcie**, zmianie wersji planu ani dodaniu encji. `monitor`/`dry_run` to domyślne tryby działania. Znaczenie encji przyjmujemy projektowo z kontraktu HA, natomiast nazwy ani opis YAML nie potwierdzają jeszcze skutku fizycznego nastaw.
@@ -40,6 +40,8 @@ Dla każdej operacji stworzyć rekord:
 | `stop_method / recovery_method` | Sprawdzona procedura przerwania, wznowienia i przywrócenia normalnego trybu |
 | `loss_of_HA_behavior` | Wynik fizycznego testu zaniku HA i łączności; warunek niezależnego fail-safe |
 | `validation_evidence / status` | Data, test, obserwacja i wynik; tylko `validated_write` dopuszcza akcję |
+
+Użytkownik **zaakceptował automatyczne sterowanie zezwoleniem na eksport PV** `switch.sun12k_solar_sell` według progu 0,40 DKK/kWh bez przeliczeń ceny. Samo zezwolenie nie jest zgodą na eksport baterii. Przed live obowiązuje test skutku i możliwości bezpiecznego przełączenia. [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md).
 
 Działanie złożone wymaga potwierdzenia, że **zestaw** akcji rzeczywiście realizuje zamierzony przepływ. `charge_power_kw = 2` nie może zostać „zrealizowane” samym włączeniem przełącznika grid charge. Podobnie globalne zezwolenie na eksport nie dowodzi bezpiecznego rozdzielenia PV i baterii.
 
