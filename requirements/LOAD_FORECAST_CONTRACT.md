@@ -6,9 +6,9 @@
 
 ## 1. Sygnał i definicja popytu
 
-- Podstawowy pomiar HA: `sensor.home_energy_consumption`, jednostka **W**; w migawce 19.10.2026: **583 W**.
+- Podstawowa encja do prognozy: `sensor.home_energy_consumption`, jednostka **W**; w migawce 19.10.2026: **583 W**. **Potwierdzona definicja użytkownika:** `pv_sum + sun12k_total_grid_power + sun12k_battery_output_power` (encja HA template, nie niezależny licznik). Nie tworzyć dodatkowego sensora tylko dlatego, że jest pochodna.
 - Drugi pomiar: `sensor.sun12k_load_totalpower` = **532 W** w tej samej migawce. **Nie zamieniać** automatycznie, ponieważ może oznaczać inny punkt fizyczny (np. obciążenie wyjścia falownika, a nie całego domu).
-- Do przewidywania popytu ekonomicznego potrzebna jest **moc odbiorników domu**, oddzielna od przepływu ładowania baterii, eksportu PV i zmiennych decyzji Co-Pilota. Jeżeli pierwsza encja nie spełnia tej definicji, jest to problem mapowania źródła, a nie powód do użycia starej prognozy Battery Controller.
+- Co-Pilot **przyjmuje istniejącą encję domu bez dalszych pytań o niezależny punkt pomiarowy**. Jej 3 składowe mają fizyczną semantykę odpowiednio PV, sieć i bateria; obecny wzór jest obowiązującym źródłem profilu. Ponieważ HA stosuje `float(0)`, przy braku którejkolwiek składowej oznaczyć wynik `invalid_input`, aby brak danych nie udawał mniejszego popytu.
 - `sensor.battery_controller_consumption_forecast` i wszystkie `battery_controller.*` są nieaktywnymi pozostałościami i **nie mogą być wejściem prognozy**.
 
 ## 2. Pozyskiwanie historii
@@ -69,7 +69,7 @@ Nie wyliczać profilu z samego stanu końcowego lub średniej `state_class` bez 
 - `LOAD-02`: 1000 W przez 15 min → 0,250 kWh i 1,0 kW.
 - `LOAD-03`: `unknown` przez połowę kwadransa → coverage 50%, nie 0 W.
 - `LOAD-04`: brak Recorder → `insufficient_history` i sensowny komunikat, bez danych z `battery_controller.*`.
-- `LOAD-05`: `sensor.home_energy_consumption = 583 W` i `sensor.sun12k_load_totalpower = 532 W` → nie utożsamiać definicji pomiarów.
+- `LOAD-05`: `sensor.home_energy_consumption = 583 W` z template `3034−2470+19`, zaś `sensor.sun12k_load_totalpower = 532 W` → używać **ustalonego** źródła domu, nie podmieniać go innym pomiarem.
 - `LOAD-06`: całkowicie pusta historia → tylko `recent_load_baseline` w trybie `provisional` / dry-run, nie udawana prognoza po dobie.
 - `LOAD-07`: mało danych na konkretny dzień tygodnia → przejście do agregatu roboczy/weekend lub godzinowego z etykietą jakości.
 - `LOAD-08`: wartości ujemne/niefinita bez zweryfikowanej semantyki → odrzucenie z przyczyną, nie absolutna wartość.
@@ -80,6 +80,6 @@ Nie wyliczać profilu z samego stanu końcowego lub średniej `state_class` bez 
 - `LOAD-13`: po replanowaniu stare prognozy zachowane w rejestrze, nowa ma nowy `training_cutoff`.
 - `LOAD-14`: sztuczna historyczna fikstura 30 dni, prognoza t0 oparta tylko na pierwszych 20 → dni 21–30 nie trafiają do cech prognozy przed t0.
 - `LOAD-15`: brak przyszłej ceny mimo wystarczającej prognozy domu → planner kończy plan na znanej cenie, a nie horyzoncie load.
-- `LOAD-16`: istotna rozbieżność pomiaru po aktywacji baterii → diagnostyka źródła, a nie automatyczna korekta historycznych zużyć.
+- `LOAD-16`: chwilowe `unavailable` jednego ze składników `home_energy_consumption` przy `float(0)` → wynik domu `invalid_input`, nie uczenie na sztucznie zaniżonym popycie.
 
 **Odbiór:** źródło Recorder, profil i wszystkie założenia jakości są dostępne w natywnym HA, oddzielone od fizycznego sterowania. Nie jest potrzebne żadne nowe źródło zużycia od użytkownika do stworzenia modułu prognostycznego; rzeczywista jakość zostanie zbadana po uruchomieniu na historii HA.
