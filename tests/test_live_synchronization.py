@@ -89,7 +89,7 @@ def test_home_report_lag_tracks_changed_inputs_not_unchanged_heartbeats():
     states["battery"] = timed("battery", change_age=1)
     values, _, issues = measurements(states, NOW)
     assert "home" in values
-    assert {i.code for i in issues} == {"home_context_lag"}
+    assert not issues
     assert live_timing(states)["home_context_lag_seconds"] == 99
 
 
