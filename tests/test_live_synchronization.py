@@ -279,8 +279,7 @@ async def test_native_template_does_not_re_report_for_unchanged_dependency(
     hass, freezer
 ):
     freezer.move_to(NOW)
-    hass.states.async_set("sensor.source_pv1", "60")
-    hass.states.async_set("sensor.source_pv2", "40")
+    hass.states.async_set("sensor.source_pv", "100")
     hass.states.async_set("sensor.source_grid", "200")
     assert await async_setup_component(
         hass,
@@ -292,7 +291,7 @@ async def test_native_template_does_not_re_report_for_unchanged_dependency(
                         {
                             "name": "Synthetic PV",
                             "unit_of_measurement": "W",
-                            "state": "{{ states('sensor.source_pv1') | float(0) + states('sensor.source_pv2') | float(0) }}",
+                            "state": "{{ states('sensor.source_pv') | float(0) }}",
                         },
                         {
                             "name": "Synthetic home",
@@ -312,7 +311,7 @@ async def test_native_template_does_not_re_report_for_unchanged_dependency(
     freezer.tick(timedelta(seconds=20))
     hass.states.async_set("sensor.source_pv1", "60")
     await hass.async_block_till_done()
-    assert hass.states.get("sensor.source_pv1").last_reported > at
+    assert hass.states.get("sensor.source_pv").last_reported > at
     assert hass.states.get("sensor.synthetic_pv").last_reported <= at
     assert hass.states.get("sensor.synthetic_home").last_reported == at
     freezer.tick(timedelta(seconds=20))
