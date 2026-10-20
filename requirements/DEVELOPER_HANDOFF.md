@@ -8,8 +8,8 @@ Lokalną, własną integrację Home Assistant (`custom_components/energy_copilot
 
 **Zasady nienegocjowalne:**
 
-- dynamiczny docelowy SOC, brak stałych progów sprzedaży/rezerwy;
-- cena eksportu = spot minus `0,0215 DKK/kWh` prowizji Vindstød; cena zakupu to oddzielna cena końcowa z opłatami;
+- dynamiczny docelowy SOC, **próg eksportu PV 0,40 DKK/kWh z encji HA** (decyzja użytkownika); brak arbitralnej stałej rezerwy SOC;
+- zakup `sensor.energi_data_service`, sprzedaż `sensor.energi_data_spotpris` — **dokładnie wartości HA, bez rozliczania prowizji, podatków czy taryf**; automatyczne ON/OFF eksportu PV zgodnie z [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md);
 - opublikowane ceny na kolejną dobę zwykle docierają około 13:00 poprzedniego dnia; koniec planu wyznacza ostatni **rzeczywiście opublikowany** slot, nie stałe 48 h;
 - rozróżnienie PV potencjalnego, uzyskanego i ograniczonego; nie uczyć błędu prognozy na sztucznie ograniczonej produkcji;
 - bez indywidualnej ważnej zgody **zakaz celowego eksportu energii z baterii**;
@@ -40,6 +40,7 @@ Lokalną, własną integrację Home Assistant (`custom_components/energy_copilot
 | 16a | [PV_FORECAST_CONTRACT.md](PV_FORECAST_CONTRACT.md) | Natywna akcja Forecast.Solar, pełny profil w `wh_period`/`watts`, 18 testów PVF |
 | 16b | [LOAD_FORECAST_CONTRACT.md](LOAD_FORECAST_CONTRACT.md) | Wewnętrzna prognoza popytu z HA Recorder i 16 testów LOAD |
 | 16c | [MEASUREMENT_CONTRACT.md](MEASUREMENT_CONTRACT.md) | Istniejące encje PV/dom/bateria/sieć, **potwierdzony wzór domu**, bez dodatkowej aparatury; 22 testy MTR |
+| 16e | [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md) | Zezwolenie na automatyczny eksport PV od ceny 0,40 DKK/kWh **wprost z HA**, 20 testów PVE |
 | 16d | [HA_TIMESERIES_CAPTURE.md](HA_TIMESERIES_CAPTURE.md) | Tylko archiwalne narzędzie diagnostyczne; nie wymaga działania użytkownika |
 | 17 | [OPEN_ITEMS.md](OPEN_ITEMS.md) | Aktualne P0/P1/P2 — nie udawać, że wszystkie są już rozwiązane |
 
@@ -68,7 +69,7 @@ Nie są to wzory, których ma dostarczyć użytkownik. Programista i projekt mus
 4. **Statystyczny model niepewności PV i zużycia** — aktualizacja po zgromadzeniu archiwum dawnych prognoz, bez nadpisywania migawek.
 5. **Wartość energii na końcu horyzontu cenowego** — model musi chronić przed sztucznym opróżnianiem baterii, ale nie wymyślać nieopublikowanych cen.
 6. **Karty zweryfikowanych sterowań** — oddzielna kontrola ładowania, eksportu PV, eksportu baterii, SOC oraz sposobu zatrzymania/odzyskiwania po utracie HA.
-7. **Rozliczenie rzeczywiste** — stosować potwierdzoną przez użytkownika końcową cenę zakupu HA bez naliczania taryf ponownie i cenę sprzedaży spot − 0,0215 DKK/kWh; nie blokować parsera cen oczekiwaniem na ponowne wyjaśnienia.
+7. **Ceny HA:** stosować wartości zakupu i sprzedaży dokładnie z encji, bez przeliczeń lub prób korygowania rachunku. Minimalna cena eksportu PV to 0,40 DKK/kWh w cenie sprzedaży HA [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md).
 
 Punkty 1–5 i 7 wpływają na jakość planu; punkt 6 i sprzętowy fail-safe **blokują rzeczywiste sterowanie**. Nie traktować braku tych danych jako zaproszenia do zgadywania.
 
@@ -94,7 +95,7 @@ Nie rozpoczynać kodowania na podstawie samej decyzji o kompletności dokumentac
 
 **Audyt dokumentów (aktualizacja 2026-10-20):**
 - Sprawdzenie odwołań względnych między plikami Markdown: **brak zerwanych odwołań do plików**.
-- Testy opisane w dokumentacji: **40** scenariuszy PHY/ECO/SOC/TIME/PVQ/SAFE/MAP + **18** PRICE + **18** PVF + **16** LOAD + **22** MTR + **16** CTRL + **20** CUR + **12** EXE + **11** UI + **10** LOG + **10** UNC + **12** BKT + **7** CAL = **212** przypadków specyfikacyjnych.
+- Testy opisane w dokumentacji: **40** scenariuszy PHY/ECO/SOC/TIME/PVQ/SAFE/MAP + **18** PRICE + **20** PVE + **18** PVF + **16** LOAD + **22** MTR + **16** CTRL + **20** CUR + **12** EXE + **11** UI + **10** LOG + **10** UNC + **12** BKT + **7** CAL = **232** przypadki specyfikacyjne.
 - Nowe testy **ECO-08 i ECO-09** weryfikują rachunek marginalny i porównanie opłacalności bez dobierania celu 65% z góry; ECO-08 przewiduje wynik **+0,4152 DKK** przy jawnie określonych stratach i degradacji. To wzorzec analityczny, nie wynik pracy kodu.
 - Nadal **nieweryfikowane** są: parametry torów AC/DC, **test odpowiedzi obecnej w HA akcji Forecast.Solar**, jakość i retencja historii popytu Recorder, realne krzywe sprawności, koszt degradacji, historyczne migawki prognoz, funkcja terminalnej wartości energii i niezależny fail-safe. **Ceny oraz metody pobierania profilu PV i prognozowania zużycia są zdefiniowane**; nie wymagają dodatkowych założeń użytkownika.
 - Testy zapisano jako przypadki do zaimplementowania; dopóki nie powstanie kod, nie należy ich nazywać „wykonanymi”.
