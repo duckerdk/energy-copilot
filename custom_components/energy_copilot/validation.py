@@ -48,7 +48,7 @@ def measurement(role, state, now, *, historical=False, allow_old_report=False):
         at = utc(state.last_updated if historical else state.last_reported)
     except ValueError, TypeError, OverflowError:
         raise ValueError("invalid_input") from None
-    if at > now + MAX_FUTURE_OFFSET or (not allow_old_report and now - at > MAX_AGE):
+    if at > now + MAX_FUTURE_OFFSET or (\n        not allow_old_report\n        and now - at > MAX_AGE\n        and not (role == "pv" and value == 0)\n    ):
         raise ValueError("stale_input")
     unit = state.attributes.get("unit_of_measurement")
     expected = (
@@ -132,7 +132,7 @@ def _derived_measurements(states, values, issues, now, templates, recovery):
     is checked, not a private HA dependency graph or a physical AC/DC model.
     An observed outage still requires a subsequent actual template report.
     """
-    # pv_sum is the only configured PV source; no PV1/PV2 corroboration.
+    # pv_sum is the only configured PV source; no PV1/PV2 corroboration.\n    # An unchanged zero is a valid HA state, not a missing heartbeat.
     if "pv" in templates and "pv" not in values:
         try:
             original = measurement("pv", states.get("pv"), now, allow_old_report=True)
