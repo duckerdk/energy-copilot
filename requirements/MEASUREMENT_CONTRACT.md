@@ -8,7 +8,7 @@
 
 | Rola logiczna | Podstawowa encja HA | Zaobserwowane | Interpretacja do przyjęcia projektowo |
 | --- | --- | --- | --- |
-| Moc PV rzeczywista | `sensor.pv_sum` | +3034 W | Suma mocy wejścia PV z MPPT, **najpewniej DC**; potwierdzić miejsce i zależność od innych szablonów |
+| Moc PV rzeczywista | `sensor.pv_sum` | +3034 W | **Potwierdzone przez użytkownika:** suma mocy dostarczanej na wejścia PV DC falownika (MPPT1 + MPPT2), przed rozdziałem na baterię/dom/eksport. Nie mierzy niewykorzystanego potencjału PV |
 | PV wejście MPPT 1 | `sensor.sun12k_pv1_power` | +2387 W | Składnik agregatu, **nie dodawać ponownie** do `pv_sum` |
 | PV wejście MPPT 2 | `sensor.sun12k_pv2_power` | +647 W | Składnik agregatu, **nie dodawać ponownie** do `pv_sum` |
 | Zużycie domu | `sensor.home_energy_consumption` | +583 W | **Potwierdzony template:** `pv_sum + total_grid_power + battery_output_power`; wejście operacyjne, **nie niezależny pomiar** |
