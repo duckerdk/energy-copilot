@@ -94,6 +94,12 @@ Podana migawka numerycznie pasuje. Dodatkowe sprawdzenia:
 6. Błąd bilansu nie jest automatycznie błędem falownika ani powodem „uczenia korekty mocy”. Najpierw kierunki znaków, punkty AC/DC, pochodność szablonów, rozdzielczość, asynchroniczność i straty.
 7. Gdy pomiary importu/eksportu nie są zweryfikowane w obu kierunkach, monitor/dry-run nadal działa z ograniczoną diagnostyką; **nie raportować oszczędności z dokładnością do groszy jako empirycznie dowiedzionych**.
 
+### Historia sensora pochodnego — kontrola jakości po czasie
+
+`sensor.home_energy_consumption` jest wyliczany z trzech źródeł przy użyciu `float(0)`. Weryfikacja tylko **aktualnych** `pv_sum`, `total_grid_power` i `battery_output_power` **nie oczyszcza danych historycznych**. Dla każdego interwału uczenia i backtestu ustalić, czy źródła były wtedy dostępne i zsynchronizowane; historyczny template o stanie liczbowym może być błędny mimo obecnie poprawnych encji. Jeśli Recorder nie zachował niezbędnych historii źródeł, oznaczyć `historical_quality_unverifiable`, wyłączyć te sloty z walidacji kosztów i nie raportować empirycznej dokładności. Nie imputować po cichu 0 kW.
+
+**Regresja MTR-23:** szablon historii pokazuje 2 kW, podczas gdy historyczny stan składowej `grid_power` to `unavailable` → slot nie jest wiarygodną obserwacją `home_energy_consumption` do modelu lub backtestu, nawet gdy bieżąca moc sieci jest już poprawna.
+
 ## 6. Testy do zaimplementowania — fikcyjne serie
 
 - `MTR-01`: migawka PV=3034 W, bateria=+19 W, sieć=−2470 W, dom=583 W → residual=0 W i **status `single_snapshot_only`**, nie `verified_independent_balance`.
