@@ -64,7 +64,7 @@ def constructed_post_012_day():
     return start, rows, tuple(runs)
 
 
-def test_nine_negative_quarters_plus_three_short_gaps_are_twelve_not_zero_filled():
+def test_nine_corrected_quarters_are_retained_while_three_real_gaps_stay_missing():
     start, rows, runs = constructed_post_012_day()
     slots = reconstruct_history(rows, DEFAULT_ENTITIES, start, NOW, runs)
     audit = rejection_audit(slots, runs)
@@ -73,14 +73,15 @@ def test_nine_negative_quarters_plus_three_short_gaps_are_twelve_not_zero_filled
         sum(s.home_kwh is not None for s in slots) == FIXTURE["expected_valid_quarters"]
     )
     assert audit["rejected_slots"] == FIXTURE["expected_rejected_quarters"]
-    assert audit["rejection_reason_slots"]["negative_home_power"] == 9
+    assert "negative_home_power" not in audit["rejection_reason_slots"]
+    assert audit["corrected_home_slots"] == 9
     assert audit["rejection_reason_slots"]["recorder_recording_gap"] == 3
-    assert audit["negative_home_and_recording_gap_slots"] == 0
+    assert audit["corrected_home_and_recording_gap_slots"] == 0
     assert (
         negative_home_audit(rows, DEFAULT_ENTITIES, start, NOW, runs)["records"] == 27
     )
     assert sum(s.unobserved_seconds for s in slots) == pytest.approx(
-        9 * 5 + sum(FIXTURE["gap_seconds"])
+        sum(FIXTURE["gap_seconds"])
     )
     assert sum(s.observed_seconds + s.unobserved_seconds for s in slots) == 86400
     for quarter, duration in zip(
@@ -114,12 +115,12 @@ async def test_recent_reader_distinguishes_quarter_loss_from_unobserved_time(
     ):
         await reader.async_read_window(start, NOW)
     result = reader.last_read_summary
-    assert result["valid_slots"] == 84
-    assert result["partial_slots"] == 12
+    assert result["valid_slots"] == 93
+    assert result["partial_slots"] == 3
     assert result["negative_home_records_in_window"] == 27
-    assert result["coverage_fraction"] == 0.875
+    assert result["coverage_fraction"] == 93 / 96
     assert result["observed_time_fraction"] == pytest.approx(
-        (86400 - 45 - sum(FIXTURE["gap_seconds"])) / 86400
+        (86400 - sum(FIXTURE["gap_seconds"])) / 86400
     )
     assert result["unobserved_reason_seconds"][
         "recorder_recording_gap"
@@ -127,7 +128,15 @@ async def test_recent_reader_distinguishes_quarter_loss_from_unobserved_time(
     assert result["physical_consumption_verified"] is False
     assert result["partial_energy_extrapolated"] is False
     assert result["negative_home_audit"]["context_counts"]["template_sum_matches"] == 27
-    assert result["negative_home_audit"]["events_truncated"] is True
+    assert "events" not in result["negative_home_audit"]
+    normalization = result["home_normalization"]
+    assert normalization["corrected_records"] == 27
+    assert normalization["corrected_segments"] == 9
+    assert normalization["corrected_seconds"] == 45
+    assert normalization["correction_kwh"] == pytest.approx(9 * 62 / 3_600_000)
+    assert normalization["observed_effective_kwh"] - normalization[
+        "observed_raw_kwh"
+    ] == pytest.approx(normalization["correction_kwh"])
     assert all(r["closed_incorrect"] is False for r in result["recording_runs"])
     assert (
         result["device_freshness_verified"]
@@ -150,7 +159,12 @@ def test_numeric_template_during_unavailable_sources_is_not_usable_energy():
     rows[DEFAULT_ENTITIES["grid"]].append(make_state("grid", -20, at=later))
     rows[DEFAULT_ENTITIES["home"]].append(make_state("home", -20, at=later))
     audit = negative_home_audit(
-        rows, DEFAULT_ENTITIES, start, NOW, (RecordingRun(start, NOW),)
+        rows,
+        DEFAULT_ENTITIES,
+        start,
+        NOW,
+        (RecordingRun(start, NOW),),
+        include_events=True,
     )
     assert audit["events"][0]["invalid_sources"] == {"grid": "invalid_input"}
     assert audit["events"][0]["template_residual_w"] is None  # No future row lookahead.
@@ -162,7 +176,8 @@ def test_numeric_template_during_unavailable_sources_is_not_usable_energy():
         rows, DEFAULT_ENTITIES, start, NOW, (RecordingRun(start, NOW),)
     )[0]
     assert slot.home_kwh is None
-    assert slot.observed_seconds == 60
+    assert slot.observed_seconds == 899
+    assert slot.home_correction_seconds == 839
     assert slot.observed_home_kwh == pytest.approx(0.2 / 60)
 
 
@@ -175,7 +190,9 @@ def test_no_evidence_is_not_observed_zero_and_audit_details_are_bounded():
     for second in range(100):
         rows[DEFAULT_ENTITIES["home"]].append(
             make_state(
-                "home", -1 if second % 2 else 100, at=start + timedelta(seconds=second)
+                "home",
+                "unavailable" if second % 2 else 100,
+                at=start + timedelta(seconds=second),
             )
         )
     slot = reconstruct_history(

@@ -25,18 +25,14 @@ MAX_AUDIT_INTERVALS = 96
 def rejection_audit(slots, runs=()):
     """Bounded interval evidence without values or private household time series.
 
-    Reason counts overlap: one quarter can contain both a negative home sample
-    and a run gap. Only the union equals the number of rejected quarters.
+    A normalized quarter can also contain a real gap and remain rejected.
+    Normalization alone never constitutes a rejection reason.
     """
     rejected = [slot for slot in slots if slot.home_kwh is None]
     by_reason = Counter(
         code for slot in rejected for code in {i.code for i in slot.issues}
     )
-    negative = {
-        slot.start
-        for slot in rejected
-        if any(i.code == "negative_home_power" for i in slot.issues)
-    }
+    corrected = {slot.start for slot in slots if slot.home_correction_seconds > 0}
     gaps = {
         slot.start
         for slot in rejected
@@ -71,8 +67,9 @@ def rejection_audit(slots, runs=()):
         ],
         "rejected_intervals_truncated": len(rejected) > MAX_AUDIT_INTERVALS,
         "rejection_reason_slots": dict(sorted(by_reason.items())),
-        "negative_home_and_recording_gap_slots": len(negative & gaps),
-        "negative_home_or_recording_gap_slots": len(negative | gaps),
+        "corrected_home_slots": len(corrected),
+        "corrected_home_and_recording_gap_slots": len(corrected & gaps),
+        "corrected_home_rejected_slots": len(corrected & {s.start for s in rejected}),
         "recording_runs": [
             {
                 "start_utc": run.start.isoformat(),
@@ -85,6 +82,27 @@ def rejection_audit(slots, runs=()):
             for run in runs[:MAX_AUDIT_INTERVALS]
         ],
         "recording_runs_truncated": len(runs) > MAX_AUDIT_INTERVALS,
+    }
+
+
+def home_normalization_summary(slots):
+    """Aggregate energy only on observed portions; source row counts exclude carry-in."""
+    observed = sum(s.observed_seconds for s in slots)
+    seconds = sum(s.home_correction_seconds for s in slots)
+    return {
+        "policy": "max_zero_when_sources_valid",
+        "corrected_records": sum(s.home_correction_records for s in slots),
+        "corrected_segments": sum(s.home_correction_segments for s in slots),
+        "corrected_seconds": seconds,
+        "corrected_observed_fraction": seconds / observed if observed else None,
+        "observed_raw_kwh": sum(s.observed_raw_home_kwh or 0 for s in slots)
+        if observed
+        else None,
+        "observed_effective_kwh": sum(s.observed_home_kwh or 0 for s in slots)
+        if observed
+        else None,
+        "correction_kwh": sum(s.home_correction_kwh for s in slots),
+        "physical_consumption_verified": False,
     }
 
 
@@ -158,8 +176,10 @@ class RecorderHistoryReader:
             "rejected_intervals": [],
             "rejected_intervals_truncated": False,
             "rejection_reason_slots": {},
-            "negative_home_and_recording_gap_slots": 0,
-            "negative_home_or_recording_gap_slots": 0,
+            "corrected_home_slots": 0,
+            "corrected_home_and_recording_gap_slots": 0,
+            "corrected_home_rejected_slots": 0,
+            "home_normalization": home_normalization_summary(()),
             "recording_runs": [],
             "recording_runs_truncated": False,
             "whole_slot_policy": "complete_observed_quarter_required",
@@ -202,10 +222,27 @@ class RecorderHistoryReader:
             + Counter(chunk["rejection_reason_slots"])
         )
         for key in (
-            "negative_home_and_recording_gap_slots",
-            "negative_home_or_recording_gap_slots",
+            "corrected_home_slots",
+            "corrected_home_and_recording_gap_slots",
+            "corrected_home_rejected_slots",
         ):
             summary[key] += chunk[key]
+        normalization = summary["home_normalization"]
+        for key in (
+            "corrected_records",
+            "corrected_segments",
+            "corrected_seconds",
+            "correction_kwh",
+        ):
+            normalization[key] += chunk["home_normalization"][key]
+        for key in ("observed_raw_kwh", "observed_effective_kwh"):
+            if (value := chunk["home_normalization"][key]) is not None:
+                normalization[key] = (normalization[key] or 0) + value
+        normalization["corrected_observed_fraction"] = (
+            normalization["corrected_seconds"] / summary["observed_seconds"]
+            if summary["observed_seconds"]
+            else None
+        )
         # Multi-month backfills retain only the latest chunk's bounded interval audit.
         summary["rejected_intervals_last_chunk"] = chunk["rejected_intervals"]
         summary["rejected_intervals_last_chunk_truncated"] = chunk[
@@ -291,6 +328,7 @@ class RecorderHistoryReader:
             ),
         )
         summary.update(rejection_audit(slots, runs))
+        summary["home_normalization"] = home_normalization_summary(slots)
         summary["negative_home_audit"] = home_audit
         summary["observed_seconds"] = sum(s.observed_seconds for s in slots)
         summary["unobserved_seconds"] = sum(s.unobserved_seconds for s in slots)

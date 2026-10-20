@@ -380,3 +380,35 @@ async def test_disabling_while_job_waits_does_not_read_historical_rows(
     with pytest.raises(HistoryReadError, match="recorder_disabled"):
         await reader.async_read_window(NOW - timedelta(minutes=15), NOW)
     assert not query.called
+
+
+async def test_backfill_aggregates_clamp_energy_without_duplicate_carry_counts(
+    hass, fake_recorder
+):
+    query, _ = fake_recorder
+
+    def negative_day(_hass, start, end, **kwargs):
+        return {
+            DEFAULT_ENTITIES[role]: [
+                make_state(role, -100 if role == "home" else 0, at=start)
+            ]
+            for role in HISTORY_ROLES
+        }
+
+    query.side_effect = negative_day
+    reader = RecorderHistoryReader(hass, DEFAULT_ENTITIES)
+    quarters = 0
+    async for batch in reader.async_iter_slots(NOW - timedelta(days=2), NOW):
+        quarters += len(batch)
+        assert all(s.home_kwh == 0 and not s.issues for s in batch)
+    assert quarters == 192
+    summary = reader.last_backfill_summary
+    assert summary["valid_slots"] == 192 and summary["rejected_slots"] == 0
+    audit = summary["home_normalization"]
+    assert audit["corrected_records"] == 2
+    assert audit["corrected_seconds"] == 2 * 86400
+    assert audit["corrected_observed_fraction"] == 1
+    assert audit["observed_raw_kwh"] == pytest.approx(-4.8)
+    assert audit["observed_effective_kwh"] == 0
+    assert audit["correction_kwh"] == pytest.approx(4.8)
+    assert "events" not in summary["negative_home_audit_last_chunk"]

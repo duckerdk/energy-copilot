@@ -14,6 +14,8 @@ class Issue:
 class Sample:
     value: float
     at: datetime
+    # Local provenance only; standard diagnostics never serialize samples.
+    raw_value: float | None = None
 
 
 @dataclass(frozen=True)
@@ -66,6 +68,11 @@ class HistorySlot:
     unobserved_reason_seconds: tuple[tuple[str, float], ...] = ()
     unobserved_intervals: tuple[HistoryGap, ...] = ()
     unobserved_intervals_truncated: bool = False
+    observed_raw_home_kwh: float | None = None
+    home_correction_seconds: float = 0
+    home_correction_records: int = 0
+    home_correction_segments: int = 0
+    home_correction_kwh: float = 0
 
 
 @dataclass

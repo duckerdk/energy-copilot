@@ -38,6 +38,7 @@ def utc(value):
 
 
 def measurement(role, state, now, *, historical=False):
+    """Validate a signed sample; home normalization needs the full source context."""
     if state is None or state.state in ("unknown", "unavailable"):
         raise ValueError("invalid_input")
     try:
@@ -74,7 +75,6 @@ def measurement(role, state, now, *, historical=False):
             "daily_pv",
             "daily_charge",
             "daily_discharge",
-            "home",
         }
         and value < 0
     ):
@@ -98,6 +98,11 @@ def measurements(states, now, *, historical=False):
     elif max(s.at for s in sources) - min(s.at for s in sources) > MAX_SKEW:
         values.pop("home", None)
         issues.append(Issue("snapshot_not_synchronous", "home"))
+    elif (home := values["home"]).value < 0:
+        # User policy applies only after validating all four sources and times.
+        # Preserve the signed input locally without modifying the HA entity.
+        values["home"] = Sample(0, home.at, raw_value=home.value)
+        issues.append(Issue("negative_home_normalized", "home"))
     flows = {}
     for role, positive, negative in (
         ("grid", "grid_import", "grid_export"),

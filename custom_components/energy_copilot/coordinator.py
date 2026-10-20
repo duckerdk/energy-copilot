@@ -247,3 +247,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             )
         # A configured template/measurement has not established physical AC demand.
         self._external_issues.append(Issue("home_profile_unverified", "home"))
+        if self.history_reader.last_read_summary.get("home_normalization", {}).get(
+            "corrected_seconds", 0
+        ):
+            self._external_issues.append(Issue("negative_home_normalized", "recorder"))

@@ -21,6 +21,7 @@ class RecordingRun:
 
 
 def recorded_power(role, state):
+    """Keep signed home power until the interval's source context is validated."""
     if state is None or state.state in {"unknown", "unavailable"}:
         raise ValueError("invalid_input")
     try:
@@ -29,8 +30,6 @@ def recorded_power(role, state):
         raise ValueError("invalid_input") from None
     if state.attributes.get("unit_of_measurement") != "W":
         raise ValueError("invalid_unit")
-    if role == "home" and value < 0:
-        raise ValueError("negative_home_power")
     if role == "pv" and value < 0:
         raise ValueError("invalid_input")
     return value
@@ -89,6 +88,8 @@ def reconstruct_history(
             stop,
         ]
         energy, observed_seconds, unobserved_seconds = 0.0, 0.0, 0.0
+        raw_energy, correction_seconds, correction_kwh = 0.0, 0.0, 0.0
+        correction_records, correction_segments, correcting = set(), 0, False
         issues, gaps, reason_seconds = set(), [], Counter()
         truncated = False
         for left, right in zip(cuts, cuts[1:]):
@@ -141,6 +142,7 @@ def reconstruct_history(
                                 Issue("home_predates_source_recovery", "home")
                             )
             if segment_issues:
+                correcting = False
                 issues.update(segment_issues)
                 unobserved_seconds += duration
                 for code in {i.code for i in segment_issues}:
@@ -156,7 +158,19 @@ def reconstruct_history(
                     truncated = True
             else:
                 observed_seconds += duration
-                energy += values["home"] / 1000 * duration / 3600
+                raw = values["home"]
+                effective = max(0, raw)
+                raw_energy += raw / 1000 * duration / 3600
+                energy += effective / 1000 * duration / 3600
+                if raw < 0:
+                    correction_seconds += duration
+                    correction_kwh += -raw / 1000 * duration / 3600
+                    correction_segments += not correcting
+                    # Count actual source rows in this quarter, not every split
+                    # caused by another sensor or repeated use of a carry-in row.
+                    if cursor <= home_at < stop:
+                        correction_records.add(home_at)
+                correcting = raw < 0
         result.append(
             HistorySlot(
                 cursor,
@@ -169,6 +183,11 @@ def reconstruct_history(
                 unobserved_reason_seconds=tuple(sorted(reason_seconds.items())),
                 unobserved_intervals=tuple(gaps),
                 unobserved_intervals_truncated=truncated,
+                observed_raw_home_kwh=raw_energy if observed_seconds else None,
+                home_correction_seconds=correction_seconds,
+                home_correction_records=len(correction_records),
+                home_correction_segments=correction_segments,
+                home_correction_kwh=correction_kwh,
             )
         )
         cursor = stop

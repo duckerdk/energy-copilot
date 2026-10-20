@@ -10,7 +10,9 @@ from .validation import number, utc
 MAX_NEGATIVE_EVENTS = 16
 
 
-def negative_home_audit(rows, entities, start, end, runs=(), excluded_roles=()):
+def negative_home_audit(
+    rows, entities, start, end, runs=(), excluded_roles=(), *, include_events=False
+):
     """Compare actual as-of Recorder rows, without confusing changes with reports.
 
     Unequal last_updated timestamps are evidence of unequal state-change times,
@@ -64,7 +66,7 @@ def negative_home_audit(rows, entities, start, end, runs=(), excluded_roles=()):
         distinct = len(set(changed.values())) > 1 if len(changed) == 3 else None
         if distinct:
             counts["different_source_change_times"] += 1
-        if len(events) < MAX_NEGATIVE_EVENTS:
+        if include_events and len(events) < MAX_NEGATIVE_EVENTS:
             events.append(
                 {
                     "at_utc": at.isoformat(),
@@ -78,13 +80,15 @@ def negative_home_audit(rows, entities, start, end, runs=(), excluded_roles=()):
                     "recording_context_known": run is not None,
                 }
             )
-    return {
+    result = {
         "records": total,
-        "events": events,
-        "events_truncated": total > len(events),
         "context_counts": dict(sorted(counts.items())),
         "timestamp_basis": "recorder_state_change_not_device_report",
         "causal_conclusion": "not_identifiable_from_state_changes_alone",
         "physical_consumption_verified": False,
         "template_residual_tolerance_w": 1,
     }
+    if include_events:
+        # Explicit local audit only. Polling and exported summaries omit events.
+        result.update(events=events, events_truncated=total > len(events))
+    return result

@@ -60,27 +60,21 @@ def constructed_day(*, overlapping=False):
     return start, rows, runs
 
 
-@pytest.mark.parametrize(
-    "overlapping,expected_rejected,overlap", [(False, 10, 0), (True, 9, 1)]
-)
-def test_negative_home_and_recording_gap_counts_require_interval_union(
-    overlapping, expected_rejected, overlap
+@pytest.mark.parametrize("overlapping,overlap", [(False, 0), (True, 1)])
+def test_normalization_does_not_hide_recording_gaps_in_the_same_quarter(
+    overlapping, overlap
 ):
     start, rows, runs = constructed_day(overlapping=overlapping)
     slots = reconstruct_history(rows, DEFAULT_ENTITIES, start, NOW, runs)
     audit = rejection_audit(slots, runs)
     assert len(slots) == 96
-    assert audit["rejection_reason_slots"]["negative_home_power"] == 8
+    assert "negative_home_power" not in audit["rejection_reason_slots"]
+    assert audit["corrected_home_slots"] == 8
     assert audit["rejection_reason_slots"]["recorder_recording_gap"] == 2
-    assert audit["negative_home_and_recording_gap_slots"] == overlap
-    assert audit["negative_home_or_recording_gap_slots"] == expected_rejected
-    assert audit["rejected_slots"] == expected_rejected
-    assert sum(slot.home_kwh is not None for slot in slots) == 96 - expected_rejected
-    assert all(
-        slot.home_kwh is None
-        for slot in slots
-        if any(i.code == "negative_home_power" for i in slot.issues)
-    )
+    assert audit["corrected_home_and_recording_gap_slots"] == overlap
+    assert audit["rejected_slots"] == 2
+    assert sum(slot.home_kwh is not None for slot in slots) == 94
+    assert all(slot.home_kwh is None or slot.home_kwh >= 0 for slot in slots)
     assert all(
         "value" not in issue
         for interval in audit["rejected_intervals"]
@@ -109,17 +103,17 @@ async def test_reader_exposes_per_quarter_reasons_and_negative_record_count(
     ):
         slots = await reader.async_read_window(start, NOW)
     summary = reader.last_read_summary
-    assert summary["valid_slots"] == 86
-    assert summary["rejected_slots"] == 10
+    assert summary["valid_slots"] == 94
+    assert summary["rejected_slots"] == 2
     assert summary["negative_home_records_in_window"] == 26
     assert summary["source_rows"]["home"]["negative_power_records_in_window"] == 26
     assert summary["history_source_format"] == "ha_backend_state"
-    assert summary["negative_home_and_recording_gap_slots"] == 0
-    assert len(summary["rejected_intervals"]) == 10
+    assert summary["corrected_home_and_recording_gap_slots"] == 0
+    assert len(summary["rejected_intervals"]) == 2
     first = summary["rejected_intervals"][0]
-    assert first["start_utc"] == slots[2].start.isoformat()
-    assert {"code": "negative_home_power", "source": "home"} in first["issues"]
-    assert {"code": "invalid_input", "source": "home"} in first["issues"]
+    assert first["start_utc"] == slots[92].start.isoformat()
+    assert {"code": "recorder_recording_gap", "source": "recorder"} in first["issues"]
+    assert summary["home_normalization"]["corrected_records"] == 26
     assert summary["recording_pause_history_verified"] is False
 
 

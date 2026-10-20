@@ -33,7 +33,7 @@ class InputQualitySensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self):
-        return "degraded" if self.coordinator.data.issues else "valid"
+        return self.coordinator.quality["input_state"]
 
     @property
     def extra_state_attributes(self):
@@ -46,6 +46,10 @@ class InputQualitySensor(CoordinatorEntity, SensorEntity):
             "release_commit": self._installed_build["commit"],
             "issue_codes": sorted({issue.code for issue in data.issues}),
             "issue_categories": self.coordinator.quality["categories"],
+            "quality_scope": self.coordinator.quality["quality_scope"],
+            "load_profile_readiness": self.coordinator.quality[
+                "load_profile_readiness"
+            ],
             "planning_readiness": self.coordinator.quality["planning_readiness"],
             "price_slots": len(data.prices),
             "forecast_periods": len(data.forecast.periods) if data.forecast else 0,

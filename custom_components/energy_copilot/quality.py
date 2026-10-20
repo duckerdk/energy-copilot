@@ -20,6 +20,8 @@ def quality_report(issues, forecast_coverage=None):
                 if night_only
                 else "forecast_horizon_unresolved"
             )
+        elif code == "negative_home_normalized":
+            category, effect = "informational", "user_approved_home_normalization"
         elif source == "recorder" or code in {
             "home_profile_unverified",
             "forecast_storage_failed",
@@ -46,7 +48,10 @@ def quality_report(issues, forecast_coverage=None):
         )
     counts = Counter(i["category"] for i in classified)
     return {
+        "input_state": "degraded" if counts["blocking"] else "valid",
+        "quality_scope": "required_current_inputs",
         "planning_readiness": "not_evaluated_m2",
+        "load_profile_readiness": "physical_validation_required",
         "categories": {
             key: counts[key] for key in ("blocking", "historical", "informational")
         },

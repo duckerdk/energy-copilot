@@ -1,8 +1,28 @@
 """Privacy-conscious diagnostics: source quality, no raw household series."""
 
 from collections import Counter
+from copy import deepcopy
 
 from .const import OPTIONAL_ENTITY_ROLES
+
+
+def history_diagnostics(summary):
+    """Export aggregate audit evidence only, even if a local audit added events."""
+    if summary is None:
+        return None
+    result = deepcopy(summary)
+    allowed = {
+        "records",
+        "context_counts",
+        "timestamp_basis",
+        "causal_conclusion",
+        "physical_consumption_verified",
+        "template_residual_tolerance_w",
+    }
+    for key in ("negative_home_audit", "negative_home_audit_last_chunk"):
+        if isinstance(result.get(key), dict):
+            result[key] = {k: v for k, v in result[key].items() if k in allowed}
+    return result
 
 
 async def async_get_config_entry_diagnostics(hass, entry):
@@ -41,6 +61,8 @@ async def async_get_config_entry_diagnostics(hass, entry):
         "observed": {
             "at": data.at.isoformat(),
             "measurement_roles": sorted(data.measurements),
+            "home_sample_normalized": "home" in data.measurements
+            and data.measurements["home"].raw_value is not None,
             "measurement_source_timing": coordinator.measurement_source_timing,
             "price_slots": len(data.prices),
             "price_first_start_utc": price_first,
@@ -60,8 +82,12 @@ async def async_get_config_entry_diagnostics(hass, entry):
                 **coordinator.forecast_history.summary,
                 "available": coordinator._archive_available,
             },
-            "recent_history": coordinator.history_reader.last_read_summary,
-            "requested_history": coordinator.history_reader.last_backfill_summary,
+            "recent_history": history_diagnostics(
+                coordinator.history_reader.last_read_summary
+            ),
+            "requested_history": history_diagnostics(
+                coordinator.history_reader.last_backfill_summary
+            ),
             "unconfigured_optional_roles": sorted(unconfigured),
             "history_slots": len(data.history),
             "history_issue_counts": dict(
@@ -74,6 +100,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "minimum_soc_percent": 20,
             "degradation_dkk_per_kwh_dc": 0.4,
             "pv_export_threshold_dkk_per_kwh": 0.4,
+            "home_negative_power_policy": "max_zero_when_sources_valid",
         },
         "assumed": {
             "live_freshness_seconds": 300,

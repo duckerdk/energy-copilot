@@ -22,11 +22,13 @@
     8.398994,
     8.14575
   ],
-  "expected_valid_quarters": 84,
-  "expected_rejected_quarters": 12,
+  "expected_valid_quarters": 93,
+  "expected_rejected_quarters": 3,
   "gap_offsets_seconds": [
     165.689077,
     27.106647,
     492.075655
-  ]
+  ],
+  "reported_valid_quarters_0_1_2": 84,
+  "reported_rejected_quarters_0_1_2": 12
 }
