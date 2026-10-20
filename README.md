@@ -1,6 +1,6 @@
 # Energy Co-Pilot
 
-**Status: specyfikacja, brak kodu integracji i wykonanych testów.** Docelowo lokalna integracja Home Assistant `custom_components/energy_copilot` (opcjonalnie HACS). Niniejsze repo **nie steruje falownikiem**.
+**Status: specyfikacja, bez kodu integracji i bez wykonanych testów implementacji.** Docelowo lokalna integracja Home Assistant `custom_components/energy_copilot` (opcjonalnie HACS). Niniejsze repo **nie steruje falownikiem**.
 
 ## Cel i granice
 
