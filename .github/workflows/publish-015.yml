@@ -1,5 +1,5 @@
 name: Publish v0.1.5 to HACS
-# Trigger after updating all 0.1.5 regression expectations.
+# Trigger after final 0.1.5 installed-version assertion fix.
 on:
   push:
     branches: [main]
