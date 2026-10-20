@@ -60,7 +60,7 @@ Kontrola jednej migawki: **3034 W PV + 19 W bateria = 583 W dom + 2470 W eksport
 
 **Bieżące encje Deye potwierdzone jako istniejące, ale NIE jako bezpieczne funkcje zapisu:** `switch.sun12k_solar_sell`, `switch.sun12k_grid_charge`, `switch.sun12k_time_of_use`, sześć `switch.sun12k_time_point_N_charge_enable`; `number.sun12k_maximum_battery_charge_current`, `number.sun12k_maximum_battery_discharge_current`, `number.sun12k_maximum_battery_grid_charge_current`; po sześć `number.sun12k_time_point_N_start`, `_power`, `_capacity`. Udokumentowane przez HA min/max prądów ±16 777 220 A **są niewiarygodne jako granice sprzętowe**.
 
-**Możliwy konflikt sterowania:** `switch.battery_controller_optimization_enabled = on`, `select.battery_controller_control_mode = hybrid`; przed przejęciem kontroli przez wykonawcę Energy Co-Pilot ustalić pojedynczego właściciela zapisu. W `dry_run` niczego nie wyłączać.
+**Pozostałości po starej integracji:** zgodnie z informacją użytkownika z 20.10.2026 encje `battery_controller.*` są osieroconymi pozostałościami; Energy Co-Pilot **ignoruje je całkowicie** (nie używa danych, decyzji, statusu przełączników ani nie blokuje działania z ich powodu). Nie zmienia to obowiązku wykrycia **rzeczywiście aktywnego**, zewnętrznego sterowania tymi samymi nastawami Deye, jeśli kiedyś zostanie zaobserwowane.
 
 Więcej szczegółów i zastrzeżeń: [HA_ENTITY_SNAPSHOT_2026-10-19.md](HA_ENTITY_SNAPSHOT_2026-10-19.md).
 
@@ -84,6 +84,22 @@ Test każdej **akcji zapisu** wymaga dodatkowo odrębnej, świadomie nadzorowane
 
 
 Aktualne stany, jednostki i źródła należy odczytać według [HA_READONLY_CAPTURE.md](HA_READONLY_CAPTURE.md); listy historycznych nazw nie zastępują odczytu.
+
+## Limity prądów ustalone przez użytkownika — obowiązujące dla Energy Co-Pilot
+
+Energy Co-Pilot stosuje **własne zakresy dozwolonych nastaw w amperach**, całkowicie niezależne od błędnych metadanych `min/max` istniejących encji HA:
+
+| Sterowanie | `entity_id` | Zakres Co-Pilot (włącznie) |
+| --- | --- | --- |
+| Maksymalny prąd ładowania baterii | `number.sun12k_maximum_battery_charge_current` | **0–50 A** |
+| Maksymalny prąd rozładowania baterii | `number.sun12k_maximum_battery_discharge_current` | **0–100 A** |
+| Maksymalny prąd ładowania baterii z sieci | `number.sun12k_maximum_battery_grid_charge_current` | **0–50 A** |
+
+**Ustalenie z 20.10.2026:** są to limity polityki Energy Co-Pilot (własna walidacja konfiguracji i planu), a **nie** potwierdzone granice sprzętowe Deye/BMS. Moduł wykonawczy odrzuca propozycje nastaw poza zakresami i nie korzysta z niewiarygodnych `min/max = ±16 777 220 A` ogłaszanych przez encje. Mniejszy limit wynikający ze sprzętu/BMS ma zawsze pierwszeństwo. Nie wolno przekładać amperów na sztywne kW bez aktualnego napięcia i ustalonej strony AC/DC.
+
+**Ważne:** przyjęcie **0 A jako dozwolonej wartości liczbowej** nie jest dowodem, że `number.set_value: 0` jest przez falownik akceptowane lub że wyłącza konkretny tor. Semantyka `0 A`, znaczenie regulatora `grid_charge_current`, granice faktycznie obsługiwane i bezpieczna procedura wyłączenia pozostają do nadzorowanego sprawdzenia **przed** jakimkolwiek zapisem. Brak pozytywnego testu oznacza pozostawienie tej zdolności w `read_only`/`disabled`.
+
+**Reguła implementacji:** osobno walidować zakres przy konfiguracji, tworzeniu planu, przed wykonaniem akcji i po odczycie stanu. Nie podmieniać nieprawidłowej komendy przez ciche przycięcie do granicy; odrzucić ją i wyjaśnić powód w rejestrze decyzji.
 
 ## Kontrakt logiczny wejść
 
