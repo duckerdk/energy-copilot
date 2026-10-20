@@ -1,37 +1,29 @@
 # Energy Co-Pilot
 
-**Status: specyfikacja, bez kodu integracji i bez wykonanych testów implementacji.** Docelowo lokalna integracja Home Assistant `custom_components/energy_copilot` (opcjonalnie HACS). Niniejsze repo **nie steruje falownikiem**.
+**Status:** specyfikacja natywnej integracji Home Assistant `custom_components/energy_copilot`; repozytorium nie zawiera jeszcze działającej integracji. Wszystkie testy w dokumentacji to **przypadki do zaimplementowania**, nie wykonane testy.
 
-## Cel i granice
+**Cel:** minimalizować całkowity koszt energii na całym dostępnym horyzoncie opublikowanych cen. Źródłem wszystkich zatwierdzonych decyzji jest [REQUIREMENTS.md](requirements/REQUIREMENTS.md). Nie rekonstruować decyzji użytkownika ze starych komentarzy ani z `OPEN_ITEMS`.
 
-Minimalizować koszt netto energii w DKK przy uwzględnieniu strat i kosztu dodatkowych cykli baterii. Oddzielać koszt rachunku, koszt degradacji, plan ekonomiczny, wykonalność w Deye i fizyczny rezultat.
+## Dokumenty — jedna rola na plik
 
-- Jedyny interfejs danych i ewentualnego sterowania: istniejące encje oraz natywne usługi Home Assistant. Bez bezpośredniego Modbus, ESPHome, firmware lub dodatkowego serwera.
-- Zakup: `sensor.energi_data_service`; sprzedaż: `sensor.energi_data_spotpris`. Używać kwot HA **bez korekt podatków, taryf ani prowizji**.
-- Autonomiczne zezwolenie na eksport **PV**, po dopuszczeniu trybu live: `switch.sun12k_solar_sell` od **0,40 DKK/kWh**. To nie jest zgoda na eksport baterii; brak potwierdzonej separacji blokuje zapis.
-- Celowe oddanie energii **z baterii** do sieci wymaga osobnej, ważnej zgody na konkretną propozycję.
-- Tryb początkowy: **monitor/dry-run**, bez zapisów. Nastawy Deye pozostają po zaniku HA, dlatego test niezależnego zabezpieczenia jest warunkiem automatyki.
-
-## Dokumenty — czytaj selektywnie
-
-| Zakres | Źródło normatywne |
+| Plik | Jedyna odpowiedzialność |
 | --- | --- |
-| Cel i instalacja | [GOALS_AND_REQUIREMENTS](requirements/GOALS_AND_REQUIREMENTS.md), [SYSTEM_BASELINE](requirements/SYSTEM_BASELINE.md) |
-| Wejścia i jakość danych | [ENTITY_CONTRACT](requirements/ENTITY_CONTRACT.md), [MEASUREMENT_CONTRACT](requirements/MEASUREMENT_CONTRACT.md), [HA_PRICE_SERIES_CONTRACT](requirements/HA_PRICE_SERIES_CONTRACT.md), [PV_FORECAST_CONTRACT](requirements/PV_FORECAST_CONTRACT.md), [LOAD_FORECAST_CONTRACT](requirements/LOAD_FORECAST_CONTRACT.md) |
-| Matematyka i niepewność | [OPTIMIZATION_MODEL](requirements/OPTIMIZATION_MODEL.md), [FORECAST_POLICY](requirements/FORECAST_POLICY.md), [CALIBRATION_POLICY](requirements/CALIBRATION_POLICY.md) |
-| Sterowanie i bezpieczeństwo | [ARCHITECTURE](requirements/ARCHITECTURE.md), [CONTROL_STRATEGY](requirements/CONTROL_STRATEGY.md), [CURRENT_CONTROLLER_MODEL](requirements/CURRENT_CONTROLLER_MODEL.md), [EXECUTION_CONTRACT](requirements/EXECUTION_CONTRACT.md), [PV_EXPORT_POLICY](requirements/PV_EXPORT_POLICY.md) |
-| Prezentacja i walidacja | [DECISION_LOGGING](requirements/DECISION_LOGGING.md), [HA_DASHBOARD](requirements/HA_DASHBOARD.md), [TEST_SCENARIOS](requirements/TEST_SCENARIOS.md), [BACKTEST_VALIDATION](requirements/BACKTEST_VALIDATION.md) |
-| Dowody i nierozwiązane kwestie | [HA_ENTITY_SNAPSHOT_2026-10-19](requirements/HA_ENTITY_SNAPSHOT_2026-10-19.md) (historyczny odczyt), [OPEN_ITEMS](requirements/OPEN_ITEMS.md) |
+| [REQUIREMENTS](requirements/REQUIREMENTS.md) | Cel, instalacja, polityka cen/SOC/degradacji, uprawnienia użytkownika |
+| [HA_CONTRACT](requirements/HA_CONTRACT.md) | Encje, znaki, jednostki, dostępność, ceny, dane PV/Recorder |
+| [OPTIMIZATION](requirements/OPTIMIZATION.md) | Bilans, funkcja celu, prognozowanie, wykonalny plan |
+| [EXECUTION](requirements/EXECUTION.md) | HA executor, bezpieczeństwo, TOU, zgody i awarie |
+| [VALIDATION](requirements/VALIDATION.md) | Testy do napisania, benchmark, log i dashboard |
+| [OPEN_ITEMS](requirements/OPEN_ITEMS.md) | **Wyłącznie niewyjaśnione dowody techniczne**, z właścicielem i etapem |
 
-**Wskazówki dla Codexa:** [AGENTS.md](AGENTS.md). Dokumenty z `requirements/` zawierają **przypadki testowe do napisania**, a nie wyniki testów. Ustalonym nazwom encji nie wolno przypisywać fizycznej funkcji bez sprawdzenia.
+Dodatkowo [AGENTS.md](AGENTS.md) zawiera instrukcje wykonawcze dla Codexa. Nie tworzyć nowych plików specyfikacji bez rzeczywistej nowej odpowiedzialności; poprawiać właściwy istniejący plik. Brak archiwum — historia jest dostępna przez Git.
 
-## Kolejność wdrożenia
+## Implementacja
 
-1. **M1 — fundament:** manifest, config/options flow, tłumaczenia, setup/unload i testy; zero wywołań sterujących.
-2. **M2 — wejścia:** mapowanie, parser cen, prognozy PV, historia zużycia, jakość czasu/znaków/jednostek.
-3. **M3 — plan:** model fizyczny, ekonomia, dry-run, porównanie alternatyw i rejestr każdej decyzji.
-4. **M4 — HA UX:** encje, panel, widoczne przyczyny, zgody i historia decyzji.
-5. **M5 — walidacja:** deterministyczne testy i backtest walk-forward bez przyszłych danych, z kontrolą curtailment.
-6. **M6 — opcjonalne polecenia:** wyłącznie po zamknięciu właściwych P0 z [OPEN_ITEMS](requirements/OPEN_ITEMS.md), fizycznych testach i świadomym włączeniu przez użytkownika.
+1. M1: manifest, config/options flow, typed runtime data, setup/unload, testy — zero zapisów.
+2. M2: mapowanie encji, walidacja cen/UTC/DST/Recorder/Forecast.Solar.
+3. M3: planner minimalnego kosztu, realistyczne możliwości Deye, `dry_run`, rejestr decyzji.
+4. M4: HA encje, dashboard, zgody eksportu baterii, STOP.
+5. M5: testy, walk-forward, walidacja alternatyw i jakości danych.
+6. M6: **dopiero po świadomym włączeniu live i testach** — autonomiczne prądy, Grid Charge, sześć TOU, Solar Sell PV; eksport baterii tylko przy indywidualnej zgodzie.
 
-**Odbiór każdej iteracji:** podać zmienione pliki, testy naprawdę uruchomione, testy zablokowane, założenia i aktualne P0/P1. Nie podawać wyników symulacji jako oszczędności osiągniętych na instalacji.
+Odbiór iteracji: kod i pliki, testy naprawdę wykonane, testy nieprzeprowadzone, istotne ryzyka i aktualne [OPEN_ITEMS](requirements/OPEN_ITEMS.md). Bez udawania, że symulacja jest oszczędnością z urządzenia.
