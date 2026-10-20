@@ -309,7 +309,7 @@ async def test_native_template_does_not_re_report_for_unchanged_dependency(
     assert home.state == "300.0"
     at = home.last_reported
     freezer.tick(timedelta(seconds=20))
-    hass.states.async_set("sensor.source_pv1", "60")
+    hass.states.async_set("sensor.source_pv", "100")
     await hass.async_block_till_done()
     assert hass.states.get("sensor.source_pv").last_reported > at
     assert hass.states.get("sensor.synthetic_pv").last_reported <= at
