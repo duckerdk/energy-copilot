@@ -163,6 +163,10 @@ W każdym slocie planu: zakres UTC, ceny, prognozy, rozbicie PV na dom/baterię/
 
 Implementacja i weryfikacja kolejności działań: [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md). Zasady prezentowania statusów: [HA_DASHBOARD.md](HA_DASHBOARD.md).
 
+**Strategia czasu i wybór kanału wykonawczego:** [CONTROL_STRATEGY.md](CONTROL_STRATEGY.md). Plan 15-minutowy nie zakłada, że można dokładnie sterować mocą przez sam limit prądu, a TOU nie jest domyślnie przepisywany. Zgodnie z obserwacją użytkownika SOC okresu TOU głównie ogranicza rozładowanie; z Grid Charge wyznacza poziom ładowania z sieci, **nie** steruje ładowaniem PV. Ostatnie nastawy falownika pozostają aktywne po utracie HA.
+
+**Dostępne obecnie encje TOU:** `switch.sun12k_time_of_use` (włączenie); dla każdego N = 1..6: `number.sun12k_time_point_N_start` (czas), `number.sun12k_time_point_N_power` (moc), `number.sun12k_time_point_N_capacity` (SOC), `switch.sun12k_time_point_N_charge_enable` (Grid Charge). Są to encje HA już obecne w odczycie z 19.10.2026; działanie przy zapisach nie było testowane. Harmonogram powtarza się dobę, jest wrażliwy na nakładanie okien i granicę 00:00.
+
 ## Mapa akcji HA — do potwierdzenia, nie do zgadywania
 
 | Intencja | Znany identyfikator lub brak | Co trzeba potwierdzić |
@@ -175,7 +179,7 @@ Implementacja i weryfikacja kolejności działań: [EXECUTION_CONTRACT.md](EXECU
 | Docelowy SOC / minimalny SOC | **Brak potwierdzonego ID** | Rozdzielić życzenie planisty od ustawienia ochronnego sprzętu |
 | Wymuś rozładowanie na potrzeby domu | **Brak potwierdzonego ID** | Możliwość wykonania bez eksportu z baterii |
 | Eksport energii z baterii | **Brak osobnego potwierdzonego sterowania** | Izolacja od PV, zgoda na konkretny plan, kWh, czas, brak zgody = brak eksportu |
-| Harmonogram i priorytety sterowania | **Brak potwierdzonych ID** | Priorytety i trwałość zapisanych wartości; konflikt z własnym planistą |
+| Harmonogram TOU (6 okresów) | `switch.sun12k_time_of_use`, `number.sun12k_time_point_N_start/_power/_capacity`, `switch.sun12k_time_point_N_charge_enable` (N=1..6) | Encje obecne; skutki fizyczne, granica doby, priorytety i trwałość **znane z relacji użytkownika tylko częściowo**; current-first nie zmienia tych encji |
 | Przywróć pracę standardową | **Brak zweryfikowanej ścieżki** | Bezpieczny wynik także przy braku HA/Wi-Fi, bez polegania na samym zapisie w encji |
 
 ### Karta weryfikacji działania pojedynczej akcji
