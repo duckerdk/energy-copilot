@@ -2,6 +2,8 @@
 
 **Status:** dokumentacja projektowa. Uruchomienie rzeczywistych zapisów wymaga zamknięcia P0 w [OPEN_ITEMS.md](OPEN_ITEMS.md). Powiązania: [ENTITY_CONTRACT.md](ENTITY_CONTRACT.md), [ARCHITECTURE.md](ARCHITECTURE.md), [OPTIMIZATION_MODEL.md](OPTIMIZATION_MODEL.md).
 
+**Granica sterowania:** executor ma operować **wyłącznie na encjach Home Assistant** i wysyłać polecenia przez natywne usługi HA. Nie istnieje w nim warstwa dostępu do rejestrów Modbus, klient Modbus, bezpośrednie sterowanie falownikiem ani modyfikacja ESPHome. Specyfikacja traktuje trzy encje prądowe HA jako przypisane do ich opisanych funkcji na podstawie założenia projektowego użytkownika; wymagania weryfikacji działania przed uruchomieniem automatyki pozostają aktualne.
+
 ## 1. Role
 
 - **Planner** wyznacza plan, SOC, harmonogram i uzasadnienie; jego wynik to *intencja*, nie polecenie.
@@ -21,7 +23,7 @@
 | `automatic_non_export` | Tylko potwierdzone bezpieczne funkcje nieeksportujące baterii po P0 |
 | `automatic_with_approved_export` | Jak wyżej, dodatkowo w granicach ważnej zgody na konkretny eksport baterii |
 
-Wzrost uprawnień **nie następuje automatycznie po restarcie**, zmianie wersji planu ani dodaniu encji. `monitor`/`dry_run` to domyślne tryby działania. Same nazwy `switch.sun12k_grid_charge`, `switch.sun12k_solar_sell` lub `number.sun12k_maximum_battery_grid_charge_current` nie potwierdzają szczegółowego skutku fizycznego.
+Wzrost uprawnień **nie następuje automatycznie po restarcie**, zmianie wersji planu ani dodaniu encji. `monitor`/`dry_run` to domyślne tryby działania. Znaczenie encji przyjmujemy projektowo z kontraktu HA, natomiast nazwy ani opis YAML nie potwierdzają jeszcze skutku fizycznego nastaw.
 
 ## 3. Karta operacji — warunek dopuszczenia zapisu
 
