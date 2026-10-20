@@ -30,6 +30,12 @@ C_sell_net[t] = sensor.energi_data_spotpris.attributes.raw_*.price[t]
 
 **Histereza cenowa:** nie dodawać arbitralnego marginesu cenowego modyfikującego próg (użytkownik podał dokładnie 0,40). Ograniczyć powtarzane zapisy tylko przy zmianie faktycznego stanu oraz stosować walidację świeżości/ważności ceny i potwierdzenie wykonania. Jedna stawka godzinowa nie powinna powodować zapisu co 15 minut bez zmiany decyzji.
 
+### Warunek danych i utraty łączności
+
+Próg 0,40 DKK/kWh oznacza cenę z HA. `raw_*.price` bywa zaokrąglone, a `current_price` dokładniejsze: jeśli oba aktualne odczyty prowadzą do **innej** decyzji przy progu, zastosuj `PRICE_THRESHOLD_AMBIGUOUS` i nie wydawaj komendy ON ([HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md)). Nie przesuwaj progu histerezą.
+
+Po utracie HA, internetu albo źródła cen przełącznik Deye może pozostać **ON** i nadal eksportować w następnej godzinie poniżej progu. Sam software HA nie daje gwarancji utrzymania minimum cenowego podczas awarii. Tryb live wymaga pokazania tego ryzyka użytkownikowi, ograniczenia czasowo ryzykownych zezwoleń zgodnie z P0 i skutecznej procedury odzyskania stanu. Brak ceny: **bez nowych poleceń** oraz alarm, nie fałszywy komunikat „eksport bezpiecznie wyłączony”.
+
 ## 3. Autonomia i uprawnienia
 
 - Użytkownik **upoważnił Co-Pilota do samodzielnego podejmowania decyzji o eksporcie PV**; docelowy wykonawca używa `switch.sun12k_solar_sell` przez usługę HA `switch.turn_on`/`switch.turn_off`, bez ręcznej zgody na każdy slot.
