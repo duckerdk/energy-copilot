@@ -63,6 +63,12 @@ Nie wyliczać profilu z samego stanu końcowego lub średniej `state_class` bez 
 - Dla każdej decyzji zapisuj wersję prognozy i czas przygotowania; nie zastępuj jej późniejszą, „lepszą” migawką, gdy liczysz wynik historyczny.
 - Testy walk-forward dla load muszą mieć te same daty i zasady braku wiedzy o przyszłości jak dla PV.
 
+### Ostrzeżenie o brakach ukrytych przez `float(0)`
+
+Walidować stan trzech źródłowych encji **w czasie każdej historycznej próbki**, a nie tylko przy uruchomieniu lub planowaniu. `sensor.home_energy_consumption` może mieć poprawnie wyglądającą liczbę nawet gdy jeden pomiar był niedostępny. Jeśli nie da się odtworzyć statusu składników dla potrzebnego okna Recorder, nie nazywać profilu „zweryfikowanym”; diagnostyka pokazuje `historical_quality_unverifiable`, a obliczenie może pozostać wyłącznie dry-run. Nie imputować braku jako faktycznego zerowego popytu.
+
+**Regresja LOAD-17:** wczoraj `battery_output_power` był `unavailable`, ale `home_energy_consumption` ma historyczny stan liczbowy z domyślnym zerem → wyklucz wadliwy przedział z uczenia.
+
 ## 7. Testy do przygotowania przez Codexa
 
 - `LOAD-01`: 600 W/10 min + 1200 W/5 min → 0,200 kWh, średnia 0,8 kW.
