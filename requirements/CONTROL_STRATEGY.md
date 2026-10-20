@@ -5,7 +5,7 @@ Powiązania: [ENTITY_CONTRACT.md](ENTITY_CONTRACT.md), [OPTIMIZATION_MODEL.md](O
 
 ## 1. Rozstrzygnięcie: dwa poziomy, a nie TOU kontra prąd
 
-**Wariant bazowy do implementacji: sterowanie bieżącym limitem prądu przez encje HA, przy zachowaniu istniejącego harmonogramu TOU w stanie zastanym.** Dynamiczne programowanie sześciu okien TOU to **osobny, opcjonalny backend**, dopuszczalny dopiero po dowodzie przewagi i sprawdzeniu ryzyka. Nie zakładać, że pojedynczy limit prądu zastępuje kontrolę docelowego/minimalnego SOC lub gwarantuje ładowanie z sieci.
+**Decyzja użytkownika 20.10.2026:** Co-Pilot może autonomicznie sterować ładowaniem z sieci i sześcioma okresami TOU. Cel to minimum całkowitego kosztu w dostępnym horyzoncie, po uwzględnieniu strat i degradacji. Etapowa implementacja i bezpieczna walidacja TOU nadal obowiązują. Nie zakładać, że pojedynczy limit prądu zastępuje kontrolę docelowego/minimalnego SOC lub gwarantuje ładowanie z sieci.
 
 - **Planner:** szuka ekonomicznie najlepszego planu w kwadransach na podstawie opublikowanych cen i prognoz; plan jest opisem *celu energetycznego*, nie gotowymi nastawami urządzenia.
 - **Translator/current controller:** przekształca plan na **dopuszczalne limity prądowe**. Zgodnie z obserwacją użytkownika falownik **precyzyjnie egzekwuje zapisaną nastawę**; kontrola zwrotna wykrywa jedynie brak dostępnej energii, blokady fizyczne, utratę komunikacji lub zmianę stanu urządzenia, zamiast zakładać losowe błędy wykonania.
