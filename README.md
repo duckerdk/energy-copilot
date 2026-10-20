@@ -22,7 +22,8 @@
 - [Potwierdzony kontrakt cen HA](requirements/HA_PRICE_SERIES_CONTRACT.md) — `raw_today/raw_tomorrow`, `tomorrow_valid`, DST, taryfy, parser i 18 testów PRICE.
 - [Kontrakt godzinowej prognozy PV](requirements/PV_FORECAST_CONTRACT.md) — natywna akcja HA `forecast_solar.get_forecast`, odpowiedź `wh_period`/`watts`, normalizacja i 18 testów PVF.
 - [Prognoza zużycia domu](requirements/LOAD_FORECAST_CONTRACT.md) — profil poboru z historii Recorder, punkt pomiarowy, DST i 16 testów LOAD.
-- [Kontrakt pomiarów i bilansu](requirements/MEASUREMENT_CONTRACT.md) — rzeczywiste encje PV/sieć/bateria/dom, znaki i źródła pochodne, integracja kWh, 20 testów MTR.
+- [Kontrakt pomiarów i bilansu](requirements/MEASUREMENT_CONTRACT.md) — rzeczywiste encje PV/sieć/bateria/dom, znaki i źródła pochodne, integracja kWh, 22 testy MTR.
+- [Polityka automatycznego eksportu PV](requirements/PV_EXPORT_POLICY.md) — cena z HA bez korekt, próg 0,40 DKK/kWh, zezwolenie przez `switch.sun12k_solar_sell` i 20 testów PVE.
 - [Archiwalny szablon diagnostyki HA](requirements/HA_TIMESERIES_CAPTURE.md) — opcjonalny; **nie** jest wymagany do pobrania cen ani prognoz.
 - [Walidacja historyczna](requirements/BACKTEST_VALIDATION.md) — test walk-forward bez wiedzy o przyszłości oraz uczciwa metoda liczenia korzyści.
 - [Przekazanie programiście](requirements/DEVELOPER_HANDOFF.md) — kolejność dokumentów, etapy M1–M6 i warunki odbioru.
@@ -37,7 +38,7 @@
 - Celowe rozładowanie baterii na eksport wymaga indywidualnej, ważnej zgody użytkownika.
 - **Domyślnie tylko odczyt i symulacja.** Brak danych, zatwierdzonego mapowania lub bezpiecznego powrotu = zakaz zapisu.
 - **Własne granice prądu regulatorów Deye (polityka Co-Pilot): 0–50 A ładowanie, 0–100 A rozładowanie, 0–50 A grid charge**; nie korzystać z błędnych granic encji HA. Wartość 0 A nie oznacza potwierdzonego fizycznego wyłączenia.
-- Zasada ceny sprzedaży przekazana przez użytkownika: cena spot minus 0,0215 DKK/kWh; pełne warunki rozliczeń nadal wymagają testu na fakturze.
+- **Źródła cen bez przeliczeń:** zakup `sensor.energi_data_service`, sprzedaż `sensor.energi_data_spotpris`. Co-Pilot nie zajmuje się prowizjami, podatkami ani taryfami. Eksport PV włączany automatycznie od 0,40 DKK/kWh wartości z HA; [polityka eksportu](requirements/PV_EXPORT_POLICY.md).
 
 ## Historia
 
