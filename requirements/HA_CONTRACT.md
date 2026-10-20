@@ -67,3 +67,7 @@ Normalizacja mocy: `grid_import=max(0,P_grid)`, `grid_export=max(0,-P_grid)`, `b
 | TOU 1…6: Grid Charge | `switch.sun12k_time_point_N_charge_enable` |
 
 Użytkownik potwierdził poprawne działanie nastaw 0 A i pozostałych regulatorów. W oprogramowaniu nadal walidować zakres/odczyt; HA potrafi zgłaszać absurdalne min/max ±16 777 220 A. Nie stosować ich. Limity są maksimum, **nie gwarantowaną mocą**. Nie używać nieaktywnych pozostałości `battery_controller.*`. Nie zmieniać YAML/ESPHome/Modbus. Testy: [VALIDATION.md](VALIDATION.md).
+
+## Jakość danych 0.1.5
+
+`Input quality` dotyczy wyłącznie bieżących wejść. Brak prognozy na noc nie degraduje bieżących pomiarów. `forecast_state=incomplete` oraz szczegółowe problemy prognozy pozostają dostępne. Przyszły planner nie może traktować nieopublikowanych Wh jako potwierdzonego zera.
