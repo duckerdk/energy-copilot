@@ -27,7 +27,7 @@ def quality_report(issues, forecast_coverage=None):
             category, effect = "blocking", "configured_source_freshness_unverified"
         elif code == "derived_predates_source_recovery":
             category, effect = "blocking", "await_actual_template_report_after_recovery"
-        elif code == "derived_sum_time_uncertain" or (
+        elif code in {"derived_sum_time_uncertain", "battery_power_inconsistent"} or (
             code == "pv_sum_inconsistent" and source in temporal_sum_sources
         ):
             category, effect = (
