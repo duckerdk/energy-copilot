@@ -28,6 +28,8 @@ Projektowo, zgodnie z decyzją użytkownika, przyjmujemy semantykę encji odpowi
 
 **Założenie potwierdzone przez użytkownika:** Deye wykonuje ustawione przez encję HA ograniczenie prądu **dokładnie i deterministycznie**, kiedy istnieją warunki do jego wykorzystania. Nie wprowadzać do optymalizatora hipotetycznej losowej niedokładności samego falownika. `maximum_*_current` oznacza **górną granicę**, więc nie można wymusić płynięcia określonego prądu, jeżeli PV, zapotrzebowanie/zezwolenie na ładowanie, SOC, BMS lub napięcie tego nie umożliwiają. To jest **ograniczenie warunków pracy**, a nie kwestia „AI” lub jakości wykonywania poleceń.
 
+**Szczegółowy algorytm wyboru wartości amperów, wynikowe przepływy DC/AC i testy liczbowe:** [CURRENT_CONTROLLER_MODEL.md](CURRENT_CONTROLLER_MODEL.md). Niniejszy dokument wyznacza granice architektury, drugi opisuje jednoznaczne przeliczenia i reguły działania.
+
 ## 3. Kanały sterowania — encje, zakres i funkcja
 
 | Intencja | Encja HA | Reguła projektowa / ograniczenie |
