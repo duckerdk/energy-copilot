@@ -7,7 +7,7 @@
 W danym momencie:
 - Znana jest przyszła seria cen **tylko do ostatniego opublikowanego slotu**; zwykle około 13:00 poprzedniego dnia publikują się ceny 00:00–23:59 dnia następnego. Jeśli nowej serii brak, nie przesuwać końca planu. Format cen: [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md). **Rozkład PV:** natywna akcja `forecast_solar.get_forecast` zwraca mapę energii `wh_period`, szczegóły [PV_FORECAST_CONTRACT.md](PV_FORECAST_CONTRACT.md).
 - Prognoza PV może obejmować okres dłuższy niż ceny. Trzeba odróżnić **potencjalną** generację PV od historycznego uzysku sztucznie ograniczonego przez pełną baterię/eksport OFF.
-- Prognoza domu powstaje z danych dostępnych do chwili decyzji, a jej błąd powinien zależeć od pory dnia/tygodnia i sezonu, gdy dane na to pozwalają.
+- Prognoza domu powstaje z historii `sensor.home_energy_consumption` w Recorder, dostępnej do chwili decyzji, z odporną medianą podobnych pór/dni i jawnymi trybami braku historii. Algorytm i testy: [LOAD_FORECAST_CONTRACT.md](LOAD_FORECAST_CONTRACT.md). Błąd zależy od pory dnia/tygodnia i sezonu, gdy dane na to pozwalają.
 - Warunki techniczne ograniczają plan niezależnie od prognoz.
 
 **Nie publikować fikcyjnych cen przyszłych slotów.** Wyświetlany harmonogram ekonomiczny kończy się na ostatniej opublikowanej cenie.
