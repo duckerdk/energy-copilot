@@ -62,7 +62,7 @@ J = Σ_t Δt * (Grid_import[t] * C_buy[t]
 ```
 
 - `C_buy[t]`: **końcowa zmienna** cena zakupu z opłatami [DKK/kWh].
-- `C_sell[t] = Spot[t] - 0,0215` [DKK/kWh], według ustalonej prowizji Vindstød; kompletność warunków rozliczenia wymaga kontroli na rachunku.
+- `C_sell[t] = sensor.energi_data_spotpris.raw_*.price[t]` [DKK/kWh] **bez przeliczeń**; analogicznie `C_buy[t]` jest wprost z `sensor.energi_data_service`. Co-Pilot **nie oblicza** prowizji, podatków ani taryf. Automatyczny eksport PV jest dozwolony tylko przy `C_sell[t] >= 0,40` zgodnie z [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md).
 - `Cost_degradation`: marginalne zużycie magazynu zależne od przepływu energii przez baterię; uwzględnia też ładowanie z PV. Model kosztu cyklu/żywotności wymaga kalibracji, nie zakładać z góry kosztu jednej kWh.
 - Straty energii są już reprezentowane przez sprawności w bilansie. **Nie doliczać tych samych strat ponownie jako ryczałtowej opłaty.**
 - Ceny ujemne, dodatni eksport, rezygnacja z przychodu przez magazynowanie i możliwy curtailment wynikają z powyższego bilansu.
