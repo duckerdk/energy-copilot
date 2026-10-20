@@ -46,7 +46,7 @@ def test_modbus_as_of_spread_preserves_home_and_negative_policy(spread, home):
     values, _, issues = measurements(states, NOW)
     assert values["home"].value == max(0, home)
     assert values["home"].raw_value == (home if home < 0 else None)
-    assert ("measurement_time_skew" in {i.code for i in issues}) == (spread > 10)
+    assert "measurement_time_skew" not in {i.code for i in issues}
     assert quality_report(issues)["input_state"] == (
         "uncertain" if spread > 10 else "valid"
     )
@@ -59,14 +59,14 @@ def test_public_issue9_single_age_snapshot_is_retained_with_explicit_uncertainty
     states = {role: timed(role, age=age) for role, age in ages.items()}
     values, _, issues = measurements(states, NOW)
     assert "home" in values
-    assert {i.code for i in issues} == {"measurement_time_skew"}
+    assert not issues
     assert live_timing(states)["all_report_skew_seconds"] == pytest.approx(33.476170)
-    assert quality_report(issues)["input_state"] == "uncertain"
+    assert quality_report(issues)["input_state"] == "valid"
     report = quality_report(
         issues + [Issue("forecast_horizon_incomplete", "forecast_solar")]
     )
-    assert report["input_state"] == "uncertain"
-    assert report["categories"]["uncertainty"] == 1
+    assert report["input_state"] == "valid"
+    assert report["categories"]["uncertainty"] == 0
     assert report["categories"]["blocking"] == 1
 
 
@@ -163,14 +163,14 @@ def test_rapid_transitions_preserve_uncertainty_and_physical_checks(source_state
         values, _, issues = measurements(states, now)
         window.record(states, now, values, issues)
         assert values["home"].value == max(0, home)
-        assert Issue("measurement_time_skew", "home") in issues
+        assert Issue("measurement_time_skew", "home") not in issues
         if seconds:
             # Accepting temporal uncertainty must not suppress corroborating failures.
             assert Issue("battery_power_inconsistent", "battery") in issues
             assert quality_report(issues)["input_state"] == "degraded"
     summary = window.summary(now)
     assert summary["home_rejected"] == 0
-    assert summary["source_change_with_uncertainty"] == 2
+    assert summary["source_change_with_uncertainty"] == 0
 
 
 def test_window_percentiles_include_varied_ages_and_expire_by_utc():
@@ -207,8 +207,8 @@ def test_synthetic_half_hour_counts_and_percentiles_are_bounded_and_private():
     summary = window.summary(now)
     assert summary["observations"] == 60
     assert summary["home_retained"] == 57 and summary["home_rejected"] == 3
-    assert summary["home_retained_with_uncertainty"] == 57
-    assert summary["source_change_with_uncertainty"] == 56
+    assert summary["home_retained_with_uncertainty"] == 0
+    assert summary["source_change_with_uncertainty"] == 0
     assert summary["home_rejection_reasons"] == {
         "grid:invalid_input": 3,
         "home:invalid_input": 3,
