@@ -76,13 +76,13 @@ Jeśli `PV = 0,1 kW` i `dom = 0`, przy nastawie 5 A ładowanie wyniesie **0,1 kW
 
 ### Przykład 2 — ekonomia opóźnionego ładowania
 
-Dwa osobne okresy godziny po 1 h, w każdym dostępne `2,5 kWh` nadwyżki PV, bateria ma miejsce. Sprzedaż rano `0,80 DKK/kWh`, po południu `0,20 DKK/kWh`; potrzeba **2,5 kWh** w baterii na noc. Test z `η = 1` i zerową degradacją izoluje tylko alokację w czasie.
+Dwa osobne okresy godziny po 1 h, w każdym dostępne `2,5 kWh` nadwyżki PV, bateria ma miejsce. Sprzedaż rano `0,80 DKK/kWh`, po południu `0,50 DKK/kWh`; potrzeba **2,5 kWh** w baterii na noc. Test z `η = 1` i zerową degradacją izoluje tylko alokację w czasie.
 
 - **Wariant matematycznie idealny:** rano `0 A` i eksport `2,5 kWh`, popołudniu `2,5 kWh` do magazynu → przychód **2,00 DKK**.
-- **Użytkowy wariant z rano 5 A:** rano magazyn `0,28 kWh` i eksport `2,22 kWh`, po południu magazyn `2,22 kWh` i eksport `0,28 kWh` → przychód **1,832 DKK**.
-- **Wariant odwrotny:** rano magazyn `2,5 kWh`, po południu eksport `2,5 kWh` → przychód **0,50 DKK**.
+- **Użytkowy wariant z rano 5 A:** rano magazyn `0,28 kWh` i eksport `2,22 kWh`, po południu magazyn `2,22 kWh` i eksport `0,28 kWh` → przychód **1,916 DKK**.
+- **Wariant odwrotny:** rano magazyn `2,5 kWh`, po południu eksport `2,5 kWh` → przychód **1,25 DKK**.
 
-**Warunek porównywalności:** wszystkie trzy warianty kończą z **identycznym SOC**, zawierają tę samą energię nocną i nie eksportują baterii. Dla niezerowych strat, degradacji i realnej topologii wynik musi zostać policzony ponownie. Jeśli fizyczne 0 A nie jest zweryfikowane, idealny wariant nie jest planem wykonywalnym, więc **1,832 DKK może być najlepszym z tych trzech wykonywalnych wariantów**, ale nie jest dowodem globalnego optimum.
+**Warunek porównywalności:** wszystkie trzy warianty kończą z **identycznym SOC**, zawierają tę samą energię nocną i nie eksportują baterii. Dla niezerowych strat, degradacji i realnej topologii wynik musi zostać policzony ponownie. Jeśli fizyczne 0 A nie jest zweryfikowane, idealny wariant nie jest planem wykonywalnym, więc **1,916 DKK może być najlepszym z tych trzech wykonywalnych wariantów**, ale nie jest dowodem globalnego optimum.
 
 ## 5. Reguła decyzji w każdym slocie
 
@@ -131,7 +131,7 @@ Każda decyzja powinna zawierać: `decision_id`, slot UTC, ceny końcowe kupna i
 - `CUR-02`: PV 3,0 kW, dom 0,5 kW, η=1, eksport PV dopuszczony, ładowanie max 2,5 kW: dla 5 A → magazyn 0,28 kW i eksport 2,22 kW.
 - `CUR-03`: jak CUR-02, lecz limit 50 A → magazyn 2,50 kW i eksport 0 kW.
 - `CUR-04`: PV 0,1 kW, dom 0, bateria 56 V, limit 5 A → ładowanie **0,1 kW**, a nie oczekiwane zawsze 0,28 kW.
-- `CUR-05`: rano sprzedaż 0,80, po południu 0,20 DKK/kWh, potrzeba magazynować 2,5 kWh, η=1 → poranne 5 A i popołudniowa korekta daje przychód **1,832 DKK**, a odwrotna alokacja **0,50 DKK**.
+- `CUR-05`: rano sprzedaż 0,80, po południu 0,50 DKK/kWh (obie ceny spełniają próg 0,40), potrzeba magazynować 2,5 kWh, η=1 → poranne 5 A i popołudniowa korekta daje przychód **1,916 DKK**, a odwrotna alokacja **1,25 DKK**.
 - `CUR-06`: dla tych samych warunków matematyczny wariant 0 A rano daje **2,00 DKK**, ale pozostaje `not_executable`, jeśli fizyczna semantyka 0 A nie została zweryfikowana.
 - `CUR-07`: ogólny limit ładowania 5 A + limit grid charge 50 A → efektywny limit sieci 5 A, jeśli ładowanie z sieci jest aktywne; odwrotnie 50 A + 5 A → limit 5 A.
 - `CUR-08`: wyłączony Grid Charge w aktywnym TOU, limit sieci 50 A → brak wnioskowania, że bateria musi ładować z sieci.
