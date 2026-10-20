@@ -39,7 +39,7 @@
 - Odczyty pochodzą z różnych chwil (PV/dom około 13:24:14 UTC, eksport około 13:24:11 UTC, bateria około 13:24:09 UTC). W kontrolerze należy wymagać synchronizacji/tolerancji czasu, nie wymuszać idealnego bilansu z asynchronicznych próbek.
 - Prognoza PV „dziś” = 15,865 kWh, a zarejestrowana produkcja = 23,5 kWh. **Odchylenie jest naturalną możliwością prognozowania, nie automatycznym błędem systemu**. Do oceny jakości potrzeba odpowiadających sobie czasów/profili, migawek prognoz i informacji o curtailment, nie wymagać 100% zgodności.
 - `last_updated` to czas zmiany stanu/atrybutów HA, **nie musi być** czasem ostatniej telemetrii z urządzenia. Starsza data SOC lub sterowania nie dowodzi samodzielnie, że czujnik przestał działać; potrzebny `last_reported` lub równoważny sygnał nowej próbki, jeśli dostępny.
-- Pożądany przychód ze sprzedaży dla aktualnego spot wynosi **1,75508376559425 − 0,0215 = 1,73358376559425 DKK/kWh**, przy założonej przez użytkownika prowizji. **Nie** używać `sensor.energi_data_service` jako ceny sprzedaży.
+- **Aktualne rozstrzygnięcie:** cena sprzedaży z podanego historycznego stanu HA to **1,75508376559425 DKK/kWh bez żadnych korekt**. Co-Pilot nie wylicza prowizji. Nie używać `sensor.energi_data_service` jako ceny sprzedaży.
 
 ## 3. Bieżące encje sterowania — potwierdzono ISTNIENIE, nie funkcję fizyczną
 
