@@ -26,7 +26,7 @@ Nie obowiązują historyczne: próg sprzedaży 0,4 DKK/kWh, sztywna rezerwa nocn
 
 ## Cena i opłacalność
 
-- **Zakup:** końcowa zmienna cena zakupu z opłatami; dokładna seria i jej składniki do sprawdzenia.
+- **Zakup:** końcowa zmienna cena zakupu udostępniona w HA; użytkownik potwierdził uwzględnienie **wszystkich opłat i taryf**. Co-Pilot nie dolicza ich ponownie. Pozostaje sprawdzić strukturę przyszłej serii i daty.
 - **Sprzedaż — reguła przekazana przez użytkownika:** netto = cena spot − **0,0215 DKK/kWh** prowizji Vindstød. Sprawdzić na rzeczywistych rozliczeniach, czy jest to komplet wszystkich zmiennych obciążeń; nie dopowiadać innych kwot.
 - Ocena ładowania/rozładowania obejmuje sprawność w obie strony, koszt zużycia magazynu, limity mocy, koszty alternatywne przyszłego zasilania domu i skutki cen ujemnych.
 - Prognozy mogą być niepewne; plan musi tolerować odchylenia i aktualizować się po istotnej zmianie danych.
