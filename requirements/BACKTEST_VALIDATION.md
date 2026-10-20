@@ -87,7 +87,7 @@ Wyrównanie końcowego SOC albo jawna **wartość końcowej energii w magazynie*
 - `BKT-02`: brak archiwalnych prognoz prowadzi do `blocked_for_walk_forward`, a nie porównania z przyszłą produkcją.
 - `BKT-03`: różne końcowe SOC pokazują różnicę energii i ograniczenie porównywalności; nie zysk wyliczony tylko z rachunku.
 - `BKT-04`: brak potencjału PV podczas curtailment nie powoduje dopisania „straconych” kWh jako rzeczywistego eksportu w strategii alternatywnej.
-- `BKT-05`: obie strategie używają tej samej struktury taryfy i historycznych prowizji obowiązujących dla dat.
+- `BKT-05`: obie strategie otrzymują te same historyczne ceny z odpowiednich encji HA **bez jakichkolwiek przeliczeń, podatków, taryf lub potrąceń**; brakujące dane są oznaczone jako brak.
 - `BKT-06`: wynik dla idealnej wiedzy przyszłości jest osobno oznaczony `oracle_upper_bound`, nie raport główny.
 - `BKT-07`: cena następnego dnia nie jest dostępna od 00:00, lecz od faktycznej publikacji około 13:00 poprzedniego dnia.
 - `BKT-08`: zmiana czasu zachowuje 23/25 godzin i właściwe uporządkowanie w UTC.
