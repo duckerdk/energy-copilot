@@ -75,6 +75,7 @@ class RecorderHistoryReader:
             "observed_first": None,
             "observed_last": None,
             "issue_counts": {},
+            "issue_sources": {},
             "status": "reading",
         }
 
@@ -94,6 +95,9 @@ class RecorderHistoryReader:
             summary["observed_last"] = max(summary["observed_last"] or last, last)
         summary["issue_counts"] = dict(
             Counter(summary["issue_counts"]) + Counter(chunk["issue_counts"])
+        )
+        summary["issue_sources"] = dict(
+            Counter(summary["issue_sources"]) + Counter(chunk["issue_sources"])
         )
 
     async def _async_query(
@@ -143,6 +147,9 @@ class RecorderHistoryReader:
             observed_first=bounds[0],
             observed_last=bounds[1],
             issue_counts=dict(Counter(i.code for slot in slots for i in slot.issues)),
+            issue_sources=dict(
+                Counter(f"{i.source}:{i.code}" for slot in slots for i in slot.issues)
+            ),
         )
         # A setting is not proof that rows covering that duration actually exist.
         retention = getattr(instance, "keep_days", None)
