@@ -29,7 +29,7 @@ async def test_original_response_and_replay_exclude_later_revision(hass):
     assert archive.original_at(changed_at) == revised
     assert archive.as_of(NOW).version == first.version
     assert archive.as_of(NOW).periods[0].kwh == 1
-    assert archive.as_of(changed_at).periods[0].start == NOW + timedelta(hours=1)
+    assert archive.as_of(changed_at).periods[0].start == NOW
     original = archive.original_at(NOW)
     original["watts"].clear()
     assert archive.original_at(NOW) == response  # Callers cannot alter observations.

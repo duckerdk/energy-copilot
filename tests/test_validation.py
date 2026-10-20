@@ -5,6 +5,7 @@ import pytest
 from homeassistant.core import State
 
 from custom_components.energy_copilot.const import DEFAULT_ENTITIES, HISTORY_ROLES
+from custom_components.energy_copilot.recorder_reconstruction import RecordingRun
 from custom_components.energy_copilot.validation import (
     forecast,
     history_slots,
@@ -248,7 +249,11 @@ def history_rows(*, corrupt=False, missing=False, sparse=False):
 
 def test_recorder_integrates_only_corroborated_history():
     slots = history_slots(
-        history_rows(), DEFAULT_ENTITIES, NOW, NOW + timedelta(minutes=15)
+        history_rows(),
+        DEFAULT_ENTITIES,
+        NOW,
+        NOW + timedelta(minutes=15),
+        recording_runs=[RecordingRun(NOW, NOW + timedelta(minutes=15))],
     )
     assert len(slots) == 1
     assert slots[0].home_kwh == pytest.approx(5.234 / 4)
@@ -260,21 +265,25 @@ def test_recorder_integrates_only_corroborated_history():
     [
         ({"corrupt": True}, "invalid_input"),
         ({"missing": True}, "historical_quality_unverifiable"),
-        ({"sparse": True}, "historical_quality_unverifiable"),
     ],
 )
 def test_recorder_masked_history_never_becomes_zero(kwargs, code):
     slot = history_slots(
-        history_rows(**kwargs), DEFAULT_ENTITIES, NOW, NOW + timedelta(minutes=15)
+        history_rows(**kwargs),
+        DEFAULT_ENTITIES,
+        NOW,
+        NOW + timedelta(minutes=15),
+        recording_runs=[RecordingRun(NOW, NOW + timedelta(minutes=15))],
     )[0]
     assert slot.home_kwh is None
     assert code in codes(slot.issues)
 
 
-def test_forecast_not_captured_before_period_is_excluded():
+def test_forecast_partially_elapsed_period_keeps_original_energy():
     snapshot = forecast(forecast_response(), NOW + timedelta(minutes=1))
-    assert snapshot.periods[0].start == NOW + timedelta(hours=1)
-    assert all(p.start >= snapshot.captured_at for p in snapshot.periods)
+    assert snapshot.periods[0].start == NOW
+    assert snapshot.periods[0].kwh == 1
+    assert snapshot.captured_at == NOW + timedelta(minutes=1)
 
 
 def test_forecast_invalid_watts_and_duplicate_utc():
@@ -288,3 +297,14 @@ def test_forecast_invalid_watts_and_duplicate_utc():
     )
     with pytest.raises(ValueError):
         forecast(response, NOW)
+
+
+def test_sparse_recorded_states_need_context_not_fake_heartbeats():
+    end = NOW + timedelta(minutes=15)
+    rows = history_rows(sparse=True)
+    assert history_slots(rows, DEFAULT_ENTITIES, NOW, end)[0].home_kwh is None
+    slot = history_slots(
+        rows, DEFAULT_ENTITIES, NOW, end, recording_runs=[RecordingRun(NOW, end)]
+    )[0]
+    assert slot.home_kwh == pytest.approx(5.234 / 4)
+    assert not slot.issues

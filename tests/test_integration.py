@@ -241,8 +241,10 @@ async def test_forecast_capture_uses_response_time(
     await hass.async_block_till_done()
     data = entry.runtime_data.coordinator.data
     assert data.forecast.captured_at == NOW + timedelta(seconds=2)
-    assert data.forecast.periods[0].start == NOW + timedelta(hours=1)
-    assert "forecast_horizon_incomplete" in {i.code for i in data.issues}
+    assert data.forecast.periods[0].start == NOW
+    assert data.forecast.periods[0].kwh == 1
+    assert "forecast_observed_after_period_start" in {i.code for i in data.issues}
+    assert "forecast_horizon_incomplete" not in {i.code for i in data.issues}
 
 
 async def test_minimal_mapping_runtime_diagnostics_reload_and_unload(

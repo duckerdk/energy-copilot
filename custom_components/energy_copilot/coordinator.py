@@ -18,6 +18,7 @@ from .const import (
     UPDATE_INTERVAL,
 )
 from .forecast_history import ForecastHistory
+from .forecast_quality import forecast_coverage
 from .history import HistoryReadError, RecorderHistoryReader
 from .models import InputSnapshot, Issue
 from .validation import forecast, measurements, prices
@@ -55,6 +56,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self._history = ()
         self._external_issues = []
         self._last_external = None
+        self.forecast_coverage = None
 
     async def _async_setup(self):
         try:
@@ -112,22 +114,27 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         if self._forecast and max(p.end for p in self._forecast.periods) <= now:
             snapshot.forecast = None
             snapshot.issues.append(Issue("stale_forecast", "forecast_solar"))
-        if snapshot.forecast and snapshot.prices:
-            for slot in snapshot.prices:
-                covered = sum(
-                    max(
-                        0,
-                        (
-                            min(p.end, slot.end) - max(p.start, slot.start)
-                        ).total_seconds(),
-                    )
-                    for p in snapshot.forecast.periods
+        self.forecast_coverage = None
+        if snapshot.forecast:
+            self.forecast_coverage = forecast_coverage(
+                snapshot.forecast, snapshot.prices, now
+            )
+            if self.forecast_coverage["missing_intervals"]:
+                snapshot.issues.append(
+                    Issue("forecast_horizon_incomplete", "forecast_solar")
                 )
-                if covered < (slot.end - slot.start).total_seconds():
-                    snapshot.issues.append(
-                        Issue("forecast_horizon_incomplete", "forecast_solar")
-                    )
-                    break
+            if self.forecast_coverage["partially_elapsed_periods"]:
+                snapshot.issues.append(
+                    Issue("forecast_observed_after_period_start", "forecast_solar")
+                )
+            if snapshot.forecast.unbounded_energy_at:
+                snapshot.issues.append(
+                    Issue("forecast_energy_boundary_unverifiable", "forecast_solar")
+                )
+            if snapshot.forecast.missing_energy_at:
+                snapshot.issues.append(
+                    Issue("forecast_energy_period_missing", "forecast_solar")
+                )
         return snapshot
 
     async def _async_forecast(self, now):
@@ -184,6 +191,14 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         except HistoryReadError as err:
             self._external_issues.append(Issue(err.code, "recorder"))
             return
+        # RecorderRuns show process boundaries, not a durable history of recorder.disable.
+        # Reconstructed state coverage must not be presented as proven continuous recording.
+        if not self.history_reader.last_read_summary.get(
+            "recording_pause_history_verified", False
+        ):
+            self._external_issues.append(
+                Issue("recorder_pause_history_unverifiable", "recorder")
+            )
         if any(s.home_kwh is None for s in self._history):
             self._external_issues.append(
                 Issue("historical_quality_unverifiable", "recorder")

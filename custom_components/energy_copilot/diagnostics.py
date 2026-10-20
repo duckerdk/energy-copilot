@@ -29,6 +29,12 @@ async def async_get_config_entry_diagnostics(hass, entry):
     forecast_first = forecast_periods[0].start.isoformat() if forecast_periods else None
     forecast_last = forecast_periods[-1].end.isoformat() if forecast_periods else None
     return {
+        "integration_manifest": {
+            "domain": "energy_copilot",
+            "version": entry.runtime_data.installed_build["installed_version"],
+        },
+        "installed_version": entry.runtime_data.installed_build["installed_version"],
+        "installed_build": entry.runtime_data.installed_build,
         "mode": coordinator.settings.get("mode", "monitor"),
         "read_only": True,
         "observed": {
@@ -41,6 +47,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "price_buy_tomorrow_records": price_raw_tomorrow_count,
             "price_buy_tomorrow_valid": buy_attrs.get("tomorrow_valid"),
             "forecast_version": data.forecast.version if data.forecast else None,
+            "forecast_coverage": coordinator.forecast_coverage,
             "forecast_first_start_utc": forecast_first,
             "forecast_last_end_utc": forecast_last,
             "forecast_captured_at": data.forecast.captured_at.isoformat()
@@ -67,8 +74,8 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "pv_export_threshold_dkk_per_kwh": 0.4,
         },
         "assumed": {
-            "freshness_seconds": 300,
-            "maximum_skew_seconds": 10,
+            "live_freshness_seconds": 300,
+            "live_maximum_skew_seconds": 10,
             "recent_history_lookback_hours": 24,
             "history_on_demand_max_days": 366,
             "history_chunk_hours": 24,
