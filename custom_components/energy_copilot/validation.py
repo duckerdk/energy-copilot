@@ -132,7 +132,7 @@ def _derived_measurements(states, values, issues, now, templates, recovery):
     is checked, not a private HA dependency graph or a physical AC/DC model.
     An observed outage still requires a subsequent actual template report.
     """
-    # pv_sum is the only configured PV source; no PV1/PV2 corroboration.\n    # An unchanged zero is a valid HA state, not a missing heartbeat.
+    # pv_sum is the only configured PV source; no PV1/PV2 corroboration.\n    # An unchanged zero is a valid HA state, not a missing heartbeat.\n    # After a witnessed outage, the actual PV entity must report again.\n    if "pv" in values and "pv" in recovery and (\n        recovery["pv"] is None or values["pv"].at < recovery["pv"]\n    ):\n        values.pop("pv")\n        issues.append(Issue("derived_predates_source_recovery", "pv"))
     if "pv" in templates and "pv" not in values:
         try:
             original = measurement("pv", states.get("pv"), now, allow_old_report=True)
