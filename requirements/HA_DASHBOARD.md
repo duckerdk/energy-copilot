@@ -48,8 +48,7 @@ Poniższe nazwy to **wewnętrzne role wyników**; ostateczne stabilne encje HA m
 
 ## 4. Ceny i horyzont
 
-- Zakup pokazywany jako **końcowa zmienna cena** z opłatami.
-- Sprzedaż jako cena spot minus `0,0215 DKK/kWh`, z informacją, że kompletność rozliczenia wymaga potwierdzenia na fakturze.
+- Zakup pokazywany dokładnie z `sensor.energi_data_service`, sprzedaż dokładnie z `sensor.energi_data_spotpris` — **bez korekt**. Panel pokazuje próg eksportu PV **0,40 DKK/kWh**, propozycję ON/OFF i aktualny stan `switch.sun12k_solar_sell` [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md).
 - Horyzont planu kończy się na ostatniej **rzeczywiście opublikowanej** cenie. Jeżeli jutro nie opublikowano jeszcze cen, pokazać „Ceny jutra niedostępne” i nie rysować fikcyjnego dalszego profilu ceny.
 - Po rzeczywistej publikacji jutrzejszych cen (zwykle około 13:00) panel aktualizuje horyzont bez sugerowania, że istnieje prognoza zawsze na 48 h.
 - Wszystkie wykresy z lokalną prezentacją Europe/Copenhagen i poprawną obsługą dwukrotnej jesiennej godziny 02:00.
@@ -87,7 +86,7 @@ Widok pokazuje **ostatnią decyzję wraz z cenami, prognozami, SOC, planowaną m
 - `UI-06`: odczyt 60 kWh prognozy, 35 kWh uzysku przy ograniczaniu PV — nie prezentować „25 kWh błędu prognozy” bez weryfikacji curtailment.
 - `UI-07`: eksporter PV jest możliwy, a eksport baterii nie — stan i przyciski nie sugerują, że są tą samą funkcją.
 - `UI-08`: błąd potwierdzenia komendy — status `uncertain`, nie sukces działania.
-- `UI-09`: ujemna cena sprzedaży — widoczny znak i wartość, bez ukrywania ujemnego przychodu.
+- `UI-09`: ujemna cena sprzedaży w HA — widoczny znak i wartość **bez przeliczenia**, eksport PV OFF przy progu 0,40.
 - `UI-10`: po jesiennej zmianie czasu — osobne punkty dla obu wystąpień lokalnej 02:00.
 - `UI-11`: historia decyzji pokazuje rzeczywistą przesłankę ekonomiczną i alternatywę, także dla `idle`/`blocked`, oraz osobno stan wykonania.
 
