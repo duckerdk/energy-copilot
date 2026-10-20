@@ -62,12 +62,10 @@
 
 W odczycie z 19.10.2026 występowały encje `switch.battery_controller_optimization_enabled`, `select.battery_controller_control_mode` i inne z prefiksem `battery_controller`. **Użytkownik wyjaśnił 20.10.2026, że są to nieaktywne pozostałości po starej integracji.** Nie traktować ich jako działającego kontrolera, blokera, źródła danych ani narzędzia sterowania. Energy Co-Pilot używa zweryfikowanych encji `sun12k_*` i innych wskazanych źródeł HA, a nie wyników starego Battery Controller. Konflikt dotyczy wyłącznie **rzeczywiście aktywnego** zewnętrznego wykonawcy, jeśli taki zostanie zaobserwowany.
 
-## 5. Co TEN odczyt rozstrzyga, a czego nie
+## 5. Granice dowodu i późniejsze ustalenia
 
-**Ustalone:** istnienie wielu potrzebnych encji, ich jednostki, obecne stany i dwie wewnętrzne kontrole bilansu (MPPT→PV i PV+bateria→dom+eksport). Znamy bieżące wartości spot, kandydata ceny zakupu, baterii, PV, domu i mocy eksportu.
+To **archiwalna migawka 19.10.2026** dostarczona przez użytkownika (surowy `wynik.txt` nie jest plikiem repozytorium). Odczyt potwierdza istnienie wymienionych w tabelach encji i wartości w tamtym momencie, nie ciągłą dostępność ani semantykę zapisu. Zerowy residual pomiaru domu jest definicyjny, bo sensor jest sumą trzech źródeł.
 
-**Uzupełnienie 20.10.2026: format przyszłych cen zakupu i spot został później potwierdzony w [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md). Poniższy opis dotyczył stanu wiedzy **wyłącznie w chwili odczytu `wynik.txt`**.
+**Ustalenia po tej migawce:** 20.10 potwierdzono strukturę `raw_today` z godzinami i znacznikami czasu oraz brak opublikowanego `raw_tomorrow` przed publikacją; pełny kontrakt w [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md). Użytkownik potwierdził widoczność akcji Forecast.Solar w HA; **nie sprawdzono odpowiedzi**. Fizyczne znaki w obydwu kierunkach, strona AC/DC, prądy 0 A, bezpieczny eksport PV i niezależne zatrzymanie nadal wymagają dowodów. Aktualna lista: [OPEN_ITEMS.md](OPEN_ITEMS.md).
 
-**Nadal nieustalone na podstawie `wynik.txt`:** struktura i kompletność **przyszłych cen kupna/spot** (szablon nie eksportował atrybutów); godzinowe sloty Forecast.Solar; wiarygodność punktów pomiaru DC/AC przy ładowaniu i rozładowaniu; realne limity BMS; ewentualne rzeczywiście aktywne obce sterowanie zapisami; osobne i mierzalne polecenie eksportu **z baterii**; przywrócenie trybu po utracie HA.
-
-**Wniosek bezpieczeństwa:** **nie** włączać sprzętowego executora na podstawie tego zrzutu. Następnym źródłem dowodowym są wyłącznie atrybuty konkretnie zidentyfikowanych źródeł cen i prognoz. Testy akcji wymagają osobnego, świadomie nadzorowanego kroku.
+Nie wyciągać z tej migawki wniosku o gotowości do live ani nie proponować ponownego, pełnego zrzutu prywatnego HA jako warunku rozpoczęcia M1–M5.
