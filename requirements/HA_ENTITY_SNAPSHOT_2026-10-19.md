@@ -24,7 +24,7 @@
 | Energia ładowania magazynu dziś | `sensor.sun12k_today_charge_of_the_battery` | 8,6 | kWh | Dzienny licznik; nieznana strona bilansu |
 | Energia rozładowania magazynu dziś | `sensor.sun12k_today_discharge_of_the_battery` | 1,2 | kWh | Dzienny licznik; nieznana strona bilansu |
 | Cena spot aktualna | `sensor.energi_data_spotpris` | 1,75508376559425 | DKK/kWh | Pomiar bieżącej ceny; brak atrybutów przyszłych slotów |
-| Cena zakupu — kandydat | `sensor.energi_data_service` | 2,23828751559425 | DKK/kWh | Wartość wyższa od spot o **0,48320375 DKK/kWh**, **nie jest dowodem kompletności opłat** |
+| Cena zakupu końcowa | `sensor.energi_data_service` | 2,23828751559425 | DKK/kWh | Użytkownik potwierdził, że cena HA zawiera **wszystkie opłaty i taryfy**; różnica do spot wynika z nich i innych składników, bez podwójnego naliczania |
 | Prognoza PV dziś | `sensor.energy_production_today` | 15,865 | kWh | Dobowa suma, nie godzinowe sloty |
 | Prognoza PV pozostała dziś | `sensor.energy_production_today_remaining` | 4,431 | kWh | Nie zastępuje informacji o wszystkich przyszłych slotach |
 | Prognoza PV jutro | `sensor.energy_production_tomorrow` | 7,536 | kWh | Dobowa suma; potrzebne dane intraday |
@@ -37,7 +37,7 @@
 - Dwa pomiary PV: **2387 W + 647 W = 3034 W** — dokładnie tyle co `sensor.pv_sum`. Dobre potwierdzenie agregacji odczytów obu MPPT w chwili zrzutu.
 - Równanie przykładowego bilansu **3034 W PV + 19 W baterii = 583 W domu + 2470 W eksportu = 3053 W** zamyka się **numerycznie**. Zgodność jest silną wskazówką przyjętej konwencji znaków, ale **nie** dowodzi wszystkich torów AC/DC, poprawności pomiaru przy ładowaniu i importowaniu ani stałości konwencji.
 - Odczyty pochodzą z różnych chwil (PV/dom około 13:24:14 UTC, eksport około 13:24:11 UTC, bateria około 13:24:09 UTC). W kontrolerze należy wymagać synchronizacji/tolerancji czasu, nie wymuszać idealnego bilansu z asynchronicznych próbek.
-- PV prognozowane „dziś” `15,865 kWh` jest **niższe** niż licznik produkcji dziennej `23,5 kWh`; **nie wolno** z tej różnicy wyciągać oceny skuteczności prognozy bez ustalenia zakresów, czasu migawki i punktu pomiaru. Sprawdzić integrację Forecast.Solar / jednostki.
+- Prognoza PV „dziś” = 15,865 kWh, a zarejestrowana produkcja = 23,5 kWh. **Odchylenie jest naturalną możliwością prognozowania, nie automatycznym błędem systemu**. Do oceny jakości potrzeba odpowiadających sobie czasów/profili, migawek prognoz i informacji o curtailment, nie wymagać 100% zgodności.
 - `last_updated` to czas zmiany stanu/atrybutów HA, **nie musi być** czasem ostatniej telemetrii z urządzenia. Starsza data SOC lub sterowania nie dowodzi samodzielnie, że czujnik przestał działać; potrzebny `last_reported` lub równoważny sygnał nowej próbki, jeśli dostępny.
 - Pożądany przychód ze sprzedaży dla aktualnego spot wynosi **1,75508376559425 − 0,0215 = 1,73358376559425 DKK/kWh**, przy założonej przez użytkownika prowizji. **Nie** używać `sensor.energi_data_service` jako ceny sprzedaży.
 
@@ -66,6 +66,6 @@ W odczycie z 19.10.2026 występowały encje `switch.battery_controller_optimizat
 
 **Ustalone:** istnienie wielu potrzebnych encji, ich jednostki, obecne stany i dwie wewnętrzne kontrole bilansu (MPPT→PV i PV+bateria→dom+eksport). Znamy bieżące wartości spot, kandydata ceny zakupu, baterii, PV, domu i mocy eksportu.
 
-**Nadal nieustalone na podstawie `wynik.txt`:** struktura i kompletność **przyszłych cen kupna/spot** (szablon nie eksportował atrybutów); godzinowe sloty Forecast.Solar; wiarygodność punktów pomiaru DC/AC przy ładowaniu i rozładowaniu; finalne opłaty na fakturze; realne limity BMS; ewentualne rzeczywiście aktywne obce sterowanie zapisami; osobne i mierzalne polecenie eksportu **z baterii**; przywrócenie trybu po utracie HA.
+**Nadal nieustalone na podstawie `wynik.txt`:** struktura i kompletność **przyszłych cen kupna/spot** (szablon nie eksportował atrybutów); godzinowe sloty Forecast.Solar; wiarygodność punktów pomiaru DC/AC przy ładowaniu i rozładowaniu; realne limity BMS; ewentualne rzeczywiście aktywne obce sterowanie zapisami; osobne i mierzalne polecenie eksportu **z baterii**; przywrócenie trybu po utracie HA.
 
 **Wniosek bezpieczeństwa:** **nie** włączać sprzętowego executora na podstawie tego zrzutu. Następnym źródłem dowodowym są wyłącznie atrybuty konkretnie zidentyfikowanych źródeł cen i prognoz. Testy akcji wymagają osobnego, świadomie nadzorowanego kroku.
