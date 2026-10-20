@@ -20,8 +20,8 @@ Przyjmujemy, że **właściwe encje wykonują właściwe funkcje**. To **założ
 
 | Rola | Historyczne ID | Wymagane sprawdzenie |
 | --- | --- | --- |
-| Cena spot teraz | sensor.energi_data_spotpris | Waluta, DKK/kWh, bieżący stan, czas |
-| Cena zakupu z opłatami | sensor.energi_data_service | **Pełne opłaty/taryfy już w HA wg użytkownika**; zweryfikować strukturę przyszłych slotów, daty i walutę |
+| Cena spot teraz i w przyszłości | sensor.energi_data_spotpris | **Potwierdzone 20.10.2026**: `raw_today`, `raw_tomorrow`, `tomorrow_valid`, `hour` + `price` w DKK/kWh; [pełny kontrakt](HA_PRICE_SERIES_CONTRACT.md) |
+| Końcowa cena zakupu (wszystkie opłaty) | sensor.energi_data_service | **Potwierdzone 20.10.2026**: `raw_today`, `raw_tomorrow`, `tomorrow_valid`, timestampowane stawki z pełnymi opłatami; [pełny kontrakt](HA_PRICE_SERIES_CONTRACT.md) |
 | SOC | sensor.sun12k_battery_capacity | Czy to SOC %, 0–100, aktualność |
 | Moc PV | sensor.pv_sum | W czy kW; znak; aktualność |
 | Moc domu | sensor.home_energy_consumption | W czy kW; definicja; aktualność |
@@ -81,7 +81,7 @@ Więcej szczegółów i zastrzeżeń: [HA_ENTITY_SNAPSHOT_2026-10-19.md](HA_ENTI
 ## Nieznane, lecz wymagane do planowania i wykonania
 
 - **Częściowo ustalone ID mocy i liczników:** znamy `sun12k_total_grid_power`, `sun12k_battery_output_power`, liczniki energii dziennej i całkowitej. Nadal trzeba potwierdzić **konwencję znaków w obu kierunkach**, stronę AC/DC, świeżość pomiaru, przejścia import/eksport i ładowanie/rozładowanie; nie przyjmować, że jeden bilans w stanie eksportowym jest kompletną kalibracją.
-- Godzinowa / kwartalna seria cen zakupu i sprzedaży z kompletnymi timestampami; profil PV w slotach; prognoza zużycia.
+- **Ceny: rozwiązane.** Dostępne timestampowane serie `raw_today` i `raw_tomorrow` oraz flagi `tomorrow_valid` dla zakupu i spot; kontrakt parsera i DST [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md). Nadal potrzebne są godzinowy profil PV i prognoza zużycia.
 - **Produkcja PV i curtailment:** potwierdzić, czy encja mocy/energii PV obejmuje również ładowanie po DC; jeśli dostępne, wskazać sygnał aktywnego ograniczenia produkcji (limit eksportu, MPPT, status curtailment) i zweryfikować jego znaczenie. Pełna bateria + wyłączony eksport to jedynie przesłanki; nie dają pomiaru niewyprodukowanych kWh. Migawki prognoz muszą mieć czas pobrania i daty/sloty ważności, aby porównanie z późniejszą produkcją nie wykorzystywało zaktualizowanej prognozy.
 - ID i znaczenie sterowań **docelowym SOC, limitem mocy ładowania, wymuszonym rozładowaniem, kierunkiem eksportu z baterii, harmonogramem Deye i przywróceniem trybu fabrycznego**. Nie wiadomo, czy HA udostępnia wszystkie te funkcje.
 - Warunki i możliwości niezależnego potwierdzania rezultatów poleceń.
@@ -122,8 +122,8 @@ Energy Co-Pilot stosuje **własne zakresy dozwolonych nastaw w amperach**, całk
 | Rola | Znormalizowane dane | Status mapowania i walidacja |
 | --- | --- | --- |
 | `spot_price` | DKK/kWh, czas obowiązywania | Historyczne `sensor.energi_data_spotpris`; sprawdzić taryfę DK1, jednostki, daty |
-| `spot_price_slots` | `start_utc, end_utc, value_dkk_kwh` | Przyszłe rzeczywiście opublikowane spot, bez uzupełniania fikcyjnymi godzinami |
-| `buy_price_slots` | Takie same przedziały, cena **końcowa** z opłatami | Użytkownik potwierdził, że ceny zakupu w HA uwzględniają wszystkie opłaty i taryfy: **nie naliczać drugi raz**. Potwierdzić tylko dostępność i format przyszłej serii |
+| `spot_price_slots` | `start_utc, end_utc, value_dkk_kwh` | `sensor.energi_data_spotpris.attributes.raw_today/raw_tomorrow[*].hour/price`; publikacja jutra wyłącznie przy poprawnym `tomorrow_valid`; [parser](HA_PRICE_SERIES_CONTRACT.md) |
+| `buy_price_slots` | Te same przedziały, cena **końcowa** z opłatami | `sensor.energi_data_service.attributes.raw_today/raw_tomorrow[*].hour/price`; **format już potwierdzony**; opłaty/taryfy już w wartości, nie doliczać ponownie |
 | `sell_price_slots` | DKK/kWh, wyliczana | `spot_price_slots - 0,0215 DKK/kWh` (ustalona prowizja Vindstød); osobna encja nie jest konieczna |
 | `battery_soc` | Procent oraz energia z jawnie przyjętej pojemności | Historyczne `sensor.sun12k_battery_capacity`; zakres SOC, aktualność, dostępna energia vs nominalna |
 | `battery_charge_power` / `battery_discharge_power` | Dwie nieujemne moce [kW] z ustaloną stroną AC/DC | Pomiary istnieją wg użytkownika; identyfikatory jeszcze nie zapisane w bieżącym rejestrze; znak i fizyczny punkt pomiaru krytyczne |
