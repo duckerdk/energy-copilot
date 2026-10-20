@@ -1,78 +1,60 @@
 # Energy Co-Pilot
 
-**Status:** M1/M2 — natywna integracja Home Assistant `custom_components/energy_copilot`, wyłącznie do odczytu. Konfiguracja i options flow, setup/reload/unload, walidacja pomiarów i cen, odczyt Forecast.Solar/Recorder oraz diagnostyka mają testy automatyczne. M3–M6 pozostają do implementacji; przypadki w VALIDATION są wymaganiami, nie raportem wykonania. Integracja nie rejestruje usług ani encji sterujących falownikiem.
+Natywna integracja Home Assistant `custom_components/energy_copilot`. **Aktualne wydanie: [v0.1.6](https://github.com/duckerdk/energy-copilot/releases/tag/v0.1.6).** Obecny zakres **M1/M2**: konfiguracja, odczyt pomiarów i cen, Forecast.Solar, historia Recorder oraz diagnostyka jakości danych. Integracja działa **wyłącznie w trybie odczytu**; nie steruje falownikiem. Planner, dashboard sterowania i wykonanie decyzji (M3–M6) nie są jeszcze zaimplementowane.
 
-**Cel:** minimalizować całkowity koszt energii na całym dostępnym horyzoncie opublikowanych cen. Źródłem wszystkich zatwierdzonych decyzji jest [REQUIREMENTS.md](requirements/REQUIREMENTS.md). Nie rekonstruować decyzji użytkownika ze starych komentarzy ani z `OPEN_ITEMS`.
+Celem docelowego rozwiązania jest minimalizacja całkowitego kosztu energii w horyzoncie opublikowanych cen, z uwzględnieniem SOC, sprawności i degradacji baterii. Zatwierdzone reguły i uprawnienia opisuje wyłącznie [REQUIREMENTS.md](requirements/REQUIREMENTS.md).
 
-## Dokumenty — jedna rola na plik
+## Instalacja i aktualizacja
 
-| Plik | Jedyna odpowiedzialność |
+Wymagany Home Assistant **2026.10 lub nowszy** (testy automatyczne: Core 2026.10.2, Python 3.14).
+
+1. Dodaj `https://github.com/duckerdk/energy-copilot` jako własne repozytorium typu **Integration** w HACS.
+2. Zainstaluj opublikowane wydanie, zrestartuj Home Assistant i dodaj **Energy Co-Pilot** w **Ustawienia → Urządzenia i usługi**.
+3. Przy aktualizacji sprawdź w diagnostyce `installed_version`, `installed_build.tag` i `installed_build.integrity`. Pakiet oficjalnego wydania powinien wskazywać `payload_matches_build_info`.
+
+Alternatywą jest ręczne skopiowanie katalogu `custom_components/energy_copilot` do instalacji HA; takie kopiowanie nie zapewnia metadanych `BUILD_INFO.json` z wydania. Nie ma potrzeby zmiany ESPHome, Modbus ani ustawień falownika.
+
+## Źródła i zasady bieżących danych
+
+| Rola | Encja |
 | --- | --- |
-| [REQUIREMENTS](requirements/REQUIREMENTS.md) | Cel, instalacja, polityka cen/SOC/degradacji, uprawnienia użytkownika |
-| [HA_CONTRACT](requirements/HA_CONTRACT.md) | Encje, znaki, jednostki, dostępność, ceny, dane PV/Recorder |
-| [OPTIMIZATION](requirements/OPTIMIZATION.md) | Bilans, funkcja celu, prognozowanie, wykonalny plan |
-| [EXECUTION](requirements/EXECUTION.md) | HA executor, bezpieczeństwo, TOU, zgody i awarie |
-| [VALIDATION](requirements/VALIDATION.md) | Testy do napisania, benchmark, log i dashboard |
-| [OPEN_ITEMS](requirements/OPEN_ITEMS.md) | **Wyłącznie niewyjaśnione dowody techniczne**, z właścicielem i etapem |
+| Produkcja PV — **jedyna** | `sensor.pv_sum` |
+| Sieć: dodatnie = import, ujemne = eksport | `sensor.sun12k_total_grid_power` |
+| Bateria: dodatnie = rozładowanie, ujemne = ładowanie | `sensor.sun12k_battery_output_power` |
+| Zużycie domu, pochodna PV + sieć + bateria | `sensor.home_energy_consumption` |
+| SOC | `sensor.sun12k_battery_capacity` |
+| Ceny zakupu / sprzedaży | `sensor.energi_data_service` / `sensor.energi_data_spotpris` |
 
-Dodatkowo [AGENTS.md](AGENTS.md) zawiera instrukcje wykonawcze dla Codexa. Nie tworzyć nowych plików specyfikacji bez rzeczywistej nowej odpowiedzialności; poprawiać właściwy istniejący plik. Brak archiwum — historia jest dostępna przez Git.
+PV1/PV2 nie są źródłami danych integracji. Poprawne, dostępne `sensor.pv_sum=0 W` pozostaje ważne także bez nocnych aktualizacji. Dodatnia moc PV oraz pozostałe bieżące pomiary podlegają sprawdzaniu aktualności; `unknown`, `unavailable`, błędne jednostki i nieprawidłowe wartości są odrzucane. Asynchroniczne raportowanie czujników nie jest samo w sobie błędem wejścia. Rzeczywiste awarie oraz powroty źródeł po awarii nadal są kontrolowane.
 
-## Implementacja
+Ujemne, ale poprawne i zweryfikowane kontekstowo odczyty `home` są na potrzeby obliczeń normalizowane do `max(0, home)`, również w historii. Nie zmienia to encji HA ani surowych danych. Braków, luk Recorder i niewiarygodnych szablonów po awarii **nie wolno** zastępować zerami.
 
-1. M1: manifest, config/options flow, typed runtime data, setup/unload, testy — zero zapisów.
-2. M2: mapowanie encji, walidacja cen/UTC/DST/Recorder/Forecast.Solar.
-3. M3: planner minimalnego kosztu, realistyczne możliwości Deye, `dry_run`, rejestr decyzji.
-4. M4: HA encje, dashboard, zgody eksportu baterii, STOP.
-5. M5: testy, walk-forward, walidacja alternatyw i jakości danych.
-6. M6: **dopiero po świadomym włączeniu live i testach** — autonomiczne prądy, Grid Charge, sześć TOU, Solar Sell PV; eksport baterii tylko przy indywidualnej zgodzie.
+Dokładne mapowanie, ograniczenia i potwierdzone formaty HA: [HA_CONTRACT.md](requirements/HA_CONTRACT.md).
 
-Odbiór iteracji: kod i pliki, testy naprawdę wykonane, testy nieprzeprowadzone, istotne ryzyka i aktualne [OPEN_ITEMS](requirements/OPEN_ITEMS.md). Bez udawania, że symulacja jest oszczędnością z urządzenia.
+## Prognoza, historia i diagnostyka
 
-## Instalacja M1/M2
+- **Forecast.Solar**: natywna usługa HA `forecast_solar.get_forecast`; `wh_period[t]` opisuje energię przedziału **kończącego się** w `t`. Brak opublikowanej prognozy, także nocą i o zmierzchu, nie jest uzupełniany domniemanym zerem. Niepełny horyzont jest pokazywany osobno jako `forecast_state=incomplete`, bez automatycznego pogarszania `Input quality`.
+- **Archiwum prognoz**: zachowuje oryginalne W/Wh i czas odczytu do odtworzenia prognozy znanej w chwili decyzji. Domyślna retencja to 90 dni i 10 000 wersji, z limitem 32 MiB; limity można konfigurować w Opcjach. `forecast_history.as_of(...)` zwraca archiwalną obserwację, a `decision_periods_as_of(...)` tylko pełne przyszłe okresy dostępne w chwili decyzji. Nieodtwarzalne stare wersje nie są przedstawiane jako prawidłowe.
+- **Recorder**: bieżąca diagnostyka wykorzystuje ostatnie 24 h; `history_reader.async_iter_slots(start, end)` umożliwia odczyt na żądanie w porcjach do 24 h (maks. 366 dni). Kwadrans bez pełnych, wiarygodnych danych ma `home_kwh=None`. Zachowana energia częściowa nie jest ekstrapolowana. Sama historia stanów nie dowodzi ciągłego raportowania sprzętu.
+- **Prywatność**: standardowy eksport diagnostyki zawiera agregaty jakości i korekt, nie szereg prywatnych próbek mocy domu ani szczegółowe zdarzenia audytu.
 
-Wymagany Home Assistant **2026.10 lub nowszy** (testy: Core 2026.10.2, Python 3.14). W HACS dodaj to repozytorium jako niestandardową integrację albo skopiuj katalog `custom_components/energy_copilot` do katalogu `custom_components` swojej instancji HA. Zrestartuj HA i dodaj **Energy Co-Pilot** w Ustawienia → Urządzenia i usługi. Nie zmieniaj konfiguracji ESPHome ani falownika.
+Sensor **Input quality** ocenia wymagane **bieżące** dane: `valid` (brak obecnych problemów blokujących i niepewności), `uncertain` (akceptowane wejścia z istotną niepewnością), `degraded` (nieważne wymagane wejście). Kwestie historyczne i Forecast.Solar są widoczne oddzielnie; `valid` **nie** potwierdza poprawności fizycznego bilansu AC/DC ani gotowości planera. Status `planning_readiness=not_evaluated_m2` pozostaje prawidłowy do wdrożenia M3.
 
-Konfiguracja wymaga `sensor.pv_sum` jako **jednego źródła PV**, sieci, baterii, SOC, domu i cen. PV1/PV2 nie są ani mapowane, ani odczytywane przez Energy Co-Pilot. Dodatkowe czujniki diagnostyczne pozostają opcjonalne.
+## Dokumentacja projektu
 
-Sensor **Input quality** i pobierana diagnostyka pokazują brakujące, niepoprawne i nieweryfikowalne dane oraz faktyczne pokrycie historii. Pole `quality` rozdziela blokujące błędy wymaganych bieżących danych (`blocking`), niepewność czasową (`uncertainty`), ograniczenia historii/kalibracji (`historical`) i informacje (`informational`). Sensor ma jawny zakres `quality_scope=required_current_inputs`: `valid` oznacza brak blokujących błędów i niepewności czasowej wymaganych bieżących wejść, `uncertain` — przyjęte dane as-of z niepewnością, `degraded` — co najmniej jeden błąd blokujący. Braki prognozy nie zmieniają `Input quality` bieżących pomiarów. Osobny `forecast_state=incomplete` informuje o niepełnym horyzoncie prognozy; błędy prognozy pozostają w diagnostyce i mogą blokować przyszły planner. Nocne luki są normalne; nie dopisujemy fikcyjnych zer. Same ostrzeżenia `historical`/`informational` nie wymuszają stałego `degraded`; wszystkie nadal są widoczne w `issue_codes`, `issue_categories` i diagnostyce. `planning_readiness=not_evaluated_m2` nie deklaruje gotowości niezaimplementowanego planera. Błąd historyczny wyklucza dotknięte próbki; tolerancję braków przez przyszły model trzeba dopiero zwalidować. Prognoza korzysta wyłącznie z natywnego `forecast_solar.get_forecast` w rozdzielczości `raw`, bez bezpośredniego API dostawcy. W Opcjach można ustawić retencję prognoz od 1 do 366 dni (domyślnie 90) i limit od 1 do 50 000 wersji (domyślnie 10 000). Dodatkowy limit jednego magazynu wynosi 32 MiB; wcześniejszy z limitów usuwa najstarsze obserwacje i nieużywane dane. Liczenie rozmiaru i walidacja magazynu odbywają się poza pętlą HA. Usunięcie integracji usuwa jej magazyn `.storage`.
+| Plik | Zakres |
+| --- | --- |
+| [REQUIREMENTS.md](requirements/REQUIREMENTS.md) | Jedyne źródło decyzji użytkownika, cel ekonomiczny i uprawnienia |
+| [HA_CONTRACT.md](requirements/HA_CONTRACT.md) | Encje HA, znaki, jednostki, kontrakt danych |
+| [OPTIMIZATION.md](requirements/OPTIMIZATION.md) | Model przepływów, prognoz i minimalizacji kosztu |
+| [EXECUTION.md](requirements/EXECUTION.md) | Wykonanie, TOU, STOP, bezpieczeństwo i zgody |
+| [VALIDATION.md](requirements/VALIDATION.md) | Wymagane regresje, odbiór, backtest |
+| [OPEN_ITEMS.md](requirements/OPEN_ITEMS.md) | Wyłącznie nadal otwarte kwestie i wymagane potwierdzenia |
+| [AGENTS.md](AGENTS.md) | Zasady pracy Codexa w tym repozytorium |
 
-Magazyn zachowuje oryginalne mapy W/Wh i klucze czasu z odpowiedzi oraz czas pierwszego udanego odczytu. HA nie podaje w tej usłudze czasu wygenerowania prognozy przez dostawcę. Identyczne kolejne odpowiedzi nie tworzą wersji ani kolejnych zapisów. Powrót do wcześniejszych wartości po innej prognozie tworzy nową obserwację, współdzieląc oryginalny zestaw danych. `coordinator.forecast_history.as_of(decision_at, source_entry=...)` wybiera ostatnią zachowaną obserwację dostępną w chwili decyzji; `original_at(...)` zwraca kopię jej pierwotnych wartości. Późniejsze aktualizacje nie zastępują wcześniejszych prognoz. Odtwarzanie jest ograniczone retencją; duże odczyty na potrzeby przyszłych testów należy wykonywać poza pętlą HA. Stary magazyn jest migrowany z zachowaniem znanych okresów i czasu, ale utraconych wcześniej surowych odpowiedzi nie można odzyskać. Znormalizowane wersje bez oryginalnych map Wh powstały przy błędnym indeksowaniu i nie są odtwarzane (`as_of()` zwraca `None`); pozostają jedynie do audytu. Wersje z zachowanym surowym źródłem są odtwarzane poprawnym parserem końca przedziału. Diagnostyka pokazuje `interval_semantics=end_timestamp` i `legacy_replay_supported=false`. Błędny lub nieznany magazyn nie jest nadpisywany.
+Nie dodawaj równoległych specyfikacji, archiwum ani plików zawierających prywatne dane HA. Historia zmian i poprzednie wydania pozostają w Git.
 
-Bieżące odczyty Recorder nadal obejmują jedynie ostatnie 24 h, odświeżane co 15 min. Dłuższe zakresy udostępnia na żądanie `coordinator.history_reader.async_iter_slots(start, end)` — maksymalnie 366 dni, w kolejnych porcjach do 24 h. Iterator jest leniwy: bez wywołania nie wykonuje zapytań, a przerwanie nie uruchamia kolejnych porcji. Wymaga dat ze strefą, pełnych kwadransów i końca niepóźniejszego niż aktualna chwila. Konsument powinien zamknąć iterator po wcześniejszym zakończeniu (np. `contextlib.aclosing`). Odczyty korzystają z executora Recorder i wspólnej blokady; unload blokuje dalsze porcje. Integracja nie kopiuje historii do osobnej bazy i nie zwiększa retencji Recorder. Diagnostyka rozdziela ustawioną retencję od zaobserwowanego pokrycia i raportuje ostatni odczyt bieżący oraz zakres zażądany osobno.
-
-Historia jest rekonstruowana od ostatniego rzeczywistego rekordu każdego źródła przez kolejne zmiany stanów. `last_updated` w Recorder oznacza zmianę, nie heartbeat: stałe nocne PV=0 i niezależne czasy zmian źródeł nie podlegają bieżącemu limitowi wieku raportu 5 min ani celowi precyzji czasowej 10 s. Reader zachowuje prawdziwy czas rekordu granicznego zamiast syntetycznego początku zapytania. Przerwy między procesami Recorder, niepewne zakończenia, źródła wykluczone, brak jednostek oraz jawne `unknown/unavailable` nadal odrzucają dotknięty kwadrans. `home` pozostaje zapisanym stanem szablonu; liczba w szablonie nie zastępuje brakującego PV/sieci/baterii. Po jawnej awarii źródła stary liczbowy szablon jest niewiarygodny do odczytu domu po odzyskaniu źródeł (`home_predates_source_recovery`). Nie jest to próg świeżości dla niezmiennych nocnych odczytów.
-
-Aktywnie wyłączony Recorder jest błędem `recorder_disabled`. Historyczna sesja procesu nie dowodzi, że zapis nigdy nie był pauzowany: HA nie zachowuje pełnego rejestru `recorder.disable` ani zmian filtrów. Diagnostyka ujawnia `device_freshness_verified=false`, `recording_pause_history_verified=false`, `historical_filter_changes_verified=false` i problem `recorder_pause_history_unverifiable`. Liczba odtworzonych kwadransów nie jest dowodem ciągłego raportowania urządzeń. To odczyt M2, bez modelu, uczenia, backtestu lub sterowania M3–M6.
-
-Poprawka #5 w **0.1.2** stosuje potwierdzony eksportem kontrakt `wh_period[end]`: energia przypisana jest do przedziału kończącego się przy danym kluczu czasu. Końcowe 8/9 Wh krótkiego okresu zachodu jest prawidłową energią, nie energią nieograniczonej przyszłości. Tylko pierwsza wartość bez poprzedniej granicy ma nieznany wcześniejszy przedział; nie rozciągamy jej na następny. Oryginalne Wh rozpoczętego okresu i czas pierwszej dostępności pozostają zachowane, bez proporcjonalnego przeliczania. Nocne zero jest używane tylko wtedy, gdy wynika z jawnej energii za przedział o znanych granicach. Brak po końcu opublikowanego horyzontu pozostaje brakiem; nie przedłużamy prognozy zerami. Dokładne luki i `energy_timestamp_semantics=interval_end` są widoczne w diagnostyce pokrycia.
-
-Wersja **0.1.3** zachowuje zasadę `complete_observed_quarter_required`: `home_kwh=None` dla niekompletnego kwadransa. Obiekt `HistorySlot` zachowuje jednak `observed_home_kwh` — całkę tylko po poprawnych zapisanych fragmentach — oraz `observed_seconds`, `unobserved_seconds` i przyczyny. Nie przelicza częściowej energii na cały kwadrans. Brak obserwacji daje `observed_home_kwh=None`, nie zero. Diagnostyka oddziela odsetek kompletnych kwadransów od `observed_time_fraction` i pokazuje brakujące podokresy UTC (maksymalnie 32 na kwadrans, z flagą obcięcia); sumy czasu obejmują wszystkie podokresy. Nieznane przerwy `recorder.disable`, aktualność sprzętu i dawne filtry nadal pozostają nieweryfikowalne, osobno od faktycznych luk między RecorderRuns.
-
-Obowiązująca [decyzja użytkownika](requirements/REQUIREMENTS.md) normalizuje ważne liczbowe ujemne `home` do **0 W** wewnątrz Co-Pilot, także przy całkowaniu historii; encja i surowe dane HA pozostają bez zmian. Sprawdzenie dostępności/jednostek wszystkich źródeł, a dla bieżących odczytów także świeżości i odzyskania kontekstu po awarii, poprzedza korektę; niepewność as-of pozostaje widoczna. Sam ujemny pik nie odrzuca kwadransa. `unknown/unavailable`, niefinitywne wartości, błędne jednostki, niewiarygodny szablon po awarii i przerwy Recorder nadal są brakami, nigdy zerem.
-
-`recent_history.home_normalization` pokazuje liczbę poprawionych rekordów i odcinków, czas i udział w obserwowanych sekundach, całkę przed/po korekcie i różnicę kWh. Są to agregaty wyłącznie poprawnych fragmentów, bez ekstrapolowania luk. `corrected_records` liczy odrębne zapisane stany ze znacznikiem w oknie; przeniesienie niezmiennej wartości na kolejny kwadrans nie tworzy nowego rekordu. `HistorySlot` zachowuje lokalnie `observed_raw_home_kwh`, efektywną energię i metadane korekty. `Sample.raw_value` zachowuje lokalnie pierwotną ujemną próbkę bieżącą. Korekta jest informacją `negative_home_normalized`, nie błędem źródła.
-
-Diagnostyka 0.1.2 wykazała 84/96 poprawnych kwadransów: 9 odrzucono przez 27 ujemnych rekordów, 3 inne zawierały luki Recorder (łącznie 27,123139 s między procesami, ponadto nieznany czas błędów po rozruchu). To wynik **starej polityki**, nie prognozowany wynik nowej instalacji. Zanonimizowana regresja z syntetycznymi mocami zachowuje po korekcie 93/96 kwadransów i nadal odrzuca 3 luki; rzeczywiste pokrycie oraz wpływ energetyczny trzeba odczytać po aktualizacji. Nie przypisujemy syntetycznym czasom ujemnych pików znaczenia pomiarów gospodarstwa.
-
-`recent_history.negative_home_audit` i odpowiednik ostatniej porcji backfill zawierają domyślnie wyłącznie agregaty kontekstu, bez `events`, `home_w`, `source_w` lub czasów indywidualnych pomiarów. Szczegółowy audyt wymaga jawnego lokalnego `negative_home_audit(..., include_events=True)` i jest ograniczony do 16 zdarzeń; standardowy odczyt go nie gromadzi. Eksport diagnostyczny dodatkowo filtruje audyt według listy dozwolonych agregatów, także jeśli szczegóły dopisano lokalnie. Nie zapisujemy drugiej bazy historii.
-
-Polityka nie potwierdza fizycznego bilansu AC/DC i nie koryguje dodatnich błędów odczytu. `physical_consumption_verified=false` i ograniczenia jakości profilu pozostają jawne. Przyczyna każdego ujemnego piku nie blokuje wdrożenia zatwierdzonej normalizacji; przed M3/M5 trzeba ocenić błąd i wrażliwość profilu. Samo `valid` sensora nie oznacza gotowości planera ani zweryfikowanego niezależnego pomiaru domu.
-
-Klasyfikacja luk PV korzysta z astronomii Astral używanej przez HA oraz lokalizacji **wybranego config entry Forecast.Solar**, bez zastępowania jej lokalizacją głównej instancji HA i bez ujawniania współrzędnych w diagnostyce. `unpublished_intervals_by_solar_state` rozdziela dzień, zmierzch i noc cywilną (Słońce poniżej −6°). Przy braku poprawnej lokalizacji lub nierozstrzygniętych zdarzeniach polarnych stan pozostaje `unknown`. `unpublished_night_seconds` jest informacją o geometrii, nie pomiarem zerowej produkcji; brakujące Wh i surowy odsetek pokrycia pozostają niezmienione. `forecast_horizon_incomplete` pozostaje blokujący dla dnia/zmierzchu/nieznanych okresów, a dla samej potwierdzonej nocy wskazuje potrzebę jawnej polityki energii nocnej w przyszłym modelu. Nie dodajemy zer do prognozy ani modelu M3.
-
-`forecast_history.decision_periods_as_of(decision_at, source_entry=...)` zwraca tylko pełne przyszłe przedziały z obserwacji znanej najpóźniej w chwili decyzji. Rozpoczęty okres pozostaje w surowym archiwum z oryginalną energią, ale jego całe Wh nie opisują pozostałych minut; bez osobnego modelu nie trafia do tego widoku danych decyzyjnych. Nie uruchamia to planera ani backtestu.
-
-`measurement_source_timing` zapisuje użyte przez koordynator Pythonowe `last_reported` i `last_updated` osobno. Bieżąca świeżość używa `last_reported`; frontendowe `null` nie jest dowodem braku pola w backendzie. Stałe źródło może raportować ponownie bez zmiany `last_updated`. Szablon HA reaguje na zmiany zależności, więc nie musi ponownie raportować przy niezmienionych wejściach; sam jego czas nie potwierdza heartbeat urządzenia. Nie wymuszamy atomowej migawki Modbus: rozrzut raportów PV/grid/battery ponad 10 s daje `measurement_time_skew`, a dom starszy niż ostatnia zmiana wejścia o ponad 10 s — `home_context_lag`. Ważne, świeże dane pozostają dostępne jako as-of (`uncertain`), również przy zatwierdzonej normalizacji ujemnego domu. Limit wieku raportu źródła bazowego pozostaje 300 s, tolerancja przyszłego czasu 10 s; sama stała wartość PV=0 nie jest dowodem aktualności. Po zaobserwowanej awarii źródła wymagany jest raport domu nie starszy niż powrót źródła (`home_predates_source_recovery`); listener HA wykrywa również awarie pomiędzy odczytami koordynatora. Pamięć ta zaczyna się od setup i jest czyszczona przy unload.
-
-Natywny szablon `sensor.pv_sum` nie musi raportować ponownie przy niezmienionej wartości. Przyjmujemy jego prawidłowy liczbowy odczyt z oryginalnym czasem i jawnym `pv_template_time_unverified` (`uncertainty`); nie tworzymy sztucznych odczytów ani nie odwołujemy się do PV1/PV2. Dla domu weryfikujemy wyłącznie sumę PV/grid/battery.
-
-PV1/PV2 nie występują w integracji. Brak aktualizacji natywnego szablonu PV nie oznacza automatycznie błędnej wartości, ale jest ujawniany jako niepewność. Jawne problemy samego PV/grid/battery nadal blokują wynik.
-
-`measurement_source_timing` rozdziela `self_report_valid` od `accepted`, pokazuje kody problemów skonfigurowanych składowych oraz oczekiwanie na raport po recovery, bez eksportowania ich mocy. Sensor pokazuje osobno `pv_available`, `home_available` i `live_measurement_acceptance=pending_day_and_night_ha_evidence`. Jest to jawna bramka odbioru na HA; pozytywne testy offline nie potwierdzają naprawy nocnego PV na konkretnej instalacji.
-
-`observed.live_measurement_window` zawiera agregaty ostatnich 30 minut (maks. 120 obserwacji): p50/p95/max wieku raportu i zmiany, rozrzutu czasów, opóźnienia kontekstu domu oraz oddzielne liczby zachowanych/odrzuconych PV i domu wraz z przyczynami (`pv_rejection_reasons`, `home_rejection_reasons`). To próbkowanie koordynatora co 30 s, nie rozkład okresów raportowania urządzenia; nie dowodzi braku pików między odczytami ani fizycznej poprawności bilansu. Brak surowych szeregów W i zapisu na dysk. Okno resetuje się przy reload/restart, ma licznik odrzuceń przez limit pojemności i resetów cofniętego zegara. Weryfikacja 30-minutowego okna na rzeczywistej instalacji pozostaje otwarta. Logika cen pozostaje niezmieniona. Nie dodano modelu ani sterowania M3–M6.
-
-## Testy deweloperskie
+## Testy i wydania
 
 ```sh
 python3.14 -m venv .venv
@@ -83,16 +65,4 @@ python3.14 -m venv .venv
 .venv/bin/python scripts/check_docs.py
 ```
 
-Testy blokują sieć IP; dopuszczają lokalne gniazda Unix potrzebne pętli asyncio. Obejmują natywny cykl życia HA, rzeczywisty Recorder SQLite w pamięci, implementację usługi Forecast.Solar z kontrolowanym estymatem oraz regresje danych/cen/UTC/DST. Nie komunikują się z falownikiem ani prywatną instancją HA. CI wykonuje te same kontrole. Gotowość do dodania jako repozytorium niestandardowe HACS nie oznacza zgłoszenia do domyślnego katalogu HACS.
-
-## Wydania i identyfikacja zainstalowanego kodu
-
-Ostatnie opublikowane wydanie to [**0.1.4**](https://github.com/duckerdk/energy-copilot/releases/tag/v0.1.4): zatwierdzona normalizacja ujemnego domu, audyt korekt i braków Recorder, rozpoznawanie nocy PV oraz poprawki jakości i prywatności diagnostyki. Wersja nadal działa wyłącznie w trybie odczytu. Opublikowane paczki i niezmienne tagi są dostępne w [GitHub Releases](https://github.com/duckerdk/energy-copilot/releases). Każde wydanie ma nowy numer SemVer w manifeście, niezmienny tag `vX.Y.Z` i odpowiadający GitHub Release. Sam commit lub merge do `main` nie jest wydaniem; istniejącego tagu/Release nie przesuwamy i nie nadpisujemy. `.github/workflows/release.yml` po wypchnięciu tagu uruchamia cały zestaw testów, Ruff, formatowanie, kontrolę dokumentacji i zgodności tag–manifest–commit, następnie publikuje zasoby Release. Wydanie jest dostępne dopiero po pomyślnym zakończeniu publikacji, nie po samym utworzeniu tagu.
-
-`scripts/build_release.py --tag vX.Y.Z --commit PEŁNY_SHA --output /tmp/energy-copilot-release` buduje powtarzalne `energy_copilot.zip`, `BUILD_INFO.json` i `SHA256SUMS` wyłącznie z obiektów Git oznaczonego commitu. Nie dołącza prywatnych ani nieśledzonych plików. ZIP zawiera pliki integracji w głównym katalogu, zgodnie z `zip_release`/`filename` w HACS. `BUILD_INFO.json` wewnątrz paczki identyfikuje wersję, tag, pełny commit i sumy plików; kod nie wyznacza zainstalowanej rewizji z HEAD lokalnego repozytorium.
-
-Aby zaktualizować: odśwież repozytorium w HACS, wybierz opublikowaną wersję Release, pobierz ją i zrestartuj HA. Następnie pobierz diagnostykę Energy Co-Pilot: `integration_manifest.version` i `installed_version` mają wskazywać `0.1.4`, a `installed_build` — tag, commit i `integrity=payload_matches_build_info`. Wersja jest także atrybutem sensora diagnostycznego i wersją oprogramowania urządzenia HA. Brak metadanych przy ręcznym kopiowaniu oznacza `metadata_unavailable`; lokalne zmiany w plikach oznaczają `payload_modified` i nie są przedstawiane jako dokładna rewizja wydania. Starsza instalacja `0.1.0` nie pozwala odtworzyć konkretnego commitu wyłącznie z numeru wersji.
-
-## Planowane 0.1.5
-
-Oddzielono status bieżących wejść od dostępności prognozy. `forecast_state` wskazuje `available` lub `incomplete`; brakujące nocne przedziały nie oznaczają awarii pomiarów. Brakujące Wh pozostają nieznane, nie są zastępowane zerem.
+GitHub Actions wykonuje te same kontrole. Wydania HACS wykorzystują **niezmienny tag** `vX.Y.Z`, odpowiadającą wersję manifestu i pakiet `energy_copilot.zip` z `BUILD_INFO.json` oraz `SHA256SUMS`. Utworzenie commitu na `main` **nie jest** publikacją wydania. Szczegółowe zasady odbioru, testów fizycznych i przejścia do M6: [VALIDATION.md](requirements/VALIDATION.md) oraz [EXECUTION.md](requirements/EXECUTION.md).
