@@ -1,0 +1,84 @@
+{
+  "title": "Energy Co-Pilot",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Read-only sources",
+        "description": "M1/M2 only reads data. Missing or unavailable data will be reported; no inverter commands are sent.",
+        "data": {
+          "pv": "Pv",
+          "pv1": "Pv1",
+          "pv2": "Pv2",
+          "grid": "Grid",
+          "battery": "Battery",
+          "voltage": "Voltage",
+          "current": "Current",
+          "soc": "Soc",
+          "home": "Home",
+          "grid_alternative": "Grid Alternative",
+          "daily_pv": "Daily Pv",
+          "daily_charge": "Daily Charge",
+          "daily_discharge": "Daily Discharge",
+          "buy": "Buy",
+          "sell": "Sell",
+          "mode": "Read-only mode",
+          "forecast_entry": "Forecast.Solar configuration entry (optional)",
+          "solar_sell": "PV export permission switch (read only)"
+        }
+      }
+    },
+    "error": {
+      "entity_missing": "Select an existing entity with the correct domain.",
+      "duplicate_entity": "Each sensor role must use a distinct entity.",
+      "read_only": "Only monitor and dry_run are supported.",
+      "forecast_entry_missing": "Select an existing Forecast.Solar configuration entry."
+    },
+    "abort": {
+      "already_configured": "Energy Co-Pilot is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Read-only sources",
+        "data": {
+          "pv": "Pv",
+          "pv1": "Pv1",
+          "pv2": "Pv2",
+          "grid": "Grid",
+          "battery": "Battery",
+          "voltage": "Voltage",
+          "current": "Current",
+          "soc": "Soc",
+          "home": "Home",
+          "grid_alternative": "Grid Alternative",
+          "daily_pv": "Daily Pv",
+          "daily_charge": "Daily Charge",
+          "daily_discharge": "Daily Discharge",
+          "buy": "Buy",
+          "sell": "Sell",
+          "mode": "Read-only mode",
+          "forecast_entry": "Forecast.Solar configuration entry (optional)",
+          "solar_sell": "PV export permission switch (read only)"
+        }
+      }
+    },
+    "error": {
+      "entity_missing": "Select an existing entity with the correct domain.",
+      "duplicate_entity": "Each sensor role must use a distinct entity.",
+      "read_only": "Only monitor and dry_run are supported.",
+      "forecast_entry_missing": "Select an existing Forecast.Solar configuration entry."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "input_quality": {
+        "name": "Input quality",
+        "state": {
+          "valid": "Valid",
+          "degraded": "Degraded"
+        }
+      }
+    }
+  }
+}

@@ -19,3 +19,9 @@ ha_history.csv
 # Lokalne artefakty
 *.log
 .DS_Store
+
+# Wyniki narzędzi testowych
+.coverage
+.coverage.*
+htmlcov/
+.ruff_cache/

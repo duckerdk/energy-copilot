@@ -1,0 +1,5 @@
+# Includes Home Assistant 2026.10.2; Python 3.14 required.
+pytest-homeassistant-custom-component==0.13.373
+ruff==0.17.1
+# Native Forecast.Solar service contract in the tested HA version (no API requests).
+forecast-solar==5.0.1
