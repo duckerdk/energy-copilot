@@ -37,7 +37,8 @@ Lokalną, własną integrację Home Assistant (`custom_components/energy_copilot
 | 14 | [HA_READONLY_CAPTURE.md](HA_READONLY_CAPTURE.md) | Jednorazowa lista aktualnych encji i jednostek HA; bez sterowania |
 | 15 | [HA_ENTITY_SNAPSHOT_2026-10-19.md](HA_ENTITY_SNAPSHOT_2026-10-19.md) | Wynik tego odczytu: potwierdzone ID, bilans, niezweryfikowane sterowania i konflikty |
 | 16 | [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md) | **Zweryfikowany** format cen godzinowych i jutra; parser, czas UTC/DST, taryfy i 18 testów PRICE |
-| 16a | [HA_TIMESERIES_CAPTURE.md](HA_TIMESERIES_CAPTURE.md) | Pomocniczy szablon do zbadania profilu godzinowego PV; ceny już udokumentowane |
+| 16a | [PV_FORECAST_CONTRACT.md](PV_FORECAST_CONTRACT.md) | Natywna akcja Forecast.Solar, pełny profil w `wh_period`/`watts`, 18 testów PVF |
+| 16b | [HA_TIMESERIES_CAPTURE.md](HA_TIMESERIES_CAPTURE.md) | Tylko archiwalne narzędzie diagnostyczne; nie wymaga działania użytkownika |
 | 17 | [OPEN_ITEMS.md](OPEN_ITEMS.md) | Aktualne P0/P1/P2 — nie udawać, że wszystkie są już rozwiązane |
 
 Jeżeli dokumenty zawierają sprzeczność, nie rozwiązywać jej przez arbitralne założenie: zgłosić konkretny fragment, zaproponować rozwiązanie i zaktualizować po potwierdzeniu.
@@ -59,7 +60,7 @@ Jeżeli dokumenty zawierają sprzeczność, nie rozwiązywać jej przez arbitral
 
 Nie są to wzory, których ma dostarczyć użytkownik. Programista i projekt muszą je **pozyskać / zweryfikować** w sposób zgodny z warunkami dostępu:
 
-1. **Mapowanie pozostałych rzeczywistych encji HA** — ceny zakupu i spot zostały jednoznacznie zmapowane z timestampami w [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md); do uzupełnienia pozostają **godzinowy profil PV**, pomiar importu/eksportu i dopasowanie torów AC/DC. Aktualne identyfikatory nie ograniczają się do wcześniejszych 11 historycznych.
+1. **Mapowanie pozostałych danych HA** — ceny zamknięte [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md). **Profil PV:** znane natywne `forecast_solar.get_forecast` i odpowiedź `wh_period`/`watts` [PV_FORECAST_CONTRACT.md](PV_FORECAST_CONTRACT.md), przy M2 sprawdzić usługę na konkretnym HA; dalej do uzupełnienia pomiary importu/eksportu i dopasowanie torów AC/DC.
 2. **Dokładność punktów pomiarowych** — uwzględnienie ładowania DC i rozpoznawanie ograniczania produkcji.
 3. **Krzywe sprawności i koszt degradacji** — kalibracja na danych z instalacji, bez wymyślania uniwersalnych parametrów.
 4. **Statystyczny model niepewności PV i zużycia** — aktualizacja po zgromadzeniu archiwum dawnych prognoz, bez nadpisywania migawek.
@@ -91,7 +92,7 @@ Nie rozpoczynać kodowania na podstawie samej decyzji o kompletności dokumentac
 
 **Audyt dokumentów (aktualizacja 2026-10-20):**
 - Sprawdzenie odwołań względnych między plikami Markdown: **brak zerwanych odwołań do plików**.
-- Testy opisane w dokumentacji: **40** scenariuszy PHY/ECO/SOC/TIME/PVQ/SAFE/MAP + **18** PRICE + **16** CTRL + **20** CUR + **12** EXE + **11** UI + **10** LOG + **10** UNC + **12** BKT + **7** CAL = **156** przypadków specyfikacyjnych.
+- Testy opisane w dokumentacji: **40** scenariuszy PHY/ECO/SOC/TIME/PVQ/SAFE/MAP + **18** PRICE + **18** PVF + **16** CTRL + **20** CUR + **12** EXE + **11** UI + **10** LOG + **10** UNC + **12** BKT + **7** CAL = **174** przypadki specyfikacyjne.
 - Nowe testy **ECO-08 i ECO-09** weryfikują rachunek marginalny i porównanie opłacalności bez dobierania celu 65% z góry; ECO-08 przewiduje wynik **+0,4152 DKK** przy jawnie określonych stratach i degradacji. To wzorzec analityczny, nie wynik pracy kodu.
-- Nadal **nieweryfikowane** są: zachowanie sterowania i torów AC/DC, godzinowy profil prognozy PV, realne krzywe sprawności, koszt degradacji, historyczne migawki prognoz, funkcja terminalnej wartości energii i niezależny fail-safe. **Strukturę cen HA oraz pełne taryfy zakupu już ustalono** na podstawie atrybutów z 20.10.2026.
+- Nadal **nieweryfikowane** są: fizyczne tory AC/DC, **dostępność akcji Forecast.Solar na konkretnym HA** (interfejs i format są znane z dokumentacji), realne krzywe sprawności, koszt degradacji, historyczne migawki prognoz, funkcja terminalnej wartości energii i niezależny fail-safe. **Ceny i metoda pobierania profilu PV są zdefiniowane**; nie wymaga to dalszych założeń użytkownika.
 - Testy zapisano jako przypadki do zaimplementowania; dopóki nie powstanie kod, nie należy ich nazywać „wykonanymi”.
