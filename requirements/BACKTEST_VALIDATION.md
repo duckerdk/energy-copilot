@@ -26,7 +26,7 @@ W razie braku historycznych migawek prognoz, nie wolno zastępować ich późnie
 | Warstwa | Minimalne wymaganie i problem |
 | --- | --- |
 | Ceny kupna | Końcowa zmienna taryfa DKK/kWh z odpowiednimi do każdego interwału opłatami; nie stosować aktualnych stawek wstecz bez oznaczenia symulacji |
-| Ceny sprzedaży | Historyczny spot DK1, reguła `spot − 0,0215` tylko wtedy, gdy rzeczywiście ma zastosowanie w porównywanym okresie; w przeciwnym razie poprawny historyczny kontrakt |
+| Ceny sprzedaży | Dokładna cena pobrana z `sensor.energi_data_spotpris` dla okresu historycznego, **bez dodatkowych przeliczeń**; brakujące archiwalne ceny = brak danych, nie odtwarzać ich z narzutów |
 | PV prognozowane | Migawki Forecast.Solar sprzed danego okresu, wersja, horyzont i rozdzielczość |
 | PV faktyczne | Jednoznaczna moc/energia PV z uwzględnieniem DC-coupled i możliwej blokady produkcji |
 | Obciążenie domu | Historyczny rzeczywisty pobór domu po AC (nie import z sieci); brak podwójnego liczenia ładowania z sieci |
@@ -69,7 +69,7 @@ Wyrównanie końcowego SOC albo jawna **wartość końcowej energii w magazynie*
 
 | Metryka | Raport |
 | --- | --- |
-| `net_grid_bill_dkk` | Import * cena końcowa − eksport * cena netto po prowizji |
+| `net_grid_bill_dkk` | Import kWh × cena z `sensor.energi_data_service` − eksport kWh × cena z `sensor.energi_data_spotpris`; **obie bez korekt** |
 | `battery_degradation_dkk` | Oddzielny modelowy koszt marginalnego zużycia obu strategii |
 | `energy_losses_kwh` | Fizyczne straty, bez ponownego doliczania do kosztu rachunku |
 | `net_economic_result_dkk` | Rachunek + marginalna degradacja + porównywalnie wyceniona energia końcowa (jawne założenie) |
