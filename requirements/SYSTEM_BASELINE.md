@@ -11,6 +11,7 @@
 | Suma nominalna | **10,24 kWh** — obliczenie 2 × 5,12 kWh |
 | Energia między 20–100% SOC | **8,192 kWh nominalnie** — obliczenie, nie energia użyteczna AC |
 | Zakres przyjęty | SOC 20–100%, ostatecznie ograniczony przez BMS i falownik |
+| Własne przedziały nastaw prądu Co-Pilot | **0–50 A** ładowanie, **0–100 A** rozładowanie, **0–50 A** ładowanie z sieci; limity logiczne użytkownika, nie zakresy fizycznie zweryfikowane |
 | Koszt magazynu | **19 000 DKK** według użytkownika |
 | Lokalizacja rozliczeń | Dania, obszar DK1 / Nordjylland; N1; Elforbundet/Vindstød |
 | Prognoza PV | Forecast.Solar w HA; godzinowa seria **niezweryfikowana** |
