@@ -25,6 +25,7 @@ Lokalną, własną integrację Home Assistant (`custom_components/energy_copilot
 | 3 | [SYSTEM_BASELINE.md](SYSTEM_BASELINE.md) | Fakty o instalacji, stopień potwierdzenia |
 | 4 | [OPTIMIZATION_MODEL.md](OPTIMIZATION_MODEL.md) | Bilans PV/dom/sieć/bateria, funkcja kosztu, prognozy, końcowy SOC |
 | 5 | [ENTITY_CONTRACT.md](ENTITY_CONTRACT.md) | Logiczne wejścia/wyjścia, historyczne HA ID, walidacja fizycznych akcji |
+| 5a | [CONTROL_STRATEGY.md](CONTROL_STRATEGY.md) | Current-first przez encje HA, trwały TOU, porównanie backendów, 16 testów CTRL |
 | 6 | [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md) | Kolejność zapisu, potwierdzenie, zgody, konflikty i fail-safe |
 | 7 | [HA_DASHBOARD.md](HA_DASHBOARD.md) | Prezentacja planu, pomiarów, kosztów, propozycji i diagnostyki |
 | 8 | [TEST_SCENARIOS.md](TEST_SCENARIOS.md) | 40 szczegółowych scenariuszy obliczeń i mapowania; dodatkowo testy EXE i UI w dokumentach tematycznych |
