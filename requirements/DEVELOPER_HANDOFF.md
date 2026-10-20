@@ -38,7 +38,8 @@ Lokalną, własną integrację Home Assistant (`custom_components/energy_copilot
 | 15 | [HA_ENTITY_SNAPSHOT_2026-10-19.md](HA_ENTITY_SNAPSHOT_2026-10-19.md) | Wynik tego odczytu: potwierdzone ID, bilans, niezweryfikowane sterowania i konflikty |
 | 16 | [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md) | **Zweryfikowany** format cen godzinowych i jutra; parser, czas UTC/DST, taryfy i 18 testów PRICE |
 | 16a | [PV_FORECAST_CONTRACT.md](PV_FORECAST_CONTRACT.md) | Natywna akcja Forecast.Solar, pełny profil w `wh_period`/`watts`, 18 testów PVF |
-| 16b | [HA_TIMESERIES_CAPTURE.md](HA_TIMESERIES_CAPTURE.md) | Tylko archiwalne narzędzie diagnostyczne; nie wymaga działania użytkownika |
+| 16b | [LOAD_FORECAST_CONTRACT.md](LOAD_FORECAST_CONTRACT.md) | Wewnętrzna prognoza popytu z HA Recorder i 16 testów LOAD |
+| 16c | [HA_TIMESERIES_CAPTURE.md](HA_TIMESERIES_CAPTURE.md) | Tylko archiwalne narzędzie diagnostyczne; nie wymaga działania użytkownika |
 | 17 | [OPEN_ITEMS.md](OPEN_ITEMS.md) | Aktualne P0/P1/P2 — nie udawać, że wszystkie są już rozwiązane |
 
 Jeżeli dokumenty zawierają sprzeczność, nie rozwiązywać jej przez arbitralne założenie: zgłosić konkretny fragment, zaproponować rozwiązanie i zaktualizować po potwierdzeniu.
@@ -92,7 +93,7 @@ Nie rozpoczynać kodowania na podstawie samej decyzji o kompletności dokumentac
 
 **Audyt dokumentów (aktualizacja 2026-10-20):**
 - Sprawdzenie odwołań względnych między plikami Markdown: **brak zerwanych odwołań do plików**.
-- Testy opisane w dokumentacji: **40** scenariuszy PHY/ECO/SOC/TIME/PVQ/SAFE/MAP + **18** PRICE + **18** PVF + **16** CTRL + **20** CUR + **12** EXE + **11** UI + **10** LOG + **10** UNC + **12** BKT + **7** CAL = **174** przypadki specyfikacyjne.
+- Testy opisane w dokumentacji: **40** scenariuszy PHY/ECO/SOC/TIME/PVQ/SAFE/MAP + **18** PRICE + **18** PVF + **16** LOAD + **16** CTRL + **20** CUR + **12** EXE + **11** UI + **10** LOG + **10** UNC + **12** BKT + **7** CAL = **190** przypadków specyfikacyjnych.
 - Nowe testy **ECO-08 i ECO-09** weryfikują rachunek marginalny i porównanie opłacalności bez dobierania celu 65% z góry; ECO-08 przewiduje wynik **+0,4152 DKK** przy jawnie określonych stratach i degradacji. To wzorzec analityczny, nie wynik pracy kodu.
-- Nadal **nieweryfikowane** są: fizyczne tory AC/DC, **dostępność akcji Forecast.Solar na konkretnym HA** (interfejs i format są znane z dokumentacji), realne krzywe sprawności, koszt degradacji, historyczne migawki prognoz, funkcja terminalnej wartości energii i niezależny fail-safe. **Ceny i metoda pobierania profilu PV są zdefiniowane**; nie wymaga to dalszych założeń użytkownika.
+- Nadal **nieweryfikowane** są: fizyczne tory AC/DC, **dostępność akcji Forecast.Solar na konkretnym HA**, jakość i retencja historii popytu Recorder, realne krzywe sprawności, koszt degradacji, historyczne migawki prognoz, funkcja terminalnej wartości energii i niezależny fail-safe. **Ceny oraz metody pobierania profilu PV i prognozowania zużycia są zdefiniowane**; nie wymagają dodatkowych założeń użytkownika.
 - Testy zapisano jako przypadki do zaimplementowania; dopóki nie powstanie kod, nie należy ich nazywać „wykonanymi”.
