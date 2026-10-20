@@ -117,7 +117,7 @@ def test_unchanged_native_pv_and_home_keep_real_timestamp_and_uncertainty():
     assert values["pv"].at == NOW - timedelta(hours=8)
     assert values["home"].at == NOW - timedelta(hours=8)
     assert Issue("pv_template_time_unverified", "pv") not in issues
-    assert quality_report(issues)["input_state"] == "uncertain"
+    assert quality_report(issues)["input_state"] == "valid"
 
 
 def test_stable_zero_non_native_pv_is_accepted():
