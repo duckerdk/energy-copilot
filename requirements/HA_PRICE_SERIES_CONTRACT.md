@@ -29,7 +29,7 @@ Atrybuty obu encji:
 - `next_data_update` — przykład: zakup `13:25:40`, spot `13:28:03`; **oddzielny** czas następnego odświeżenia, może się różnić.
 - `today_min/max/mean`, `tomorrow_min/max/mean` i `today_remaining_*` — wskaźniki informacyjne; **nie** budować szeregu na podstawie wartości średnich lub minimalnych.
 
-**Snapshot 20.10.2026, przed cenami jutrzejszymi:** obie encje miały po **24** pozycji w `raw_today` (00:00–23:00, offset +02:00); obie miały `tomorrow_valid: false`, `tomorrow: null` i `raw_tomorrow: null`. To pełna dostępna seria na dziś i **normalny** brak serii na jutro.
+**Snapshot 20.10.2026, przed cenami jutrzejszymi:** obie encje miały po **24** pozycji w `raw_today` (00:00–23:00, offset +02:00); obie miały `tomorrow_valid: false`, `tomorrow: null` i `raw_tomorrow: null`. To pełna dostępna seria na dziś i **normalny** brak serii na jutro. **Ściśle:** rekordy `raw_today` i istnienie klucza `raw_tomorrow` są potwierdzone; zawartości niepustego `raw_tomorrow` jeszcze nie obserwowano. Parser projektowo oczekuje identycznego schematu `hour`/`price` i sam zweryfikuje pierwszą opublikowaną listę — bez dodatkowego pytania do użytkownika i bez fikcyjnych cen.
 
 Wybrane potwierdzone pary godzinowe (ilustracyjne **migawki danych z 20.10**, nie stałe programu):
 
