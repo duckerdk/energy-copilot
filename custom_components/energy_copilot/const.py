@@ -4,7 +4,6 @@ from datetime import timedelta
 
 DOMAIN = "energy_copilot"
 UPDATE_INTERVAL = timedelta(seconds=30)
-MAX_AGE = timedelta(minutes=5)
 # Precision warning for independent as-of reports, not a hard rejection limit.
 MAX_SKEW = timedelta(seconds=10)
 MAX_FUTURE_OFFSET = timedelta(seconds=10)
