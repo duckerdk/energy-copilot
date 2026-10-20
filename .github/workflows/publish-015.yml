@@ -1,4 +1,5 @@
 name: Publish v0.1.5 to HACS
+# Trigger after the final release test formatting fix.
 on:
   push:
     branches: [main]
