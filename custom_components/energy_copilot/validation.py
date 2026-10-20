@@ -46,7 +46,7 @@ def measurement(role, state, now, *, historical=False, allow_old_report=False):
     try:
         value = number(state.state)
         at = utc(state.last_updated if historical else state.last_reported)
-    except (ValueError, TypeError, OverflowError):
+    except ValueError, TypeError, OverflowError:
         raise ValueError("invalid_input") from None
     if at > now + MAX_FUTURE_OFFSET or (
         not allow_old_report
@@ -100,7 +100,7 @@ def live_timing(states, samples=None):
         try:
             reported[role] = utc(state.last_reported)
             changed[role] = utc(state.last_updated)
-        except (AttributeError, TypeError, ValueError, OverflowError):
+        except AttributeError, TypeError, ValueError, OverflowError:
             continue
     sources = ("pv", "grid", "battery")
 
@@ -139,8 +139,10 @@ def _derived_measurements(states, values, issues, now, templates, recovery):
     # pv_sum is the only configured PV source; no PV1/PV2 corroboration.
     # An unchanged zero is a valid HA state, not a missing heartbeat.
     # After a witnessed outage, the actual PV entity must report again.
-    if "pv" in values and "pv" in recovery and (
-        recovery["pv"] is None or values["pv"].at < recovery["pv"]
+    if (
+        "pv" in values
+        and "pv" in recovery
+        and (recovery["pv"] is None or values["pv"].at < recovery["pv"])
     ):
         values.pop("pv")
         issues.append(Issue("derived_predates_source_recovery", "pv"))
@@ -200,9 +202,7 @@ def _derived_measurements(states, values, issues, now, templates, recovery):
         context_at = min(values[r].context_at or values[r].at for r in required)
         pv_time_unknown = Issue("pv_template_time_unverified", "pv") in issues
         stable_zero_pv = "pv" in configured and values["pv"].value == 0
-        if now - context_at > MAX_AGE and not (
-            pv_time_unknown or stable_zero_pv
-        ):
+        if now - context_at > MAX_AGE and not (pv_time_unknown or stable_zero_pv):
             issues.append(Issue("derived_freshness_unverifiable", role))
             continue
         values[role] = Sample(original.value, original.at, context_at=context_at)
@@ -317,7 +317,7 @@ def _prices(state, now, source):
                 if start + timedelta(hours=1) <= now:
                     continue
                 result[start] = price
-            except (KeyError, ValueError, TypeError, OverflowError):
+            except KeyError, ValueError, TypeError, OverflowError:
                 issues.append(Issue("invalid_price_slot", source))
     return result, issues
 
@@ -342,7 +342,7 @@ def prices(buy_state, sell_state, now):
             precise = number(sell_state.attributes["current_price"])
             if (precise >= 0.4) != (current.sell >= 0.4):
                 issues.append(Issue("PRICE_THRESHOLD_AMBIGUOUS", "sell"))
-        except (KeyError, TypeError, ValueError, OverflowError):
+        except KeyError, TypeError, ValueError, OverflowError:
             issues.append(Issue("missing_current_price", "sell"))
     return slots, issues
 
