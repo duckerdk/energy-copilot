@@ -1,6 +1,6 @@
 # Energy Co-Pilot
 
-Natywna integracja Home Assistant `custom_components/energy_copilot`. **Aktualne wydanie: [v0.1.6](https://github.com/duckerdk/energy-copilot/releases/tag/v0.1.6).** Obecny zakres **M1/M2**: konfiguracja, odczyt pomiarów i cen, Forecast.Solar, historia Recorder oraz diagnostyka jakości danych. Integracja działa **wyłącznie w trybie odczytu**; nie steruje falownikiem. Planner, dashboard sterowania i wykonanie decyzji (M3–M6) nie są jeszcze zaimplementowane.
+Natywna integracja Home Assistant `custom_components/energy_copilot`. **Aktualne wydanie: [v0.1.7](https://github.com/duckerdk/energy-copilot/releases/tag/v0.1.7).** Obecny zakres **M1/M2**: konfiguracja, odczyt pomiarów i cen, Forecast.Solar, historia Recorder oraz diagnostyka jakości danych. Integracja działa **wyłącznie w trybie odczytu**; nie steruje falownikiem. Planner, dashboard sterowania i wykonanie decyzji (M3–M6) nie są jeszcze zaimplementowane.
 
 Celem docelowego rozwiązania jest minimalizacja całkowitego kosztu energii w horyzoncie opublikowanych cen, z uwzględnieniem SOC, sprawności i degradacji baterii. Zatwierdzone reguły i uprawnienia opisuje wyłącznie [REQUIREMENTS.md](requirements/REQUIREMENTS.md).
 
