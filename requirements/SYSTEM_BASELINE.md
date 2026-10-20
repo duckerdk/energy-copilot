@@ -14,7 +14,7 @@
 | Własne przedziały nastaw prądu Co-Pilot | **0–50 A** ładowanie, **0–100 A** rozładowanie, **0–50 A** ładowanie z sieci; limity logiczne użytkownika, nie zakresy fizycznie zweryfikowane |
 | Koszt magazynu | **19 000 DKK** według użytkownika |
 | Lokalizacja rozliczeń | Dania, obszar DK1 / Nordjylland; N1; Elforbundet/Vindstød |
-| Prognoza PV | Forecast.Solar w HA; godzinowa seria **niezweryfikowana** |
+| Prognoza PV | Forecast.Solar w HA: z dokumentacji wynika, że natywna akcja `forecast_solar.get_forecast` zwraca okresowe `wh_period`/`watts`; **dostępność akcji w posiadanej wersji HA jeszcze nie sprawdzona**, bez zgadywania danych [PV_FORECAST_CONTRACT.md](PV_FORECAST_CONTRACT.md) |
 | Ceny | Energi Data Service: obie encje HA mają `raw_today`/`raw_tomorrow`, `tomorrow_valid` i rekordy `hour`+`price` DKK/kWh (potwierdzone 20.10.2026); [kontrakt](HA_PRICE_SERIES_CONTRACT.md). Końcowa cena zakupu zawiera wszystkie opłaty i taryfy; sprzedaż netto = spot − 0,0215 DKK/kWh |
 | Historia | Recorder / Energy; użytkownik ma historię z kilku lat, rozdzielczość i kompletność **niezweryfikowane** |
 
