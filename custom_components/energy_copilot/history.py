@@ -147,7 +147,9 @@ class RecorderHistoryReader:
             observed_first=bounds[0],
             observed_last=bounds[1],
             issue_counts=dict(Counter(i.code for slot in slots for i in slot.issues)),
-            issue_sources=dict(Counter(f"{i.source}:{i.code}" for slot in slots for i in slot.issues)),
+            issue_sources=dict(
+                Counter(f"{i.source}:{i.code}" for slot in slots for i in slot.issues)
+            ),
         )
         # A setting is not proof that rows covering that duration actually exist.
         retention = getattr(instance, "keep_days", None)
