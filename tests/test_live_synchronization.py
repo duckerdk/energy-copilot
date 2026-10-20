@@ -109,7 +109,7 @@ def test_real_faults_still_reject_numeric_template(role, fault):
         if fault in {"unknown", "unavailable", "nan"}
         else make_state(role, unit="kWh")
         if fault == "unit"
-        else timed(role, value=100 if role == "pv" and fault == "stale" else None, age=301 if fault == "stale" else -11)
+        else timed(\n            role,\n            value=100 if role == "pv" and fault == "stale" else None,\n            age=301 if fault == "stale" else -11,\n        )
     )
     values, _, issues = measurements(states, NOW)
     assert "home" not in values
