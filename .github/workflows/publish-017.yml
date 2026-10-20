@@ -1,0 +1,54 @@
+name: Publish Energy Co-Pilot v0.1.7 to HACS
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-017.yml'
+permissions:
+  contents: write
+  statuses: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+      - run: pip install -r requirements-test.txt
+      - run: ruff check custom_components tests scripts/build_release.py
+      - run: ruff format --check custom_components tests scripts/build_release.py
+      - run: pytest --cov=custom_components.energy_copilot --cov-report=term-missing
+      - run: python scripts/check_docs.py
+      - name: Publish verified HACS package once
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(python -c 'import json; print(json.load(open("custom_components/energy_copilot/manifest.json"))["version"])')" = "0.1.7"
+          if gh release view v0.1.7 >/dev/null 2>&1; then
+            echo "v0.1.7 already published"
+            exit 0
+          fi
+          if [ -n "$(git tag -l v0.1.7)" ]; then
+            echo "Refusing to replace existing v0.1.7 tag"
+            exit 1
+          fi
+          git tag v0.1.7 "$GITHUB_SHA"
+          python scripts/build_release.py --tag v0.1.7 --commit "$GITHUB_SHA" --output /tmp/energy-copilot-release
+          git push origin v0.1.7
+          gh release create v0.1.7             /tmp/energy-copilot-release/energy_copilot.zip             /tmp/energy-copilot-release/SHA256SUMS             /tmp/energy-copilot-release/BUILD_INFO.json             --verify-tag --title "Energy Co-Pilot v0.1.7"             --notes "Fix false Degraded caused by hours of unchanged valid HA sensor states, including SOC, PV, battery, grid and daily counters. Preserve explicit unavailable, invalid value, future timestamp and outage/recovery rejection. Keep current measurements read-only."
+      - name: Report HACS publication outcome
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$JOB_STATUS" = "success" ]; then STATE=success; else STATE=failure; fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state="$STATE" -f context="hacs-v0.1.7" \
+            -f description="HACS v0.1.7: $JOB_STATUS" -f target_url="$RUN_URL"
