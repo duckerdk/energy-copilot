@@ -14,7 +14,7 @@
 | Sprawność ładowania | 0,9487 | **Tylko wartość skonfigurowana w zrzucie diagnostycznym z 19.10.2026**, nie pomiar; dopuszczona jako jawny scenariusz startowy w dry-run |
 | Sprawność rozładowania | 0,9487 | Taki sam status; produkt obu wartości ≈ 0,9000, ale nie stanowi dowodu sprawności każdego toru |
 | Sprawność toru PV po DC | 0,97 | Wartość pomocnicza skonfigurowana w zrzucie; **nie zakładać**, że opisuje sprawność całego toru PV→bateria ani PV→AC |
-| Cena sprzedaży | spot − 0,0215 DKK/kWh | Reguła ekonomiczna przekazana przez użytkownika; potrzebna kompletność timestampów spot |
+| Cena sprzedaży | `sensor.energi_data_spotpris.raw_*.price` | **Bez żadnych potrąceń**; użyć dokładnie danych z HA |
 | Koszt cyklu / liczba EFC | nieznane | Nie podstawiać trwale parametru z głowy; sposób obliczania poniżej |
 
 **Zrzut Battery Controller jest jedynie historycznym źródłem wartości początkowych. Nowy optymalizator nie może zależeć od tej integracji ani odziedziczyć jej decyzji, czujników wirtualnych, waluty „EUR” czy kosztów kupna/sprzedaży.** W zrzucie nazwy źródłowych czujników są ukryte jako `REDACTED`. Sama konfiguracja nie dowodzi kalibracji na pracującym systemie.
@@ -58,7 +58,7 @@ Całkowity koszt marginalny uproszczonego cyklu to `cost_per_kWh_bidirectional_D
 - Dla porównywalnych wariantów policzyć `incremental_gain_dkk`, oddzielnie koszt fakturowy, degradację, stratę fizyczną, końcową wartość SOC oraz ryzyko.
 - Jeżeli wiarygodny wynik jest dodatni nawet po uwzględnieniu rozsądnego zakresu niepewności → dopuścić do planowania (nie oznacza uprawnienia do wykonania).
 - Jeżeli znak wyniku zmienia się między wiarygodnymi wariantami kalibracji → `benefit_uncertain`, preferować brak **dodatkowego** cyklu lub niepotrzebnego przełączenia; pokazać dlaczego i z jakimi liczbami.
-- Nie wprowadzać arbitralnego stałego progu `0,05 DKK` lub `0,4 DKK/kWh`. Model powinien uwzględnić mierzalne koszty działania i precyzję danych.
+- **Obowiązuje próg podany przez użytkownika:** minimalna cena eksportu PV `0,40 DKK/kWh` z `sensor.energi_data_spotpris` (konfigurowalna wartość startowa). Nie stosować progów arbitralnych do innych decyzji ekonomicznych. [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md).
 - Realizować zwykłą standardową pracę falownika zgodnie z dotychczasowym trybem, jeśli automat nie może wykazać dodatniego wyniku zmiany.
 
 ## 5. Prognozy i model końcowego SOC
