@@ -1,12 +1,12 @@
 # Kontrakt prognozy PV — Forecast.Solar w Home Assistant
 
-**Status:** publiczny kontrakt natywnej akcji HA zweryfikowany w oficjalnej dokumentacji; **dostępność tej akcji w konkretnej instancji użytkownika jeszcze nie została sprawdzona**. To zadanie automatycznej diagnostyki Codexa, nie powód do ręcznego przepisywania atrybutów ani pytania o ceny.
+**Status:** oficjalny kontrakt usługi HA zweryfikowany w dokumentacji. **Użytkownik potwierdził obecność akcji w swojej liście HA, lecz nie przetestowano odpowiedzi ani wyboru config_entry.** M2 sprawdza odpowiedź lokalnie; nie żąda ręcznego przepisywania atrybutów.
 
 **Źródła:** [oficjalna akcja Forecast.Solar: Get forecast](https://www.home-assistant.io/actions/forecast_solar.get_forecast/); [oficjalna integracja Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/).
 
 ## 1. Źródło pełnego profilu
 
-**Preferowana droga (warunkowa):** `forecast_solar.get_forecast` to **akcja/usługa Home Assistant, NIE encja** — szuka się jej w **Narzędzia deweloperskie → Akcje**, nie w Stanach. Jest opisana w oficjalnej dokumentacji, ale **nie potwierdziliśmy jej dostępności w HA użytkownika**. Zanim Codex oprze na niej prognozę, musi sprawdzić obecność akcji w aktualnej instalacji i w razie braku przewidzieć inne zweryfikowane źródło. Akcja zwraca dane w odpowiedzi (response data). Co-Pilot pobiera ją przez **wewnętrzne API usług HA**, bez połączenia do zewnętrznego Forecast.Solar, bez osobnego klienta HTTP i bez modyfikowania integracji Forecast.Solar.
+**Preferowana droga (warunkowa):** `forecast_solar.get_forecast` to **akcja/usługa Home Assistant, NIE encja** — szuka się jej w **Narzędzia deweloperskie → Akcje**, nie w Stanach. Jest opisana oficjalnie i użytkownik potwierdził jej widoczność w swojej instancji, ale faktycznej odpowiedzi nadal nie sprawdzono. Zanim Codex oprze na niej prognozę, musi sprawdzić obecność akcji w aktualnej instalacji i w razie braku przewidzieć inne zweryfikowane źródło. Akcja zwraca dane w odpowiedzi (response data). Co-Pilot pobiera ją przez **wewnętrzne API usług HA**, bez połączenia do zewnętrznego Forecast.Solar, bez osobnego klienta HTTP i bez modyfikowania integracji Forecast.Solar.
 
 | Element | Znaczenie |
 | --- | --- |
@@ -34,7 +34,7 @@ wh_period:
 ## 2. Wybór wpisu i kontrola dostępności
 
 Codex musi:
-1. Rozpoznać, czy akcja `forecast_solar.get_forecast` jest w danej instalacji **rzeczywiście dostępna**. Oficjalna dokumentacja nie potwierdza wersji posiadanej przez użytkownika.
+1. Przy M2 potwierdzić działanie akcji `forecast_solar.get_forecast` (jej obecność w UI została potwierdzona przez użytkownika), konfigurację, format odpowiedzi i pokrycie przedziałów. Nie zakładać, że sama obecność akcji oznacza poprawne dane.
 2. Przez HA wykryć dostępne wpisy `forecast_solar`; gdy jest jeden, użyć go; gdy więcej niż jeden, pozwolić użytkownikowi wybrać wpis w config/options flow. **Nie hardkodować** `config_entry`, ID sensora, lokalizacji, tokenu ani instalacji.
 3. Pobierać wynik jako **response data**, nie stan nowej encji i nie zakładać, że profil jest w atrybutach `sensor.energy_production_today`.
 4. Wykazać w diagnostyce: `forecast_source = forecast_solar.get_forecast`, wybrany wpis, rozdzielczość, liczbę okresów, pierwszy/ostatni okres, czas uzyskania, ostatnio zarejestrowaną wersję prognozy i ewentualny błąd.
