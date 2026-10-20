@@ -77,7 +77,7 @@ async def test_stable_native_pv_and_home_need_no_string_sensor_inputs(
     assert hass.states.get(entry.data["pv"]).last_reported == initial_pv_report
     assert coordinator.data.measurements["pv"].value == 0
     assert coordinator.data.measurements["home"].value == 2200
-    assert Issue("pv_template_time_unverified", "pv") in coordinator.data.issues
+    assert Issue("pv_template_time_unverified", "pv") not in coordinator.data.issues
     assert coordinator.live_window.summary(coordinator.data.at)["pv_rejected"] == 0
     assert not any(role in coordinator.entities for role in ("pv1", "pv2"))
     d = await async_get_config_entry_diagnostics(hass, entry)
@@ -116,11 +116,11 @@ def test_unchanged_native_pv_and_home_keep_real_timestamp_and_uncertainty():
     )
     assert values["pv"].at == NOW - timedelta(hours=8)
     assert values["home"].at == NOW - timedelta(hours=8)
-    assert Issue("pv_template_time_unverified", "pv") in issues
+    assert Issue("pv_template_time_unverified", "pv") not in issues
     assert quality_report(issues)["input_state"] == "uncertain"
 
 
-def test_stale_non_native_pv_still_blocks():
+def test_stable_zero_non_native_pv_is_accepted():
     states = {r: make_state(r) for r in ("pv", "grid", "battery", "home")}
     states["pv"] = make_state("pv", 0, at=NOW - timedelta(hours=8))
     values, _, issues = measurements(states, NOW)
