@@ -204,10 +204,14 @@ def _derived_measurements(states, values, issues, now, templates, recovery):
             continue
         values[role] = Sample(original.value, original.at, context_at=context_at)
         issues.remove(Issue("stale_input", role))
-        issues.append(Issue(
-            "derived_home_with_unverified_pv_time"
-            if pv_time_unknown else "derived_value_from_fresh_sources", role
-        ))
+        issues.append(
+            Issue(
+                "derived_home_with_unverified_pv_time"
+                if pv_time_unknown
+                else "derived_value_from_fresh_sources",
+                role,
+            )
+        )
 
 
 def measurements(

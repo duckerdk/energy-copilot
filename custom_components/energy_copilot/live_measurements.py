@@ -150,9 +150,7 @@ class LiveMeasurementWindow:
                 "reasons": reasons if rejected else set(),
                 "pv_rejected": "pv" not in values,
                 "pv_reasons": {
-                    reason
-                    for reason in reasons
-                    if reason.split(":", 1)[0] == "pv"
+                    reason for reason in reasons if reason.split(":", 1)[0] == "pv"
                 }
                 if "pv" not in values
                 else set(),

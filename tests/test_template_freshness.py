@@ -1,4 +1,5 @@
 """The configured PV input is exclusively sensor.pv_sum."""
+
 from datetime import timedelta
 
 import pytest
@@ -6,7 +7,9 @@ from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.energy_copilot.const import DEFAULT_ENTITIES, DOMAIN
-from custom_components.energy_copilot.diagnostics import async_get_config_entry_diagnostics
+from custom_components.energy_copilot.diagnostics import (
+    async_get_config_entry_diagnostics,
+)
 from custom_components.energy_copilot.live_measurements import derived_templates
 from custom_components.energy_copilot.models import Issue
 from custom_components.energy_copilot.quality import quality_report
@@ -23,14 +26,28 @@ async def native_templates(hass, settings, source_states, freezer):
             hass.states.async_set(state.entity_id, state.state, dict(state.attributes))
     hass.states.async_set("sensor.raw_pv_total", "0", {"unit_of_measurement": "W"})
     hass.states.async_set("switch.sun12k_solar_sell", "off")
-    assert await async_setup_component(hass, "template", {"template": [{
-        "sensor": [
-            {"name": "PV sum", "unit_of_measurement": "W",
-             "state": "{{ states('sensor.raw_pv_total') | float(0) }}"},
-            {"name": "Home energy consumption", "unit_of_measurement": "W",
-             "state": "{{ states('sensor.pv_sum') | float(0) + states('sensor.sun12k_total_grid_power') | float(0) + states('sensor.sun12k_battery_output_power') | float(0) }}"},
-        ],
-    }]})
+    assert await async_setup_component(
+        hass,
+        "template",
+        {
+            "template": [
+                {
+                    "sensor": [
+                        {
+                            "name": "PV sum",
+                            "unit_of_measurement": "W",
+                            "state": "{{ states('sensor.raw_pv_total') | float(0) }}",
+                        },
+                        {
+                            "name": "Home energy consumption",
+                            "unit_of_measurement": "W",
+                            "state": "{{ states('sensor.pv_sum') | float(0) + states('sensor.sun12k_total_grid_power') | float(0) + states('sensor.sun12k_battery_output_power') | float(0) }}",
+                        },
+                    ],
+                }
+            ]
+        },
+    )
     await hass.async_start()
     await hass.async_block_till_done()
     entry = MockConfigEntry(domain=DOMAIN, data=settings, unique_id=DOMAIN)
@@ -64,7 +81,9 @@ async def test_stable_native_pv_and_home_need_no_string_sensor_inputs(
     assert coordinator.live_window.summary(coordinator.data.at)["pv_rejected"] == 0
     assert not any(role in coordinator.entities for role in ("pv1", "pv2"))
     d = await async_get_config_entry_diagnostics(hass, entry)
-    assert not any(role in d["observed"]["measurement_source_timing"] for role in ("pv1", "pv2"))
+    assert not any(
+        role in d["observed"]["measurement_source_timing"] for role in ("pv1", "pv2")
+    )
 
 
 @pytest.mark.parametrize("bad", ["unknown", "unavailable", "nan"])
@@ -123,8 +142,10 @@ def test_pv_recovery_needs_new_template_report():
     states = {r: make_state(r) for r in ("pv", "grid", "battery", "home")}
     states["pv"] = make_state("pv", 0, at=NOW - timedelta(hours=2))
     values, _, issues = measurements(
-        states, NOW, derived_templates={"pv": (), "home": ("pv", "grid", "battery")},
-        source_recovery_at={"pv": NOW - timedelta(seconds=20)}
+        states,
+        NOW,
+        derived_templates={"pv": (), "home": ("pv", "grid", "battery")},
+        source_recovery_at={"pv": NOW - timedelta(seconds=20)},
     )
     assert "pv" not in values and "home" not in values
     assert Issue("stale_input", "pv") in issues
