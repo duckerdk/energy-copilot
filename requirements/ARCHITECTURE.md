@@ -9,6 +9,8 @@
 5. **Executor (osobny i domyślnie wyłączony):** walidacja i dopiero później sterowanie przez sprawdzone usługi/encje HA. Każda komenda: porównanie z oczekiwanym stanem → walidacja → zapis → fizyczny odczyt zwrotny → błąd lub potwierdzenie.
 6. **Approval:** propozycje eksportu z baterii z identyfikatorem, określonym oknem czasu, limitem kWh oraz terminem ważności. Akceptacja nie przechodzi na nowy plan. Ponowne sprawdzenie przed pierwszą i kolejnymi akcjami.
 
+**Kanał sterowania w czasie:** oddziel matematyczne optimum od planu realizowalnego przez HA. Domyślny wariant current-first (zmiana limitu prądu z istniejącym TOU bez zmian) i odrębny eksperymentalny wariant dynamic TOU opisano w [CONTROL_STRATEGY.md](CONTROL_STRATEGY.md). Oba warianty muszą zachować semantykę nastaw utrzymywanych przez falownik po utracie HA.
+
 ## Wymagania integracji HA
 
 - Rozpocząć od custom_components/energy_copilot z manifest.json, config_flow.py, strings.json/translations oraz testami. HACS dopiero gdy repo zawiera poprawny pakiet.
