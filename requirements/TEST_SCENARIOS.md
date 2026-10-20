@@ -242,6 +242,24 @@ Dla **SOC-01** i **SOC-02** wspólne:
 **Dane:** skonfigurowano `number.sun12k_maximum_battery_grid_charge_current` z opisem niezgodnym między pierwotną logiką PV a etykietą grid; nie przeprowadzono testu skutku.  
 **Oczekiwane:** sterowanie tą encją pozostaje zablokowane niezależnie od tego, czy liczba wynosi 1 A czy 40 A; jednocześnie można używać sprawdzonych encji do odczytu i symulacji.
 
+### MAP-07 — Własne zakresy prądu zamiast błędnych granic HA
+
+**Dane:** HA reklamuje `min = -16777220 A`, `max = 16777220 A` dla trzech regulatorów. W polityce Energy Co-Pilot odpowiednio **0–50 A**, **0–100 A**, **0–50 A**. W trybie `dry_run` testować wartości: ładowanie `-1, 0, 50, 51 A`; rozładowanie `-1, 0, 100, 101 A`; grid charge `-1, 0, 50, 51 A`.
+
+**Oczekiwane:** dla każdej encji tylko wartości **wewnątrz własnego domkniętego przedziału** przechodzą walidację numeryczną, a `-1 A` i przekroczenie maksimum są odrzucane z `CURRENT_LIMIT_OUT_OF_RANGE` bez zapisu. Znaczenie fizyczne wartości 0 wymaga niezależnej walidacji.
+
+### MAP-08 — 0 A nie jest automatycznym poleceniem wyłączenia
+
+**Dane:** plan wymaga zatrzymania ładowania; karta akcji nie potwierdza semantyki ustawienia 0 A na `number.sun12k_maximum_battery_grid_charge_current`.
+
+**Oczekiwane:** dopuszczenie 0 A w polityce liczbowej **nie** powoduje wywołania HA. Działanie ma status `blocked` / `CAPABILITY_NOT_VALIDATED`, aż zatwierdzona będzie fizyczna reakcja falownika oraz procedura bezpiecznego zatrzymania.
+
+### MAP-09 — Osierocone encje Battery Controller ignorowane
+
+**Dane:** występuje `switch.battery_controller_optimization_enabled = on` i `select.battery_controller_control_mode = hybrid`, ale użytkownik potwierdził, że to pozostałości bez działającego kontrolera.
+
+**Oczekiwane:** Energy Co-Pilot **nie** wykorzystuje ich jako źródeł, nie wydaje do nich komend i nie tworzy z nich powodu blokady. Potwierdzony *rzeczywiście działający* konkurencyjny wykonawca zapisujący nastawy Deye jest traktowany osobno.
+
 ## 9. Co programista ma udowodnić
 
 | Zestaw | Wynik akceptacji |
