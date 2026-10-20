@@ -8,7 +8,7 @@ Powiązania: [ENTITY_CONTRACT.md](ENTITY_CONTRACT.md), [OPTIMIZATION_MODEL.md](O
 **Wariant bazowy do implementacji: sterowanie bieżącym limitem prądu przez encje HA, przy zachowaniu istniejącego harmonogramu TOU w stanie zastanym.** Dynamiczne programowanie sześciu okien TOU to **osobny, opcjonalny backend**, dopuszczalny dopiero po dowodzie przewagi i sprawdzeniu ryzyka. Nie zakładać, że pojedynczy limit prądu zastępuje kontrolę docelowego/minimalnego SOC lub gwarantuje ładowanie z sieci.
 
 - **Planner:** szuka ekonomicznie najlepszego planu w kwadransach na podstawie opublikowanych cen i prognoz; plan jest opisem *celu energetycznego*, nie gotowymi nastawami urządzenia.
-- **Translator/current controller:** przekształca plan na **dopuszczalne limity prądowe**, obserwuje skutek i koryguje wyłącznie po zweryfikowanym działaniu usług HA.
+- **Translator/current controller:** przekształca plan na **dopuszczalne limity prądowe**. Zgodnie z obserwacją użytkownika falownik **precyzyjnie egzekwuje zapisaną nastawę**; kontrola zwrotna wykrywa jedynie brak dostępnej energii, blokady fizyczne, utratę komunikacji lub zmianę stanu urządzenia, zamiast zakładać losowe błędy wykonania.
 - **TOU:** obecny harmonogram pozostaje aktywny/zastany. Nie nadpisywać go „profilami 15-minutowymi”; zapisuje się trwale w falowniku, powtarza się co dobę, ma tylko sześć przedziałów i jest wrażliwy na zazębianie/czas 00:00.
 - **Backtester:** odrębnie ocenia idealny plan energetyczny, plan **wykonywalny samą regulacją prądu** przy stałym TOU oraz opcjonalny plan z dynamicznym TOU. Nie raportować oszczędności idealnego planu jako oszczędności osiągalnych.
 - **Executor:** zawsze używa wyłącznie encji HA i natywnych usług HA, nigdy bezpośredniego Modbus/rejestrów lub modyfikacji ESPHome.
@@ -25,6 +25,8 @@ Wynik: **preferencja current-first**, nie definitywne stwierdzenie, że TOU nie 
 - Aktualnie **eksport energii z baterii jest wyłączony**. Nie uznawać tego za gwarancję na przyszłość bez weryfikacji pozycji odpowiedzialnej za eksport.
 
 Projektowo, zgodnie z decyzją użytkownika, przyjmujemy semantykę encji odpowiadającą nazwom; fizyczne potwierdzenie jest osobnym warunkiem aktywacji zapisu.
+
+**Założenie potwierdzone przez użytkownika:** Deye wykonuje ustawione przez encję HA ograniczenie prądu **dokładnie i deterministycznie**, kiedy istnieją warunki do jego wykorzystania. Nie wprowadzać do optymalizatora hipotetycznej losowej niedokładności samego falownika. `maximum_*_current` oznacza **górną granicę**, więc nie można wymusić płynięcia określonego prądu, jeżeli PV, zapotrzebowanie/zezwolenie na ładowanie, SOC, BMS lub napięcie tego nie umożliwiają. To jest **ograniczenie warunków pracy**, a nie kwestia „AI” lub jakości wykonywania poleceń.
 
 ## 3. Kanały sterowania — encje, zakres i funkcja
 
@@ -95,7 +97,7 @@ Każdy przebieg symulacji liczyć dla **tych samych** cen, przyszłej prognozy, 
 | --- | --- |
 | `baseline_deye` | Obecne zachowanie Deye bez poleceń Co-Pilota (w tym istniejące TOU i eksport) |
 | `ideal_dispatch` | Matematycznie optymalne przepływy **bez** uproszczenia do encji; górna granica możliwości, nie obietnica |
-| `current_first` | Aktualne encje limitu prądu + istniejące TOU; wyłącznie dostępne funkcje i ewentualna niedokładność sterowania |
+| `current_first` | Aktualne encje limitu prądu + istniejące TOU; **dokładnie respektowane limity**, przy uwzględnieniu dostępności PV, SOC, BMS i działania innych warunków falownika |
 | `dynamic_tou` | Wariant opcjonalny, **tylko** po walidacji ograniczeń okien i bezpiecznego zapisu |
 
 Metryki: `net_cost_dkk`, eksport PV kWh, ograniczona produkcja PV (jedynie przy wiarygodnych danych), import/eksport baterii, osiągnięty SOC, nieosiągnięte zadane moce, ilość zapisów na dobę, liczba niespełnionych ograniczeń i ryzyko powtórzenia planu po zaniku HA. Brak danych potrzebnych do wiarygodnego porównania = **wynik nieznany**, nie 0 DKK.
@@ -103,7 +105,7 @@ Metryki: `net_cost_dkk`, eksport PV kWh, ograniczona produkcja PV (jedynie przy 
 ## 8. Scenariusze odbioru — fikcyjne encje HA
 
 - `CTRL-01`: spot PV wysoki rano, niższy w południe, wystarczająca prognoza PV → current-first może wybrać niski limit prądu ładowania rano i większy w południe; nie wpisuje na stałe 5/50 A.
-- `CTRL-02`: PV rano 3 kW, bateria 56 V, limit 5 A → plan nie zakłada dokładnie 5 A rzeczywistego ładowania ani automatycznego eksportu całej pozostałej PV.
+- `CTRL-02`: przy dostępnej energii, wolnej pojemności baterii i braku ostrzejszych ograniczeń nastawa 5 A ogranicza ładowanie do 5 A (około 0,28 kW DC przy 56 V); przy niedoborze PV lub limicie BMS faktyczny prąd może być mniejszy, **bez oznaczania tego jako błędu dokładności falownika**. Eksport nadwyżki zależy od zezwolenia eksportu.
 - `CTRL-03`: ogólny limit ładowania 5 A, limit grid charge 50 A → dostępny limit ładowania sieciowego jest co najwyżej 5 A; nie 50 A.
 - `CTRL-04`: ogólny limit 50 A, limit grid charge 5 A → ładowanie PV może korzystać z ogólnego limitu 50 A; ładowanie z sieci nie przekracza limitu 5 A.
 - `CTRL-05`: grid charge globalnie ON, ale brak zezwolenia dla aktywnego TOU → samo 50 A na encji prądu nie jest dowodem wykonalnego ładowania z sieci.
@@ -112,10 +114,10 @@ Metryki: `net_cost_dkk`, eksport PV kWh, ograniczona produkcja PV (jedynie przy 
 - `CTRL-08`: zezwolenie na ładowanie z sieci uzależnione od przyszłego OFF w HA, brak sprzętowego stopu → działanie wykonawcze zablokowane, choć plan może wskazywać korzyść.
 - `CTRL-09`: zamiana slotów 23:30→00:00 i następnego 00:00→05:00 z nieustalonym formatem → dynamiczny zapis TOU zablokowany; nie zakładać poprawnej obsługi granicy doby.
 - `CTRL-10`: siedem zmian ekonomicznie uzasadnionych w dobie → nie przypisywać ich automatycznie sześciu TOU; porównać dokładność obecnej konfiguracji current-first i możliwej kompresji.
-- `CTRL-11`: brak zmiany fizycznego przepływu pomimo sukcesu `number.set_value` → nie raportować wykonanej realizacji planu ani oszczędności.
+- `CTRL-11`: usługa HA ustawiła limit, ale PV jest niedostępne albo SOC wynosi 100% → **nastawa jest przyjęta, lecz nie wymusza przepływu**; brak ładowania nie stanowi błędu wykonania. Osobno: jeśli w warunkach umożliwiających ładowanie nowy limit został przekroczony lub odczyt nastawy się nie zmienił, zgłosić niespójność.
 - `CTRL-12`: przy dodatniej cenie sprzedaży PV, pełnej baterii i eksporterze PV wyłączonym/braku potwierdzonej separacji baterii → nie zakładać automatycznego, bezpiecznego eksportu PV.
 - `CTRL-13`: istniejące osierocone encje `battery_controller.*` → ignorowane jako źródła, sterowania i blokady.
-- `CTRL-14`: current-first i TOU mają te same koszty netto w granicach niepewności; current-first wymaga mniej trwałych zmian → preferować current-first.
+- `CTRL-14`: current-first i TOU mają te same koszty netto w granicach niepewności **prognoz i kosztów**, nie niepewności precyzji wykonania nastawy; current-first wymaga mniej trwałych zmian → preferować current-first.
 - `CTRL-15`: próba aktualizacji sześciu TOU kończy się na trzecim polu → brak raportu `success`, procedura przetestowanego odzyskiwania, brak nowych kroków.
 - `CTRL-16`: znany model pokazuje, że current-first nie może zapewnić docelowego SOC przed nocą, a TOU może; raportować brakującą zdolność i potencjalny zysk TOU **bez** samoczynnego włączenia TOU.
 
