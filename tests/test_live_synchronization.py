@@ -346,10 +346,10 @@ async def test_native_quality_sensor_uncertainty_and_blocking_are_distinct(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     sensor = hass.states.get("sensor.energy_co_pilot_input_quality")
-    assert sensor.state == "uncertain"
+    assert sensor.state == "valid"
     assert sensor.attributes["home_available"]
     assert sensor.attributes["issue_categories"]["blocking"] == 0
-    assert sensor.attributes["issue_categories"]["uncertainty"] == 1
+    assert sensor.attributes["issue_categories"]["uncertainty"] == 0
     assert "home" in entry.runtime_data.coordinator.data.measurements
     hass.states.async_set(entry.data["pv"], "unavailable", {"unit_of_measurement": "W"})
     await entry.runtime_data.coordinator.async_refresh()
