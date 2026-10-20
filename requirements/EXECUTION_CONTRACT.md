@@ -51,7 +51,7 @@ Dla trzech regulatorów Deye executor stosuje **twarde zakresy polityki użytkow
 
 - Limity dotyczą docelowych wartości parametrów *prądowych* w A; nie zastępują limitów BMS, mocy falownika, temperatury ani definicji źródła ładowania.
 - Każda żądana nastawa spoza przedziału jest **odrzucana** i logowana z kodem `CURRENT_LIMIT_OUT_OF_RANGE`. Nie robić cichego `clamp` i nie wysyłać polecenia.
-- `0 A` jest dozwolone w polityce, ale dopóki nie zweryfikowano skutku fizycznego wartości 0 i jej dopuszczalności przez Deye, **nie wysyłać** jej do urządzenia. „Zero” nie oznacza automatycznie „wyłącz ładowanie”.
+- `0 A` jest dopuszczalną nastawą; użytkownik 20.10.2026 potwierdził, że falownik przyjmuje zadane wartości i reaguje prawidłowo. Nie wymagać ponownej deklaracji od użytkownika. Executor nadal ma egzekwować granice oraz weryfikować efekt polecenia przez aktualne HA przed uruchomieniem automatyki.
 - Przed zmianą prądu moduł musi mieć status `validated_write`, potwierdzoną jednostkę, bezpieczne wartości, pomiar zwrotny i sposób wyjścia. Żadne z tych ograniczeń nie aktywuje automatyki samo.
 - Encje `battery_controller.*` są zgodnie z wyjaśnieniem użytkownika osieroconymi pozostałościami i **nie służą do blokowania** Energy Co-Pilot, rozpoznawania konfliktów ani wyznaczania nastaw. Jedynie realnie zaobserwowany inny aktywny wykonawca może stanowić konflikt.
 
@@ -59,7 +59,7 @@ Dla trzech regulatorów Deye executor stosuje **twarde zakresy polityki użytkow
 
 Projektowy kanał bieżących korekt to natywne usługi HA do encji limitu prądu baterii; szczegóły [CONTROL_STRATEGY.md](CONTROL_STRATEGY.md). To **górny limit**, nie polecenie dokładnej mocy. Aktywne TOU pozostaje w stanie zastanym; jego aktualny okres i SOC ograniczają realną wykonalność intencji. Osobna operacja ładowania z sieci wymaga warunków globalnego Grid Charge, limitu ogólnego, limitu sieci i zgody Grid Charge w TOU. Zmiana wyłącznie limitu w A **nie** jest gwarancją ładowania.
 
-Urządzenie utrzymuje ostatnio zapisane nastawy po utracie HA. Nie uruchamiać operacji wymagających przyszłej komendy `OFF` jako jedynej bariery bezpieczeństwa; zwłaszcza nieplanowanego długotrwałego grid charge lub eksportu baterii. **Bezpieczny fizycznie limit prądu** i **ekonomicznie optymalna nastawa na dany kwadrans** to różne właściwości. Po restarcie konieczny nowy odczyt i plan, a nie odtworzenie dawnego polecenia.
+Urządzenie utrzymuje ostatnio zapisane nastawy po utracie HA. **Użytkownik 20.10.2026 zaakceptował taki stan oraz możliwe straty ekonomiczne do czasu powrotu HA** (np. nieoptymalną cenę grid charge/eksportu PV). Nie uznawać utraty HA za fizyczne wyłączenie działania. Tam, gdzie przyszła komenda `OFF` jest warunkiem *bezpieczeństwa fizycznego lub egzekucji konkretnej zgody na eksport baterii*, wymagany jest niezależny mechanizm ochrony; sama nieoptymalność ekonomiczna nie wymaga nowego sprzętowego wyłącznika. **Bezpieczny fizycznie limit prądu** i **ekonomicznie optymalna nastawa na dany kwadrans** to różne właściwości. Po restarcie konieczny nowy odczyt i plan, a nie odtworzenie dawnego polecenia.
 
 Dynamiczne programowanie sześciu okien TOU stanowi **osobną, domyślnie nieaktywną zdolność**, dopiero po testach atomowości pozornej, granicy 00:00, powtarzalności dobowej i wycofania niekompletnej aktualizacji. Samo istnienie encji TOU nie nadaje prawa do ich zapisu.
 
@@ -104,7 +104,7 @@ Wg użytkownika **wszystkie** nastawy Deye z HA pozostają zapisane po zaniku HA
 | Klasa | Przykład | Wymóg przy utracie HA |
 | --- | --- | --- |
 | `persistent_limit` — fizycznie bezpieczne maksimum | Zweryfikowany limit ładowania baterii, np. niski limit PV | **Dopuszczalne tylko po wykazaniu**, że trwała wartość nie powoduje fizycznego niebezpieczeństwa; brak przyszłej korekty może oznaczać **koszt ekonomiczny**, logowany osobno, nie domniemaną awarię BMS |
-| `requires_autonomous_end` — działanie ograniczone czasem lub energią | Celowe ładowanie sieciowe w tanich godzinach, zatwierdzony eksport baterii | Wymaga **sprzętowo samodzielnego, przetestowanego zakończenia** bez HA i mechanizmu kontroli energii; nie polegać na jutrzejszym `switch.turn_off` |
+| `requires_autonomous_end` — czynność wymagająca zakończenia z powodów bezpieczeństwa lub zgody | Zatwierdzony eksport baterii z limitem kWh/czasu; dowolna akcja z fizycznym ograniczeniem czasu | Wymaga niezależnego, sprawdzonego zakończenia. **Grid charge w bezpiecznych limitach może pozostać aktywny po awarii HA za zgodą użytkownika**, mimo strat ekonomicznych; nie klasyfikować go automatycznie jako niebezpiecznego wyłącznie z powodu ceny |
 | `multi_setting_persistent` — złożona nastawa | Zmiana sześciu przedziałów TOU | Wymaga bezpiecznego pośredniego i końcowego stanu oraz analizy powtórzenia harmonogramu po północy i następnego dnia |
 
 **Interpretacja wymogu fail-safe:** nie oznacza konieczności mechanicznego resetu wszystkich bezpiecznych limitów przy zaniku HA. Oznacza dowiedzenie, że **fizyczny stan utrzymywany bez HA** pozostaje dopuszczalny i chroniony niezależnie przez falownik/BMS. Dla cykli zależnych od zakończenia w określonym czasie ten warunek nie jest spełniony samym ograniczeniem prądu. Brak stosownego dowodu blokuje tylko daną klasę działania. Sposób porównywania strategii: [CONTROL_STRATEGY.md](CONTROL_STRATEGY.md).
@@ -120,7 +120,7 @@ Wg użytkownika **wszystkie** nastawy Deye z HA pozostają zapisane po zaniku HA
 | Inna automatyzacja zmieniła nastawę | Zgłoś konflikt i `blocked`; nie walcz z nią ciągłym nadpisywaniem |
 | Restart HA lub integracji | Najpierw odczyt i uzgodnienie stanów; bez odtwarzania poprzedniej aktywnej akcji ani poprzedniej zgody |
 | Wyłączenie/odinstalowanie | Wstrzymaj nowe akcje; nie twierdź, że urządzenie wróciło do normalnego trybu bez fizycznego dowodu |
-| Awaria całego HA/Wi-Fi | Wymaga uprzednio sprawdzonego **niezależnego** fail-safe urządzenia; jeśli go brak, automatyka jest niedopuszczalna |
+| Awaria całego HA/Wi-Fi | Ostatnie nastawy Deye pozostają aktywne — **zaakceptowane przez użytkownika**. Fizyczna ochrona BMS/falownika i twarde min SOC 20% pozostają wymogiem; nie wykonywać nowych akcji. Po powrocie odczyt i nowy plan. Dla ograniczonych zgód, np. eksportu baterii, wymagać niezależnego zakończenia |
 
 **Kluczowe:** brak nowych poleceń NIE wyłącza utrzymanej w falowniku nastawy. Przed automatyzacją trzeba wykazać bezpieczne zachowanie każdego aktywnego trybu także bez HA. Standardowej konfiguracji falownika ani działania resetu nie wolno zgadywać.
 
