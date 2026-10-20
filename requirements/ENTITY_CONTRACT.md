@@ -2,6 +2,20 @@
 
 **Status: część identyfikatorów i stanów potwierdzona odczytem HA z 19.10.2026, pozostałe historyczne.** Szczegółowy aktualny odczyt, bilans i lista sterowań: [HA_ENTITY_SNAPSHOT_2026-10-19.md](HA_ENTITY_SNAPSHOT_2026-10-19.md). Sam fakt istnienia encji i jej wartość nie są dowodem semantyki fizycznej ani bezpiecznego skutku zapisu. W integracji wybór źródeł przez UI i walidacja jednostek oraz punktu pomiaru.
 
+## Granica integracji: wyłącznie encje i usługi Home Assistant
+
+**Zasada obowiązująca:** Energy Co-Pilot odczytuje stany/atrybuty encji HA i steruje wyłącznie poprzez natywne usługi HA na zweryfikowanych encjach (np. `number.set_value`, `switch.turn_on/off`). Integracja **nie** odczytuje ani nie zapisuje rejestrów Modbus, nie otwiera połączenia z falownikiem i nie modyfikuje ESPHome, YAML, firmware ani istniejącego mostka. Analiza `deye-esp.yaml` służy tylko zrozumieniu znaczenia encji; numeracja wewnętrznych rejestrów nie jest interfejsem Co-Pilot.
+
+**Przyjęte semantyki na etapie projektowania (zgodnie z dyspozycją użytkownika):**
+
+| Encja HA | Rola w Co-Pilot | Limit polityki |
+| --- | --- | --- |
+| `number.sun12k_maximum_battery_charge_current` | Ogólny maksymalny prąd ładowania baterii, także ładowania z PV | 0–50 A |
+| `number.sun12k_maximum_battery_discharge_current` | Maksymalny prąd rozładowania baterii | 0–100 A |
+| `number.sun12k_maximum_battery_grid_charge_current` | Dodatkowy maksymalny prąd ładowania z sieci | 0–50 A |
+
+Przyjmujemy, że **właściwe encje wykonują właściwe funkcje**. To **założenie projektowe**, nie wynik testu fizycznego. Nie blokuje projektowania algorytmu i mapowania akcji, ale nie upoważnia do uruchomienia zapisów; semantykę oraz skutek `0 A` zweryfikować dopiero w osobno uzgodnionym teście. Więcej: [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md).
+
 ## Znane historycznie identyfikatory
 
 | Rola | Historyczne ID | Wymagane sprawdzenie |
@@ -18,7 +32,7 @@
 | Limit prądu ładowania | number.sun12k_maximum_battery_grid_charge_current | **NIE WYKORZYSTYWAĆ DO ZAPISU** bez weryfikacji opisanej poniżej |
 | Powiadomienie mobilne | notify.mobile_app_pixel_7dk | Historyczna usługa/akcja, nie encja ze stanem; jej aktualna dostępność |
 
-**Konflikt krytyczny:** oryginalna logika opisuje number.sun12k_maximum_battery_grid_charge_current jako limit ładowania **z sieci**, a późniejsza korekta użytkownika opisywała ograniczenie ładowania **z PV** (historyczne wartości 1 A / 40 A). Nazwa encji nie rozstrzyga semantyki. Żadnej z tych wartości nie wolno przyjąć jako bezpiecznej ani jako sposobu wyłączenia ładowania. Wymagane sprawdzenie rzeczywistej funkcji, zakresu min/max/step, priorytetów oraz skutku przy obu kierunkach przepływu energii.
+**Rozstrzygnięcie projektowe:** wcześniejsze niejednoznaczności między rolami obu encji ładowania nie są powodem do wstrzymania specyfikacji. Dla Co-Pilot przyjmujemy ogólny limit ładowania (także z PV) w `number.sun12k_maximum_battery_charge_current` i dodatkowy limit ładowania z sieci w `number.sun12k_maximum_battery_grid_charge_current`. Nie oznacza to potwierdzenia fizycznego zachowania urządzenia ani bezpiecznego skutku wartości `0 A`.
 
 
 ## Dodatkowe identyfikatory z archiwalnego logu HA
@@ -154,7 +168,9 @@ Implementacja i weryfikacja kolejności działań: [EXECUTION_CONTRACT.md](EXECU
 | Intencja | Znany identyfikator lub brak | Co trzeba potwierdzić |
 | --- | --- | --- |
 | Zezwól na ładowanie z sieci | `switch.sun12k_grid_charge` — historyczne | Czy `on/off` rzeczywiście steruje tylko tą funkcją i w jakim trybie |
-| Ogranicz ładowanie | `number.sun12k_maximum_battery_grid_charge_current` — **sporne znaczenie** | PV/sieć, jednostki A, min/max/step, skutek i zakres przed jakimkolwiek zapisem |
+| Ogranicz ładowanie baterii, w tym z PV | `number.sun12k_maximum_battery_charge_current` | Projektowo: ogólny limit 0–50 A; przed realnym zapisem wymagany test skutku przez encję HA |
+| Ogranicz ładowanie z sieci | `number.sun12k_maximum_battery_grid_charge_current` | Projektowo: dodatkowy limit 0–50 A; przed realnym zapisem wymagany test skutku przez encję HA |
+| Ogranicz rozładowanie baterii | `number.sun12k_maximum_battery_discharge_current` | Projektowo: 0–100 A; przed realnym zapisem wymagany test skutku przez encję HA |
 | Zezwól na eksport | `switch.sun12k_solar_sell` — historyczne | Czy zezwala na eksport z PV i baterii, co robi `off`, jaki jest odczyt skutku |
 | Docelowy SOC / minimalny SOC | **Brak potwierdzonego ID** | Rozdzielić życzenie planisty od ustawienia ochronnego sprzętu |
 | Wymuś rozładowanie na potrzeby domu | **Brak potwierdzonego ID** | Możliwość wykonania bez eksportu z baterii |
