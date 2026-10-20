@@ -49,7 +49,7 @@ Nie wstawiać na stałe 51,2 V lub 56 V; używać aktualnego napięcia z `sensor
 
 Następnie wybrać **legalną nastawę** z dostępnego, udokumentowanego kroku encji oraz indywidualnego zakresu 0–50/0–100/0–50 A. Dla rzeczywiście wymaganej *górnej* granicy mocy **nie zaokrąglać w górę**, bo przekroczyłoby planowy maksymalny przepływ. Jeśli odchylenie po kwantyzacji jest istotne, planner musi ponownie wycenić plan przy dostępnych wartościach nastaw. **Nie przycinać po cichu** nielegalnej prośby do granicy; błąd planera to osobny `CURRENT_LIMIT_OUT_OF_RANGE`.
 
-**Wartość 0 A:** w polityce jest legalna, ale nie może być automatycznie używana jako sposób zakończenia działania przed potwierdzeniem, że falownik ją akceptuje i realizuje zgodnie z oczekiwaniem. Minimalna bezpieczna czynna nastawa może okazać się dodatnia; wówczas planner ponownie liczy dostępny wynik ekonomiczny.
+**Wartość 0 A:** użytkownik 20.10.2026 potwierdził działanie zadawanych nastaw w falowniku. Przyjąć 0 A jako dopuszczalną wartość graniczną polityki, bez ponownego pytania o zasadę regulacji. Przy integracji HA nadal potwierdzić rzeczywisty odczyt/efekt i nie utożsamiać limitu prądu z wymuszeniem konkretnego przepływu.
 
 `I_grid_effective_limit_A = min(I_charge_cap_A, I_grid_charge_cap_A, I_BMS_charge_limit_A)` — **tylko kiedy ładowanie z sieci jest zezwolone przez faktycznie aktywne tryby**. Dodatkowe ograniczenie mocy lub napięcia również obowiązuje. Samo ustawienie `I_grid_charge_cap_A` nie uruchamia grid charge.
 
@@ -82,7 +82,7 @@ Dwa osobne okresy godziny po 1 h, w każdym dostępne `2,5 kWh` nadwyżki PV, ba
 - **Użytkowy wariant z rano 5 A:** rano magazyn `0,28 kWh` i eksport `2,22 kWh`, po południu magazyn `2,22 kWh` i eksport `0,28 kWh` → przychód **1,916 DKK**.
 - **Wariant odwrotny:** rano magazyn `2,5 kWh`, po południu eksport `2,5 kWh` → przychód **1,25 DKK**.
 
-**Warunek porównywalności:** wszystkie trzy warianty kończą z **identycznym SOC**, zawierają tę samą energię nocną i nie eksportują baterii. Dla niezerowych strat, degradacji i realnej topologii wynik musi zostać policzony ponownie. Jeśli fizyczne 0 A nie jest zweryfikowane, idealny wariant nie jest planem wykonywalnym, więc **1,916 DKK może być najlepszym z tych trzech wykonywalnych wariantów**, ale nie jest dowodem globalnego optimum.
+**Warunek porównywalności:** wszystkie trzy warianty kończą z **identycznym SOC**, zawierają tę samą energię nocną i nie eksportują baterii. Dla niezerowych strat, degradacji i realnej topologii wynik musi zostać policzony ponownie. Fizyczna obsługa 0 A została zadeklarowana przez użytkownika. Trzy warianty ilustrują plan przy założeniu identycznego końcowego SOC, lecz przykład nie dowodzi globalnego optimum ani zgodności z wszystkimi trybami TOU.
 
 ## 5. Reguła decyzji w każdym slocie
 
@@ -117,7 +117,7 @@ Zarówno zdalne, jak i ręczne nastawy Deye pozostają aktywne w falowniku. **Ni
 - **Bezpieczeństwo fizyczne bez HA:** limit prądu nie przekracza polityki oraz istniejących zabezpieczeń BMS/falownika, a stan pozostaje akceptowalny przez czas nieokreślony, albo funkcja jest blokowana do uzyskania niezależnego kończenia.
 - **Ryzyko ekonomiczne bez HA:** pozostawiony limit 5 A może ograniczać przyszłe magazynowanie PV; utrzymanie ładowania z sieci może kosztować energię po zmianie ceny. To nie są te same klasy konsekwencji.
 
-Dla czasowo ograniczonego `grid_charge` i eksportu baterii przyszły `turn_off` w HA **nie jest** niezależnym zabezpieczeniem; potrzebny samodzielny, zweryfikowany mechanizm zakończenia, np. prawidłowo zaprogramowany TOU — ale dopiero po udowodnieniu działania, także przy przejściu 00:00 i powtarzalności następnego dnia. Do tego czasu tylko symulacja.
+Dla eksportu baterii ograniczonego indywidualną zgodą w kWh/czasie przyszły `turn_off` w HA **nie** zapewnia egzekucji granicy po awarii: potrzebny niezależny mechanizm zakończenia. Dla `grid_charge` użytkownik 20.10.2026 **zaakceptował pozostanie ostatnich nastaw po awarii HA i ryzyko ekonomiczne**; wystarczają niezależne zabezpieczenia fizyczne falownika/BMS i zgodność z twardą granicą SOC 20%. Po odzyskaniu HA odczytać stan i przeliczyć plan.
 
 Po restarcie: najpierw odczytać **aktualne** nastawy i stany, zbudować nowy plan; nie odtwarzać poprzedniej komendy wyłącznie z trwałych logów.
 
@@ -132,7 +132,7 @@ Każda decyzja powinna zawierać: `decision_id`, slot UTC, ceny końcowe kupna i
 - `CUR-03`: jak CUR-02, lecz limit 50 A → magazyn 2,50 kW i eksport 0 kW.
 - `CUR-04`: PV 0,1 kW, dom 0, bateria 56 V, limit 5 A → ładowanie **0,1 kW**, a nie oczekiwane zawsze 0,28 kW.
 - `CUR-05`: rano sprzedaż 0,80, po południu 0,50 DKK/kWh (obie ceny spełniają próg 0,40), potrzeba magazynować 2,5 kWh, η=1 → poranne 5 A i popołudniowa korekta daje przychód **1,916 DKK**, a odwrotna alokacja **1,25 DKK**.
-- `CUR-06`: dla tych samych warunków matematyczny wariant 0 A rano daje **2,00 DKK**, ale pozostaje `not_executable`, jeśli fizyczna semantyka 0 A nie została zweryfikowana.
+- `CUR-06`: dla tych samych warunków matematyczny wariant 0 A rano daje **2,00 DKK**, a przed trybem live wymaga zwykłego sprawdzenia stanu wykonawcy/HA, nie ponownego pytania użytkownika o 0 A.
 - `CUR-07`: ogólny limit ładowania 5 A + limit grid charge 50 A → efektywny limit sieci 5 A, jeśli ładowanie z sieci jest aktywne; odwrotnie 50 A + 5 A → limit 5 A.
 - `CUR-08`: wyłączony Grid Charge w aktywnym TOU, limit sieci 50 A → brak wnioskowania, że bateria musi ładować z sieci.
 - `CUR-09`: planowane 75% jako minimum, aktywne TOU 20%, brak mechanizmu zmiany → `missing_capabilities` i brak obietnicy utrzymania SOC.
