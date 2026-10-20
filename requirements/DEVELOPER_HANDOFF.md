@@ -25,18 +25,18 @@ Lokalną, własną integrację Home Assistant (`custom_components/energy_copilot
 | 3 | [SYSTEM_BASELINE.md](SYSTEM_BASELINE.md) | Fakty o instalacji, stopień potwierdzenia |
 | 4 | [OPTIMIZATION_MODEL.md](OPTIMIZATION_MODEL.md) | Bilans PV/dom/sieć/bateria, funkcja kosztu, prognozy, końcowy SOC |
 | 5 | [ENTITY_CONTRACT.md](ENTITY_CONTRACT.md) | Logiczne wejścia/wyjścia, historyczne HA ID, walidacja fizycznych akcji |
-| 5a | [CONTROL_STRATEGY.md](CONTROL_STRATEGY.md) | Current-first przez encje HA, trwały TOU, porównanie backendów, 16 testów CTRL |
-| 6 | [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md) | Kolejność zapisu, potwierdzenie, zgody, konflikty i fail-safe |
-| 7 | [HA_DASHBOARD.md](HA_DASHBOARD.md) | Prezentacja planu, pomiarów, kosztów, propozycji i diagnostyki |
-| 8 | [TEST_SCENARIOS.md](TEST_SCENARIOS.md) | 40 szczegółowych scenariuszy obliczeń i mapowania; dodatkowo testy EXE i UI w dokumentach tematycznych |
-| 9 | [FORECAST_POLICY.md](FORECAST_POLICY.md) | Niepewność prognoz, nieantycypacyjność i wartość SOC na końcu opublikowanych cen |
-| 10 | [DECISION_LOGGING.md](DECISION_LOGGING.md) | Log każdej decyzji i powód wyboru widoczne od pierwszego uruchomienia |
-| 11 | [BACKTEST_VALIDATION.md](BACKTEST_VALIDATION.md) | Testy na historii bez przyszłych danych i uczciwy benchmark finansowy |
-| 12 | [CALIBRATION_POLICY.md](CALIBRATION_POLICY.md) | Zasady weryfikacji sprawności, degradacji i prognoz — wartości startowe nie są pomiarami |
-| 13 | [HA_READONLY_CAPTURE.md](HA_READONLY_CAPTURE.md) | Jednorazowa lista aktualnych encji i jednostek HA; bez sterowania |
-| 14 | [HA_ENTITY_SNAPSHOT_2026-10-19.md](HA_ENTITY_SNAPSHOT_2026-10-19.md) | Wynik tego odczytu: potwierdzone ID, bilans, niezweryfikowane sterowania i konflikty |
-| 15 | [HA_TIMESERIES_CAPTURE.md](HA_TIMESERIES_CAPTURE.md) | Wąski odczyt przyszłych cen i profilu PV z atrybutów źródeł |
-| 16 | [OPEN_ITEMS.md](OPEN_ITEMS.md) | Aktualne P0/P1/P2 — nie udawać, że wszystkie są już rozwiązane |
+| 6 | [CONTROL_STRATEGY.md](CONTROL_STRATEGY.md) | Current-first przez encje HA, trwały TOU, porównanie backendów, 16 testów CTRL |
+| 7 | [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md) | Kolejność zapisu, potwierdzenie, zgody, konflikty i fail-safe |
+| 8 | [HA_DASHBOARD.md](HA_DASHBOARD.md) | Prezentacja planu, pomiarów, kosztów, propozycji i diagnostyki |
+| 9 | [TEST_SCENARIOS.md](TEST_SCENARIOS.md) | 40 szczegółowych scenariuszy obliczeń i mapowania; dodatkowo testy EXE i UI w dokumentach tematycznych |
+| 10 | [FORECAST_POLICY.md](FORECAST_POLICY.md) | Niepewność prognoz, nieantycypacyjność i wartość SOC na końcu opublikowanych cen |
+| 11 | [DECISION_LOGGING.md](DECISION_LOGGING.md) | Log każdej decyzji i powód wyboru widoczne od pierwszego uruchomienia |
+| 12 | [BACKTEST_VALIDATION.md](BACKTEST_VALIDATION.md) | Testy na historii bez przyszłych danych i uczciwy benchmark finansowy |
+| 13 | [CALIBRATION_POLICY.md](CALIBRATION_POLICY.md) | Zasady weryfikacji sprawności, degradacji i prognoz — wartości startowe nie są pomiarami |
+| 14 | [HA_READONLY_CAPTURE.md](HA_READONLY_CAPTURE.md) | Jednorazowa lista aktualnych encji i jednostek HA; bez sterowania |
+| 15 | [HA_ENTITY_SNAPSHOT_2026-10-19.md](HA_ENTITY_SNAPSHOT_2026-10-19.md) | Wynik tego odczytu: potwierdzone ID, bilans, niezweryfikowane sterowania i konflikty |
+| 16 | [HA_TIMESERIES_CAPTURE.md](HA_TIMESERIES_CAPTURE.md) | Wąski odczyt przyszłych cen i profilu PV z atrybutów źródeł |
+| 17 | [OPEN_ITEMS.md](OPEN_ITEMS.md) | Aktualne P0/P1/P2 — nie udawać, że wszystkie są już rozwiązane |
 
 Jeżeli dokumenty zawierają sprzeczność, nie rozwiązywać jej przez arbitralne założenie: zgłosić konkretny fragment, zaproponować rozwiązanie i zaktualizować po potwierdzeniu.
 
@@ -87,9 +87,9 @@ Nie rozpoczynać kodowania na podstawie samej decyzji o kompletności dokumentac
 
 ## 7. Kontrola spójności dokumentacji
 
-**Audyt dokumentów (2026-10-19):**
+**Audyt dokumentów (aktualizacja 2026-10-20):**
 - Sprawdzenie odwołań względnych między plikami Markdown: **brak zerwanych odwołań do plików**.
-- Testy opisane w dokumentacji: **40** scenariuszy PHY/ECO/SOC/TIME/PVQ/SAFE/MAP + **12** EXE + **11** UI + **10** LOG + **10** UNC + **12** BKT + **7** CAL = **102** przypadki specyfikacyjne.
+- Testy opisane w dokumentacji: **40** scenariuszy PHY/ECO/SOC/TIME/PVQ/SAFE/MAP + **16** CTRL + **12** EXE + **11** UI + **10** LOG + **10** UNC + **12** BKT + **7** CAL = **118** przypadków specyfikacyjnych.
 - Nowe testy **ECO-08 i ECO-09** weryfikują rachunek marginalny i porównanie opłacalności bez dobierania celu 65% z góry; ECO-08 przewiduje wynik **+0,4152 DKK** przy jawnie określonych stratach i degradacji. To wzorzec analityczny, nie wynik pracy kodu.
-- Nadal **nieweryfikowane** są: szczegóły torów fizycznych i encji, dokładna cena zakupu z opłatami, realne krzywe sprawności, koszt degradacji, historyczne migawki prognoz, funkcja terminalnej wartości energii i niezależny fail-safe. Zapisanie wzorów **nie zamyka** tych kwestii.
+- Nadal **nieweryfikowane** są: rzeczywista semantyka sterowania i torów AC/DC, struktura przyszłych przedziałów cen w HA (pełne taryfy zakupu potwierdzone przez użytkownika), realne krzywe sprawności, koszt degradacji, historyczne migawki prognoz, funkcja terminalnej wartości energii i niezależny fail-safe. Zapisanie wzorów **nie zamyka** tych kwestii.
 - Testy zapisano jako przypadki do zaimplementowania; dopóki nie powstanie kod, nie należy ich nazywać „wykonanymi”.
