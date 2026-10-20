@@ -14,12 +14,16 @@ from .const import (
     DEFAULT_FORECAST_MAX_VERSIONS,
     DEFAULT_FORECAST_RETENTION_DAYS,
     DOMAIN,
+    HISTORY_ROLES,
     OPTIONAL_ENTITY_ROLES,
     UPDATE_INTERVAL,
 )
 from .forecast_history import ForecastHistory
+from .forecast_quality import forecast_coverage
 from .history import HistoryReadError, RecorderHistoryReader
 from .models import InputSnapshot, Issue
+from .quality import quality_report
+from .solar import solar_evidence
 from .validation import forecast, measurements, prices
 
 _LOGGER = logging.getLogger(__name__)
@@ -55,6 +59,9 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self._history = ()
         self._external_issues = []
         self._last_external = None
+        self.forecast_coverage = None
+        self.measurement_source_timing = {}
+        self.quality = None
 
     async def _async_setup(self):
         try:
@@ -70,6 +77,26 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             role: self.hass.states.get(entity_id) if entity_id else None
             for role, entity_id in self.entities.items()
         }
+        self.measurement_source_timing = {}
+        for role in HISTORY_ROLES:
+            state = states[role]
+            reported = getattr(state, "last_reported", None)
+            updated = getattr(state, "last_updated", None)
+            self.measurement_source_timing[role] = {
+                "backend": "python_state",
+                "freshness_time_basis": "last_reported",
+                "last_reported_utc": reported.isoformat()
+                if reported is not None
+                else None,
+                "last_updated_utc": updated.isoformat()
+                if updated is not None
+                else None,
+                "report_age_seconds": (now - reported).total_seconds()
+                if reported is not None
+                else None,
+                "available": state is not None
+                and state.state not in {"unknown", "unavailable"},
+            }
         snapshot.measurements, snapshot.flows_kw, snapshot.issues = measurements(
             states, now
         )
@@ -112,22 +139,44 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         if self._forecast and max(p.end for p in self._forecast.periods) <= now:
             snapshot.forecast = None
             snapshot.issues.append(Issue("stale_forecast", "forecast_solar"))
-        if snapshot.forecast and snapshot.prices:
-            for slot in snapshot.prices:
-                covered = sum(
-                    max(
-                        0,
-                        (
-                            min(p.end, slot.end) - max(p.start, slot.start)
-                        ).total_seconds(),
-                    )
-                    for p in snapshot.forecast.periods
+        self.forecast_coverage = None
+        if snapshot.forecast:
+            # Use the selected PV location, never an unrelated default HA location.
+            solar_entry = self.hass.config_entries.async_get_entry(
+                self.settings.get("forecast_entry", "")
+            )
+            solar = None
+            if snapshot.prices:
+                solar = solar_evidence(
+                    solar_entry.data if solar_entry else {},
+                    max(now, snapshot.prices[0].start),
+                    snapshot.prices[-1].end,
+                    dt_util.utcnow(),
                 )
-                if covered < (slot.end - slot.start).total_seconds():
-                    snapshot.issues.append(
-                        Issue("forecast_horizon_incomplete", "forecast_solar")
-                    )
-                    break
+            self.forecast_coverage = forecast_coverage(
+                snapshot.forecast, snapshot.prices, now, solar=solar
+            )
+            if self.forecast_coverage["missing_intervals"]:
+                snapshot.issues.append(
+                    Issue("forecast_horizon_incomplete", "forecast_solar")
+                )
+            if self.forecast_coverage["unpublished_night_seconds"]:
+                snapshot.issues.append(
+                    Issue("forecast_night_unpublished", "forecast_solar")
+                )
+            if self.forecast_coverage["partially_elapsed_periods"]:
+                snapshot.issues.append(
+                    Issue("forecast_observed_after_period_start", "forecast_solar")
+                )
+            if snapshot.forecast.unbounded_energy_at:
+                snapshot.issues.append(
+                    Issue("forecast_energy_boundary_unverifiable", "forecast_solar")
+                )
+            if snapshot.forecast.missing_energy_at:
+                snapshot.issues.append(
+                    Issue("forecast_energy_period_missing", "forecast_solar")
+                )
+        self.quality = quality_report(snapshot.issues, self.forecast_coverage)
         return snapshot
 
     async def _async_forecast(self, now):
@@ -184,7 +233,21 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         except HistoryReadError as err:
             self._external_issues.append(Issue(err.code, "recorder"))
             return
+        # RecorderRuns show process boundaries, not a durable history of recorder.disable.
+        # Reconstructed state coverage must not be presented as proven continuous recording.
+        if not self.history_reader.last_read_summary.get(
+            "recording_pause_history_verified", False
+        ):
+            self._external_issues.append(
+                Issue("recorder_pause_history_unverifiable", "recorder")
+            )
         if any(s.home_kwh is None for s in self._history):
             self._external_issues.append(
                 Issue("historical_quality_unverifiable", "recorder")
             )
+        # A configured template/measurement has not established physical AC demand.
+        self._external_issues.append(Issue("home_profile_unverified", "home"))
+        if self.history_reader.last_read_summary.get("home_normalization", {}).get(
+            "corrected_seconds", 0
+        ):
+            self._external_issues.append(Issue("negative_home_normalized", "recorder"))

@@ -21,6 +21,7 @@ from .const import (
     MAX_FORECAST_RETENTION_DAYS,
     MAX_FORECAST_VERSIONS,
 )
+from .forecast_quality import periods_for_decision
 from .models import ForecastPeriod, ForecastSnapshot
 from .validation import forecast, number, utc
 
@@ -297,10 +298,17 @@ class ForecastHistory:
             return None
         payload = self.payloads[row["version"]]
         if "legacy_periods" in payload:
-            return self._legacy_snapshot(payload, row["captured_at"], row["version"])
+            # These periods were normalized by the incorrect start-index parser.
+            # Without the original end-index Wh map they cannot be repaired safely.
+            return None
         return replace(
             forecast(payload, utc(row["captured_at"])), version=row["version"]
         )
+
+    def decision_periods_as_of(self, decision_at, *, source_entry=None):
+        """Read-only decision input; no future observation or full started-period Wh."""
+        snapshot = self.as_of(decision_at, source_entry=source_entry)
+        return periods_for_decision(snapshot, decision_at) if snapshot else ()
 
     def original_at(self, decision_at: datetime, *, source_entry=None) -> dict | None:
         """Original W/Wh values/site timezone keys; legacy originals cannot be invented."""
@@ -328,4 +336,6 @@ class ForecastHistory:
             ),
             "evicted_this_runtime": self.evicted,
             "provider_generated_at_available": False,
+            "interval_semantics": "end_timestamp",
+            "legacy_replay_supported": False,
         }

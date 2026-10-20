@@ -14,6 +14,8 @@ class Issue:
 class Sample:
     value: float
     at: datetime
+    # Local provenance only; standard diagnostics never serialize samples.
+    raw_value: float | None = None
 
 
 @dataclass(frozen=True)
@@ -36,6 +38,20 @@ class ForecastSnapshot:
     captured_at: datetime
     version: str
     periods: tuple[ForecastPeriod, ...]
+    source_start: datetime | None = None
+    source_end: datetime | None = None
+    # Kept for persisted/public snapshot compatibility; end-indexed raw values
+    # never imply unbounded future energy at the last timestamp.
+    unbounded_energy_at: tuple[datetime, ...] = ()
+    unbounded_prior_energy_at: tuple[datetime, ...] = ()
+    missing_energy_at: tuple[datetime, ...] = ()
+
+
+@dataclass(frozen=True)
+class HistoryGap:
+    start: datetime
+    end: datetime
+    issues: tuple[Issue, ...]
 
 
 @dataclass(frozen=True)
@@ -44,6 +60,19 @@ class HistorySlot:
     end: datetime
     home_kwh: float | None
     issues: tuple[Issue, ...] = ()
+    # Partial energy is only the integral over validated recorded subintervals.
+    # It is never a complete-quarter estimate or a verified physical AC load.
+    observed_home_kwh: float | None = None
+    observed_seconds: float = 0
+    unobserved_seconds: float = 0
+    unobserved_reason_seconds: tuple[tuple[str, float], ...] = ()
+    unobserved_intervals: tuple[HistoryGap, ...] = ()
+    unobserved_intervals_truncated: bool = False
+    observed_raw_home_kwh: float | None = None
+    home_correction_seconds: float = 0
+    home_correction_records: int = 0
+    home_correction_segments: int = 0
+    home_correction_kwh: float = 0
 
 
 @dataclass

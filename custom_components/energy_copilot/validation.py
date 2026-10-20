@@ -3,7 +3,6 @@
 import hashlib
 import json
 import math
-from bisect import bisect_left, bisect_right
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -12,7 +11,6 @@ from .const import HISTORY_ROLES, MAX_AGE, MAX_SKEW, POWER_ROLES
 from .models import (
     ForecastPeriod,
     ForecastSnapshot,
-    HistorySlot,
     Issue,
     PriceSlot,
     Sample,
@@ -40,6 +38,7 @@ def utc(value):
 
 
 def measurement(role, state, now, *, historical=False):
+    """Validate a signed sample; home normalization needs the full source context."""
     if state is None or state.state in ("unknown", "unavailable"):
         raise ValueError("invalid_input")
     try:
@@ -76,7 +75,6 @@ def measurement(role, state, now, *, historical=False):
             "daily_pv",
             "daily_charge",
             "daily_discharge",
-            "home",
         }
         and value < 0
     ):
@@ -100,6 +98,11 @@ def measurements(states, now, *, historical=False):
     elif max(s.at for s in sources) - min(s.at for s in sources) > MAX_SKEW:
         values.pop("home", None)
         issues.append(Issue("snapshot_not_synchronous", "home"))
+    elif (home := values["home"]).value < 0:
+        # User policy applies only after validating all four sources and times.
+        # Preserve the signed input locally without modifying the HA entity.
+        values["home"] = Sample(0, home.at, raw_value=home.value)
+        issues.append(Issue("negative_home_normalized", "home"))
     flows = {}
     for role, positive, negative in (
         ("grid", "grid_import", "grid_export"),
@@ -189,14 +192,18 @@ def prices(buy_state, sell_state, now):
 
 
 def forecast(response, captured_at):
-    """Parse HA 2026.10 raw response: Wh for the interval starting at timestamp."""
+    """Parse observed HA raw Wh for the interval ENDING at each timestamp.
+
+    The native service's start-index docstring contradicts the exported data.
+    The contract in HA_CONTRACT is backed by adjacent watts/time integrals.
+    """
     if not isinstance(response, Mapping):
         raise ValueError("invalid_forecast_response")
     periods = response.get("wh_period")
     if not isinstance(periods, Mapping) or not periods:
         raise ValueError("invalid_forecast_response")
-    # wh_period alone cannot establish the final interval's end.
-    # Require the corresponding watts timeline to prove interval boundaries.
+    # The first energy value has no known preceding boundary. Every later
+    # value belongs to the interval bounded by the preceding/current watts keys.
     watts = response.get("watts")
     if not isinstance(watts, Mapping):
         raise ValueError("forecast_boundaries_unverifiable")
@@ -212,64 +219,35 @@ def forecast(response, captured_at):
         raise ValueError("invalid_forecast_response")
     result = []
     for start, end in zip(boundaries, boundaries[1:]):
-        if start in values and start >= captured_at:
-            result.append(ForecastPeriod(start, end, values[start] / 1000))
+        if end in values and end > captured_at:
+            result.append(ForecastPeriod(start, end, values[end] / 1000))
     if not result:
         raise ValueError("empty_forecast")
     serial = [(p.start.isoformat(), p.end.isoformat(), p.kwh) for p in result]
     version = hashlib.sha256(
         json.dumps([captured_at.isoformat(), serial]).encode()
     ).hexdigest()[:16]
-    return ForecastSnapshot(captured_at, version, tuple(result))
+    # Keep an already-started interval intact: its original Wh cannot be prorated
+    # without a finer energy forecast. captured_at still records when it became known.
+    return ForecastSnapshot(
+        captured_at,
+        version,
+        tuple(result),
+        source_start=boundaries[0],
+        source_end=boundaries[-1],
+        # A nonzero final value is bounded by the previous timestamp. Only
+        # initial energy lacks its PRECEDING boundary; never invent that period.
+        unbounded_prior_energy_at=tuple(
+            t for t, value in values.items() if t == boundaries[0] and value != 0
+        ),
+        missing_energy_at=tuple(t for t in boundaries[1:] if t not in values),
+    )
 
 
-def history_slots(history, entities, start, end):
-    """Integrate 15 minute slots only when every source has corroborating history.
+def history_slots(history, entities, start, end, recording_runs=(), excluded_roles=()):
+    """Reconstruct recorded states only with supplied Recorder process/run evidence."""
+    from .recorder_reconstruction import reconstruct_history
 
-    State-change Recorder rows cannot prove unchanged sensors kept reporting.
-    Carry-forwards exceeding MAX_AGE are explicitly unverifiable, never zeros.
-    """
-    series = {}
-    times = {}
-    for role in HISTORY_ROLES:
-        rows = history.get(entities[role], [])
-        series[role] = sorted(rows, key=lambda s: s.last_updated)
-        times[role] = [utc(s.last_updated) for s in series[role]]
-    timeline = sorted({t for ts in times.values() for t in ts})
-    result = []
-    cursor = start
-    while cursor + timedelta(minutes=15) <= end:
-        stop = cursor + timedelta(minutes=15)
-        cuts = [
-            cursor,
-            *timeline[bisect_right(timeline, cursor) : bisect_left(timeline, stop)],
-            stop,
-        ]
-        energy, issues = 0.0, []
-        for left, right in zip(cuts, cuts[1:]):
-            selected = {}
-            for role, rows in series.items():
-                index = bisect_right(times[role], left) - 1
-                state = rows[index] if index >= 0 else None
-                if state is None:
-                    issues.append(Issue("historical_quality_unverifiable", role))
-                    continue
-                try:
-                    # Recorder last_reported is not persisted: use last_updated.
-                    at = utc(state.last_updated)
-                    if right - at > MAX_AGE:
-                        issues.append(Issue("historical_quality_unverifiable", role))
-                    selected[role] = state
-                except ValueError, TypeError:
-                    issues.append(Issue("historical_quality_unverifiable", role))
-            values, _, errors = measurements(selected, left, historical=True)
-            issues.extend(errors)
-            if "home" in values:
-                energy += (
-                    values["home"].value / 1000 * (right - left).total_seconds() / 3600
-                )
-        result.append(
-            HistorySlot(cursor, stop, None if issues else energy, tuple(set(issues)))
-        )
-        cursor = stop
-    return tuple(result)
+    return reconstruct_history(
+        history, entities, start, end, recording_runs, excluded_roles
+    )

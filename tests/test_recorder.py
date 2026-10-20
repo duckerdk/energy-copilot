@@ -63,3 +63,44 @@ async def test_recorder_database_failure_is_diagnostic(
     assert "recorder_query_failed" in {
         i.code for i in entry.runtime_data.coordinator.data.issues
     }
+
+
+async def test_real_recorder_sparse_constants_preserve_original_carry_timestamp(
+    hass, populated_hass, freezer, async_setup_recorder_instance
+):
+    """An unchanged night-time PV zero is not missing periodic measurement data."""
+    from pytest_homeassistant_custom_component.components.recorder.common import (
+        async_wait_recording_done,
+    )
+
+    from custom_components.energy_copilot.const import DEFAULT_ENTITIES, HISTORY_ROLES
+    from custom_components.energy_copilot.history import RecorderHistoryReader
+
+    recorded_at = NOW - timedelta(hours=1)
+    freezer.move_to(recorded_at)
+    await async_setup_recorder_instance(hass)
+    await hass.async_start()
+    for role in HISTORY_ROLES:
+        hass.states.async_set(
+            DEFAULT_ENTITIES[role],
+            "200" if role == "home" else "0",
+            {"unit_of_measurement": "W"},
+        )
+    await hass.async_block_till_done()
+    await async_wait_recording_done(hass)
+    freezer.move_to(NOW)
+    reader = RecorderHistoryReader(hass, DEFAULT_ENTITIES)
+    slots = await reader.async_read_window(NOW - timedelta(minutes=15), NOW)
+    assert slots[0].home_kwh == pytest.approx(0.05)
+    assert not slots[0].issues
+    summary = reader.last_read_summary
+    assert summary["source_rows"]["pv"] == {
+        "changes_in_window": 0,
+        "carry_in_at": recorded_at.isoformat(),
+        "first_change_at": None,
+        "last_change_at": None,
+    }
+    assert summary["reconstruction_method"] == "piecewise_constant_recorder_states"
+    assert summary["device_freshness_verified"] is False
+    assert summary["observed_first"] is None  # No synthetic query-start observation.
+    assert summary["valid_slots"] == 1
