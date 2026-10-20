@@ -72,5 +72,7 @@ W backtestach i baseline obowiązuje **ten sam próg i jednostki polityki Co-Pil
 - `PVE-18`: aktywny przyszły slot ma cenę sprzedaży 0,35 i sam PV mógłby przynieść przychód → zakaz eksportu zgodnie z **wybranym przez użytkownika progiem**, mimo dodatniej ceny.
 - `PVE-19`: cena −0,10 → eksport OFF, cena pozostaje −0,10 bez obcinania do zera.
 - `PVE-20`: dobrowolny ręczny tryb `monitor/dry_run` → propozycja ON/OFF i log, **bez** wywołania usługi HA.
+- `PVE-21`: `raw_today.price=0,400` i potwierdzony bieżący `current_price=0,3996` → `PRICE_THRESHOLD_AMBIGUOUS`, brak komendy ON; test włącznego progu tylko przy zgodnych odczytach.
+- `PVE-22`: przełącznik pozostał ON po utracie HA i w kolejnej godzinie cena spadła do 0,20 → stan ryzyka, bez fałszywej gwarancji OFF; po odzyskaniu HA wymagane sprawdzenie obecnego stanu i ceny przed dalszymi akcjami.
 
 **Warunek odbioru:** testy sprawdzają użycie **niezmienionej ceny z HA** i autonomię tylko dla PV. Nie implementować żadnego rozliczania prowizji, podatków, taryf ani innych korekt cenowych.
