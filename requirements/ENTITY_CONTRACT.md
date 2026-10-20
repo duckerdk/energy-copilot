@@ -24,7 +24,7 @@ Przyjmujemy, że **właściwe encje wykonują właściwe funkcje**. To **założ
 | Końcowa cena zakupu (wszystkie opłaty) | sensor.energi_data_service | **Potwierdzone 20.10.2026**: `raw_today`, `raw_tomorrow`, `tomorrow_valid`, timestampowane stawki z pełnymi opłatami; [pełny kontrakt](HA_PRICE_SERIES_CONTRACT.md) |
 | SOC | sensor.sun12k_battery_capacity | Czy to SOC %, 0–100, aktualność |
 | Moc PV | sensor.pv_sum | W czy kW; znak; aktualność |
-| Moc domu | sensor.home_energy_consumption | W czy kW; definicja; aktualność |
+| Moc domu | sensor.home_energy_consumption | **Potwierdzona encja pochodna:** PV + moc sieci ze znakiem + moc baterii ze znakiem, W; kontrolować dostępność 3 wejść |
 | Prognoza PV dziś | sensor.energy_production_today | kWh; pełny dzień czy od teraz |
 | Prognoza PV jutro | sensor.energy_production_tomorrow | kWh; horyzont; nazwa aktualna |
 | Pozwolenie na eksport | switch.sun12k_solar_sell | Dokładny skutek; czy obejmuje również eksport z baterii |
@@ -59,7 +59,7 @@ Wymagane normalizacje i stan faktyczny:
 | Rola | Encja | Odczyt i znaczenie |
 | --- | --- | --- |
 | PV | `sensor.pv_sum` | 3034 W; suma `sun12k_pv1_power` 2387 W + `sun12k_pv2_power` 647 W |
-| Pobór domu | `sensor.home_energy_consumption` | 583 W; `sun12k_load_totalpower` = 532 W to **odrębne** wskazanie |
+| Pobór domu | `sensor.home_energy_consumption` | 583 W w odczycie; **potwierdzony template** z `pv_sum + sun12k_total_grid_power + sun12k_battery_output_power`; `sun12k_load_totalpower` = 532 W to osobny sensor |
 | Moc sieci netto | `sensor.sun12k_total_grid_power` | −2470 W, spójne z eksportem w tym stanie; do sprawdzenia znak w okresach importu |
 | Moc baterii | `sensor.sun12k_battery_output_power` | +19 W, w tym stanie spójne z dodatnią mocą oddawaną do bilansu, ale brak testu obu kierunków |
 | SOC | `sensor.sun12k_battery_capacity` | 97% |
@@ -70,7 +70,7 @@ Wymagane normalizacje i stan faktyczny:
 | Ładowanie/rozładowanie dziś | `sensor.sun12k_today_charge_of_the_battery`, `sensor.sun12k_today_discharge_of_the_battery` | 8,6 kWh / 1,2 kWh; strona pomiaru nieznana |
 | Prognoza PV | `sensor.energy_production_today`, `sensor.energy_production_tomorrow`, `sensor.energy_production_today_remaining` | 15,865 / 7,536 / 4,431 kWh; nie zastępują godzinowych slotów |
 
-Kontrola jednej migawki: **3034 W PV + 19 W bateria = 583 W dom + 2470 W eksport = 3053 W**. **Uwaga o pochodności:** jeżeli `home_energy_consumption` jest sensorem pochodnym liczonym z pozostałych trzech sygnałów, równanie jest tautologią, a nie niezależną weryfikacją. Metoda i testy: [MEASUREMENT_CONTRACT.md](MEASUREMENT_CONTRACT.md). Stan `last_updated` nie musi być timestampem ostatniej raportowanej próbki; do oceny świeżości potrzebna jest semantyka aktualizacji źródła lub `last_reported`.
+Kontrola jednej migawki: **3034 W PV + 19 W bateria = 583 W dom + 2470 W eksport = 3053 W**. **Potwierdzona pochodność:** `home_energy_consumption` jest właśnie sumą tych trzech sygnałów. Zerowy residual wynika z wzoru i nie stanowi niezależnej weryfikacji. Metoda i testy: [MEASUREMENT_CONTRACT.md](MEASUREMENT_CONTRACT.md). Stan `last_updated` nie musi być timestampem ostatniej raportowanej próbki; do oceny świeżości potrzebna jest semantyka aktualizacji źródła lub `last_reported`.
 
 **Bieżące encje Deye potwierdzone jako istniejące, ale NIE jako bezpieczne funkcje zapisu:** `switch.sun12k_solar_sell`, `switch.sun12k_grid_charge`, `switch.sun12k_time_of_use`, sześć `switch.sun12k_time_point_N_charge_enable`; `number.sun12k_maximum_battery_charge_current`, `number.sun12k_maximum_battery_discharge_current`, `number.sun12k_maximum_battery_grid_charge_current`; po sześć `number.sun12k_time_point_N_start`, `_power`, `_capacity`. Udokumentowane przez HA min/max prądów ±16 777 220 A **są niewiarygodne jako granice sprzętowe**.
 
@@ -80,7 +80,7 @@ Więcej szczegółów i zastrzeżeń: [HA_ENTITY_SNAPSHOT_2026-10-19.md](HA_ENTI
 
 ## Nieznane, lecz wymagane do planowania i wykonania
 
-- **Mapa metrologiczna:** znane `sun12k_total_grid_power`, `sun12k_battery_output_power`, `pv_sum`, `home_energy_consumption`, liczniki kWh; kierunki obu znaków, fizyczne punkty AC/DC i niezależność źródeł sprawdza się według [MEASUREMENT_CONTRACT.md](MEASUREMENT_CONTRACT.md). Nadal trzeba potwierdzić **konwencję znaków w obu kierunkach**, stronę AC/DC, świeżość pomiaru, przejścia import/eksport i ładowanie/rozładowanie; nie przyjmować, że jeden bilans w stanie eksportowym jest kompletną kalibracją.
+- **Mapa pomiarów:** znane `sun12k_total_grid_power`, `sun12k_battery_output_power`, `pv_sum` i **potwierdzony pochodny** `home_energy_consumption`; bez dodatkowych liczników. Wzór i kontrola brakujących składowych: [MEASUREMENT_CONTRACT.md](MEASUREMENT_CONTRACT.md). Nadal trzeba potwierdzić **konwencję znaków w obu kierunkach**, stronę AC/DC, świeżość pomiaru, przejścia import/eksport i ładowanie/rozładowanie; nie przyjmować, że jeden bilans w stanie eksportowym jest kompletną kalibracją.
 - **Ceny: rozwiązane.** Timestampowane serie zakupu i spot: [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md). **PV: kontrakt dostępu określony** — preferowana natywna akcja HA `forecast_solar.get_forecast` zwraca godzinowy lub 15-minutowy profil `wh_period`/`watts`: [PV_FORECAST_CONTRACT.md](PV_FORECAST_CONTRACT.md). Do sprawdzenia przy uruchomieniu przez Codexa: dostępność akcji w tej instalacji i wybór wpisu konfiguracji; nie wymaga ręcznego kopiowania prognozy. Prognoza zużycia: profil tworzony lokalnie na danych Recorder `sensor.home_energy_consumption`, według [LOAD_FORECAST_CONTRACT.md](LOAD_FORECAST_CONTRACT.md).
 - **Produkcja PV i curtailment:** potwierdzić, czy encja mocy/energii PV obejmuje również ładowanie po DC; jeśli dostępne, wskazać sygnał aktywnego ograniczenia produkcji (limit eksportu, MPPT, status curtailment) i zweryfikować jego znaczenie. Pełna bateria + wyłączony eksport to jedynie przesłanki; nie dają pomiaru niewyprodukowanych kWh. Migawki prognoz muszą mieć czas pobrania i daty/sloty ważności, aby porównanie z późniejszą produkcją nie wykorzystywało zaktualizowanej prognozy.
 - ID i znaczenie sterowań **docelowym SOC, limitem mocy ładowania, wymuszonym rozładowaniem, kierunkiem eksportu z baterii, harmonogramem Deye i przywróceniem trybu fabrycznego**. Nie wiadomo, czy HA udostępnia wszystkie te funkcje.
@@ -129,7 +129,7 @@ Energy Co-Pilot stosuje **własne zakresy dozwolonych nastaw w amperach**, całk
 | `battery_charge_power` / `battery_discharge_power` | Dwie nieujemne moce [kW] z ustaloną stroną AC/DC | `sensor.sun12k_battery_output_power` już istnieje; projektowy podział `max(0,−P_bat)`/`max(0,+P_bat)` po potwierdzeniu znaków obu kierunków; [MEASUREMENT_CONTRACT.md](MEASUREMENT_CONTRACT.md) |
 | `grid_import_power` / `grid_export_power` | Dwie nieujemne moce [kW] na punkcie przyłącza | `sensor.sun12k_total_grid_power` już istnieje; roboczo `max(0,+P_grid)`/`max(0,−P_grid)` po potwierdzeniu znaków obu kierunków; [MEASUREMENT_CONTRACT.md](MEASUREMENT_CONTRACT.md) |
 | `pv_actual_power` | kW, jawnie DC lub AC | Historyczne `sensor.pv_sum`; potwierdzić, czy obejmuje ładowanie baterii po DC; nie liczyć tego dwa razy |
-| `house_load_power` | kW na AC, bez ładowania baterii | Historyczne `sensor.home_energy_consumption`; zweryfikować definicję |
+| `house_load_power` | W z istniejącej encji, normalizowane do kW | `sensor.home_energy_consumption` = `pv_sum + total_grid_power + battery_output_power`; **wzór potwierdzony**, bez niezależnego pomiaru domu. Nie polegać na nim, jeśli którakolwiek składowa ma `unknown/unavailable` (szablon stosuje `float(0)`) |
 | `pv_forecast_slots` | `start_utc`, `end_utc`, `energy_wh`, rozdzielczość i czas pobrania | **Natywna akcja** `forecast_solar.get_forecast` z `resolution: raw` lub `hourly` zwraca `wh_period` i `watts`; szczegóły [PV_FORECAST_CONTRACT.md](PV_FORECAST_CONTRACT.md). Dobowe sensory wyłącznie do diagnostyki; gdy akcja niedostępna, stan `unavailable`, nie fikcyjny profil |
 | `house_load_forecast_slots` | średnie kW, energia kWh, jakość pokrycia, czas i wersja modelu | **Algorytm zdefiniowany** w [LOAD_FORECAST_CONTRACT.md](LOAD_FORECAST_CONTRACT.md): lokalny Recorder dla `sensor.home_energy_consumption`, bez przyszłych danych; dostępność historycznych próbek zostanie sprawdzona w HA |
 | `curtailment_status` | `uncurtailed` / `curtailed_confirmed` / `curtailment_unknown` | Potrzebny zweryfikowany sygnał ograniczenia PV lub jawna klasyfikacja niepewności; pełna bateria i eksport OFF nie dowodzą ilości straconych kWh |
