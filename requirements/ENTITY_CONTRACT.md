@@ -4,7 +4,7 @@
 
 ## Granica integracji: wyłącznie encje i usługi Home Assistant
 
-**Zasada obowiązująca:** Energy Co-Pilot odczytuje stany/atrybuty encji HA i steruje wyłącznie poprzez natywne usługi HA na zweryfikowanych encjach (np. `number.set_value`, `switch.turn_on/off`). Integracja **nie** odczytuje ani nie zapisuje rejestrów Modbus, nie otwiera połączenia z falownikiem i nie modyfikuje ESPHome, YAML, firmware ani istniejącego mostka. Analiza `deye-esp.yaml` służy tylko zrozumieniu znaczenia encji; numeracja wewnętrznych rejestrów nie jest interfejsem Co-Pilot.
+**Zasada obowiązująca:** Energy Co-Pilot odczytuje stany/atrybuty encji HA i steruje wyłącznie poprzez natywne usługi HA na zweryfikowanych encjach (np. `number.set_value`, `switch.turn_on/off`). Integracja **nie** odczytuje ani nie zapisuje rejestrów Modbus, nie otwiera połączenia z falownikiem i nie modyfikuje ESPHome, YAML, firmware ani istniejącego mostka. Opis istniejącego mostka ESPHome, jeżeli jest dostępny poza repo, może służyć wyłącznie do objaśnienia encji; nie jest kontraktem sterowania i nie powinien być wymaganym plikiem projektu.
 
 **Przyjęte semantyki na etapie projektowania (zgodnie z dyspozycją użytkownika):**
 
@@ -16,67 +16,9 @@
 
 Przyjmujemy, że **właściwe encje wykonują właściwe funkcje**. To **założenie projektowe**, nie wynik testu fizycznego. Nie blokuje projektowania algorytmu i mapowania akcji, ale nie upoważnia do uruchomienia zapisów; semantykę oraz skutek `0 A` zweryfikować dopiero w osobno uzgodnionym teście. Więcej: [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md).
 
-## Znane historycznie identyfikatory
+## Aktualne role — obserwacja z 19.10.2026
 
-| Rola | Historyczne ID | Wymagane sprawdzenie |
-| --- | --- | --- |
-| Cena spot teraz i w przyszłości | sensor.energi_data_spotpris | **Potwierdzone 20.10.2026**: `raw_today`, `raw_tomorrow`, `tomorrow_valid`, `hour` + `price` w DKK/kWh; [pełny kontrakt](HA_PRICE_SERIES_CONTRACT.md) |
-| Końcowa cena zakupu (wszystkie opłaty) | sensor.energi_data_service | **Potwierdzone 20.10.2026**: `raw_today`, `raw_tomorrow`, `tomorrow_valid`, timestampowane stawki z pełnymi opłatami; [pełny kontrakt](HA_PRICE_SERIES_CONTRACT.md) |
-| SOC | sensor.sun12k_battery_capacity | Czy to SOC %, 0–100, aktualność |
-| Moc PV | sensor.pv_sum | W czy kW; znak; aktualność |
-| Moc domu | sensor.home_energy_consumption | **Potwierdzona encja pochodna:** PV + moc sieci ze znakiem + moc baterii ze znakiem, W; kontrolować dostępność 3 wejść |
-| Prognoza PV dziś | sensor.energy_production_today | kWh; pełny dzień czy od teraz |
-| Prognoza PV jutro | sensor.energy_production_tomorrow | kWh; horyzont; nazwa aktualna |
-| Pozwolenie na eksport | switch.sun12k_solar_sell | Dokładny skutek; czy obejmuje również eksport z baterii |
-| Pozwolenie na ładowanie z sieci | switch.sun12k_grid_charge | Skutek fizyczny, tryby Deye, odczyt zwrotny |
-| Limit prądu ładowania | number.sun12k_maximum_battery_grid_charge_current | **NIE WYKORZYSTYWAĆ DO ZAPISU** bez weryfikacji opisanej poniżej |
-| Powiadomienie mobilne | notify.mobile_app_pixel_7dk | Historyczna usługa/akcja, nie encja ze stanem; jej aktualna dostępność |
-
-**Rozstrzygnięcie projektowe:** wcześniejsze niejednoznaczności między rolami obu encji ładowania nie są powodem do wstrzymania specyfikacji. Dla Co-Pilot przyjmujemy ogólny limit ładowania (także z PV) w `number.sun12k_maximum_battery_charge_current` i dodatkowy limit ładowania z sieci w `number.sun12k_maximum_battery_grid_charge_current`. Nie oznacza to potwierdzenia fizycznego zachowania urządzenia ani bezpiecznego skutku wartości `0 A`.
-
-
-## Dodatkowe identyfikatory z archiwalnego logu HA
-
-W logu Home Assistant z **03.08.2026** (nie z bieżącego odczytu stanów) występują również poniższe entity_id. Traktować je jako **istniejące historycznie kandydaty do mapowania**, a nie potwierdzenie obecnej dostępności, aktualności, jednostki lub semantyki. Nie są to polecenia zapisu.
-
-| Entity ID z logu | Sugerowana rola do weryfikacji |
-| --- | --- |
-| `sensor.sun12k_daily_energy_bought` | Dzienna zakupiona energia kWh; sprawdzić reset i punkt pomiaru |
-| `sensor.sun12k_daily_energy_sold` | Dzienna sprzedana energia kWh; sprawdzić reset i punkt pomiaru |
-| `sensor.sun12k_daily_energy_bought_cost` | Historyczny koszt zakupu dziennego; sprawdzić walutę, opłaty i sposób naliczania |
-| `sensor.sun12k_daily_energy_sold_compensation` | Historyczny pomocniczy przychód z eksportu; **nie używać do wyznaczania ceny sprzedaży** — ta pochodzi bezpośrednio z `sensor.energi_data_spotpris` |
-| `sensor.sun12k_daily_production` | Dzienna produkcja PV; czy uwzględnia DC→bateria i curtailment |
-| `sensor.sun12k_total_pv_production` | Narastająca produkcja PV; w logu **ostrzeżenie o niezgodności `state_class=measurement` z `device_class=energy`** |
-| `sensor.sun12k_today_charge_of_the_battery` | Dzienna energia ładowania magazynu; sprawdzić jednostkę, straty i źródła PV/sieć |
-| `sensor.sun12k_today_discharge_of_the_battery` | Dzienna energia rozładowania magazynu; sprawdzić stronę DC/AC |
-
-**Ograniczenie:** log potwierdza użycie tych nazw w sierpniu 2026, lecz **nie** dostarcza aktualnej listy encji, sposobu ich działania, serii cen ani zdolności zapisu. Wymagany jest bieżący odczyt `state` + istotnych `attributes` w HA.
-
-## Zweryfikowane istniejące role z pliku wynik.txt (odczyt 19.10.2026)
-
-Wymagane normalizacje i stan faktyczny:
-
-| Rola | Encja | Odczyt i znaczenie |
-| --- | --- | --- |
-| PV | `sensor.pv_sum` | 3034 W; suma `sun12k_pv1_power` 2387 W + `sun12k_pv2_power` 647 W |
-| Pobór domu | `sensor.home_energy_consumption` | 583 W w odczycie; **potwierdzony template** z `pv_sum + sun12k_total_grid_power + sun12k_battery_output_power`; `sun12k_load_totalpower` = 532 W to osobny sensor |
-| Moc sieci netto | `sensor.sun12k_total_grid_power` | −2470 W, spójne z eksportem w tym stanie; do sprawdzenia znak w okresach importu |
-| Moc baterii | `sensor.sun12k_battery_output_power` | +19 W, w tym stanie spójne z dodatnią mocą oddawaną do bilansu, ale brak testu obu kierunków |
-| SOC | `sensor.sun12k_battery_capacity` | 97% |
-| Prąd i napięcie baterii | `sensor.sun12k_battery_output_current`, `sensor.sun12k_battery_voltage` | 0,35 A / 56,69 V; sprawdzić znak i punkt pomiaru |
-| Cena spot | `sensor.energi_data_spotpris` | 1,75508376559425 DKK/kWh |
-| Cena zakupu końcowa | `sensor.energi_data_service` | 2,23828751559425 DKK/kWh w odczycie; **opłaty i taryfy potwierdzone przez użytkownika**, profil przyszły do odczytu |
-| Produkcja PV dziś | `sensor.sun12k_daily_production` | 23,5 kWh; sprawdzić reset i DC/AC |
-| Ładowanie/rozładowanie dziś | `sensor.sun12k_today_charge_of_the_battery`, `sensor.sun12k_today_discharge_of_the_battery` | 8,6 kWh / 1,2 kWh; strona pomiaru nieznana |
-| Prognoza PV | `sensor.energy_production_today`, `sensor.energy_production_tomorrow`, `sensor.energy_production_today_remaining` | 15,865 / 7,536 / 4,431 kWh; nie zastępują godzinowych slotów |
-
-Kontrola jednej migawki: **3034 W PV + 19 W bateria = 583 W dom + 2470 W eksport = 3053 W**. **Potwierdzona pochodność:** `home_energy_consumption` jest właśnie sumą tych trzech sygnałów. Zerowy residual wynika z wzoru i nie stanowi niezależnej weryfikacji. Metoda i testy: [MEASUREMENT_CONTRACT.md](MEASUREMENT_CONTRACT.md). Stan `last_updated` nie musi być timestampem ostatniej raportowanej próbki; do oceny świeżości potrzebna jest semantyka aktualizacji źródła lub `last_reported`.
-
-**Bieżące encje Deye potwierdzone jako istniejące, ale NIE jako bezpieczne funkcje zapisu:** `switch.sun12k_solar_sell`, `switch.sun12k_grid_charge`, `switch.sun12k_time_of_use`, sześć `switch.sun12k_time_point_N_charge_enable`; `number.sun12k_maximum_battery_charge_current`, `number.sun12k_maximum_battery_discharge_current`, `number.sun12k_maximum_battery_grid_charge_current`; po sześć `number.sun12k_time_point_N_start`, `_power`, `_capacity`. Udokumentowane przez HA min/max prądów ±16 777 220 A **są niewiarygodne jako granice sprzętowe**.
-
-**Pozostałości po starej integracji:** zgodnie z informacją użytkownika z 20.10.2026 encje `battery_controller.*` są osieroconymi pozostałościami; Energy Co-Pilot **ignoruje je całkowicie** (nie używa danych, decyzji, statusu przełączników ani nie blokuje działania z ich powodu). Nie zmienia to obowiązku wykrycia **rzeczywiście aktywnego**, zewnętrznego sterowania tymi samymi nastawami Deye, jeśli kiedyś zostanie zaobserwowane.
-
-Więcej szczegółów i zastrzeżeń: [HA_ENTITY_SNAPSHOT_2026-10-19.md](HA_ENTITY_SNAPSHOT_2026-10-19.md).
+[HA_ENTITY_SNAPSHOT_2026-10-19.md](HA_ENTITY_SNAPSHOT_2026-10-19.md) przechowuje pojedynczy historyczny odczyt jednostek, kandydatów sterowania i pomiarów. Dla Codexa **nie jest** to aktualna konfiguracja: `entity_id` mapuj przez UI, sprawdzaj jednostkę, znak, źródło, dostępność i stan w chwili działania. Nie przenoś list z archiwalnych logów ani nie korzystaj z encji `battery_controller.*`.
 
 ## Nieznane, lecz wymagane do planowania i wykonania
 
@@ -97,7 +39,7 @@ Test każdej **akcji zapisu** wymaga dodatkowo odrębnej, świadomie nadzorowane
 **Nie wykonywać takich testów zapisu przez Codexa ani automatycznie.** Brak jednej kluczowej funkcji blokuje odpowiednią automatyzację; nie zastępować jej inną, podobnie nazwaną encją.
 
 
-Aktualne stany, jednostki i źródła należy odczytać według [HA_READONLY_CAPTURE.md](HA_READONLY_CAPTURE.md); listy historycznych nazw nie zastępują odczytu.
+Aktualne stany, jednostki i źródła odczytać przez API encji HA w M2; migawka z 19.10 jest dowodem historycznym, nie bieżącym.
 
 ## Limity prądów ustalone przez użytkownika — obowiązujące dla Energy Co-Pilot
 
