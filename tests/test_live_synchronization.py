@@ -65,7 +65,7 @@ def test_public_issue9_single_age_snapshot_is_retained_with_explicit_uncertainty
     report = quality_report(
         issues + [Issue("forecast_horizon_incomplete", "forecast_solar")]
     )
-    assert report["input_state"] == "degraded"
+    assert report["input_state"] == "uncertain"
     assert report["categories"]["uncertainty"] == 1
     assert report["categories"]["blocking"] == 1
 
