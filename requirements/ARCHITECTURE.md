@@ -30,7 +30,7 @@ Przed jakimkolwiek zapisem wymagane: zgodne i świeże wejścia, potwierdzone se
 
 Eksport z PV i z baterii musi być rozróżniany na poziomie sprzętowym. Jeżeli przełącznik eksportu działa globalnie i nie można zapobiec celowemu eksportowi z baterii bez zgody, funkcja automatycznego eksportu również pozostaje zablokowana, dopóki nie ma skutecznej separacji.
 
-**Uszczegółowienie wykonania i UI:** [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md) oraz [HA_DASHBOARD.md](HA_DASHBOARD.md). **Logi każdej decyzji od pierwszego dry-run:** [DECISION_LOGGING.md](DECISION_LOGGING.md). Prognozy i stan końcowy: [FORECAST_POLICY.md](FORECAST_POLICY.md). Walidacja historyczna: [BACKTEST_VALIDATION.md](BACKTEST_VALIDATION.md). Podsumowanie etapów: [DEVELOPER_HANDOFF.md](DEVELOPER_HANDOFF.md).
+**Uszczegółowienie wykonania i UI:** [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md) oraz [HA_DASHBOARD.md](HA_DASHBOARD.md). **Logi każdej decyzji od pierwszego dry-run:** [DECISION_LOGGING.md](DECISION_LOGGING.md). Prognozy i stan końcowy: [FORECAST_POLICY.md](FORECAST_POLICY.md). Walidacja historyczna: [BACKTEST_VALIDATION.md](BACKTEST_VALIDATION.md). Kolejność etapów M1–M6: [README](../README.md).
 
 ## Wiarygodność prognoz PV przy ograniczeniu produkcji
 
