@@ -53,7 +53,7 @@ def test_live_home_is_clamped_only_after_context_validation(source_states, raw):
         ("home", -20, "kWh", 0),
         ("grid", 10, "kWh", 0),
         ("pv", -1, "W", 0),
-        ("battery", 10, "W", 20),
+        ("battery", 10, "W", 301),
         ("home", -20, "W", 301),
     ],
 )
@@ -297,7 +297,12 @@ def test_history_only_or_informational_issues_do_not_permanently_degrade_inputs(
         ]
     )
     assert report["input_state"] == "valid"
-    assert report["categories"] == {"blocking": 0, "historical": 2, "informational": 1}
+    assert report["categories"] == {
+        "blocking": 0,
+        "uncertainty": 0,
+        "historical": 2,
+        "informational": 1,
+    }
     assert len(report["issues"]) == 3
     assert report["planning_readiness"] == "not_evaluated_m2"
     assert (

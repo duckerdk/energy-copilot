@@ -4,8 +4,9 @@ import asyncio
 import logging
 from datetime import timedelta
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
@@ -21,10 +22,16 @@ from .const import (
 from .forecast_history import ForecastHistory
 from .forecast_quality import forecast_coverage
 from .history import HistoryReadError, RecorderHistoryReader
+from .live_measurements import (
+    WATCHED_ROLES,
+    LiveMeasurementWindow,
+    LiveSourceContext,
+    derived_templates,
+)
 from .models import InputSnapshot, Issue
 from .quality import quality_report
 from .solar import solar_evidence
-from .validation import forecast, measurements, prices
+from .validation import forecast, measurement, measurements, prices
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,8 +69,32 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self.forecast_coverage = None
         self.measurement_source_timing = {}
         self.quality = None
+        self.live_context = LiveSourceContext()
+        self.live_window = LiveMeasurementWindow()
 
     async def _async_setup(self):
+        # State-change events preserve short outages between the 30-second polls.
+        @callback
+        def source_changed(event):
+            templates = derived_templates(self.hass, self.entities)
+            for role in WATCHED_ROLES:
+                if role in {"pv1", "pv2"} and "pv" not in templates:
+                    continue
+                if self.entities[role] == event.data["entity_id"]:
+                    self.live_context.observe(
+                        role,
+                        event.data["new_state"],
+                        dt_util.utcnow(),
+                        derived=role in templates,
+                    )
+
+        self.config_entry.async_on_unload(
+            async_track_state_change_event(
+                self.hass,
+                [self.entities[role] for role in WATCHED_ROLES if self.entities[role]],
+                source_changed,
+            )
+        )
         try:
             await self.forecast_history.async_load(dt_util.utcnow())
         except HomeAssistantError:
@@ -77,8 +108,10 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             role: self.hass.states.get(entity_id) if entity_id else None
             for role, entity_id in self.entities.items()
         }
+        templates = derived_templates(self.hass, self.entities)
         self.measurement_source_timing = {}
-        for role in HISTORY_ROLES:
+        timing_roles = (*HISTORY_ROLES, *templates.get("pv", ()))
+        for role in timing_roles:
             state = states[role]
             reported = getattr(state, "last_reported", None)
             updated = getattr(state, "last_updated", None)
@@ -97,9 +130,62 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                 "available": state is not None
                 and state.state not in {"unknown", "unavailable"},
             }
+        for role in WATCHED_ROLES:
+            if role in {"pv1", "pv2"} and "pv" not in templates:
+                self.live_context.recovery_at.pop(role, None)
+                continue
+            if self.entities[role]:
+                self.live_context.observe(
+                    role, states[role], now, derived=role in templates
+                )
         snapshot.measurements, snapshot.flows_kw, snapshot.issues = measurements(
-            states, now
+            states,
+            now,
+            source_recovery_at=self.live_context.recovery_at,
+            derived_templates=templates,
         )
+        for role, timing in self.measurement_source_timing.items():
+            sample = snapshot.measurements.get(role)
+            try:
+                measurement(role, states[role], now)
+            except ValueError:
+                self_report_valid = False
+            else:
+                self_report_valid = True
+            timing.update(
+                {
+                    "self_report_valid": self_report_valid,
+                    "accepted": sample is not None,
+                    "issue_codes": sorted(
+                        {i.code for i in snapshot.issues if i.source == role}
+                    ),
+                    "native_state_template": role in templates,
+                    "context_oldest_report_utc": sample.context_at.isoformat()
+                    if sample and sample.context_at
+                    else None,
+                    "configured_sources": list(templates.get(role, ())),
+                    "configured_source_issues": {
+                        r: sorted({i.code for i in snapshot.issues if i.source == r})
+                        for r in templates.get(role, ())
+                        if r not in snapshot.measurements
+                    },
+                    "recovery_pending_sources": sorted(
+                        r
+                        for r in templates.get(role, ())
+                        if r in self.live_context.recovery_at
+                        and (
+                            sample is None
+                            or self.live_context.recovery_at[r] is None
+                            or sample.at < self.live_context.recovery_at[r]
+                        )
+                    ),
+                    "template_dependency_graph_verified": False,
+                }
+            )
+            if sample and sample.context_at:
+                timing["freshness_time_basis"] = "validated_configured_sources"
+        self.live_context.accept_home(snapshot.measurements.get("home"))
+        self.live_window.record(states, now, snapshot.measurements, snapshot.issues)
         for role in OPTIONAL_ENTITY_ROLES:
             if not self.entities[role]:
                 snapshot.issues.append(Issue("optional_entity_unconfigured", role))
