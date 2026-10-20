@@ -1,25 +1,23 @@
 # Polityka automatycznego eksportu PV — Energy Co-Pilot
 
-**Status: decyzja użytkownika 20.10.2026.** Obowiązuje w projekcie; nie trzeba ponownie pytać o prowizję ani wysokość progu. Wdrożenie sprzętowe nadal wymaga ukończenia fazy monitor/dry-run i zatwierdzenia uruchomienia automatyki.
+**Status: decyzja użytkownika 20.10.2026.** Obowiązuje w projekcie; nie trzeba ponownie pytać o znaczenie ceny ani wysokość progu. Wdrożenie sprzętowe nadal wymaga ukończenia fazy monitor/dry-run i zatwierdzenia uruchomienia automatyki.
 
-## 1. Cena — bez podwójnego potrącania
+## 1. Ceny bez jakichkolwiek przeliczeń
 
-**Użytkownik jednoznacznie wyjaśnił:** cena w istniejącej encji `sensor.energi_data_spotpris` **już uwzględnia prowizję sprzedażową**. Dlatego:
+**Użytkownik jednoznacznie ustalił:** Co-Pilot pobiera ceny dokładnie takie, jakie dostarcza HA, i **nie zajmuje się prowizjami, podatkami ani taryfami**. Dlatego:
 
 ```text
 C_buy[t]      = sensor.energi_data_service.attributes.raw_*.price[t]
 C_sell_net[t] = sensor.energi_data_spotpris.attributes.raw_*.price[t]
 ```
 
-- Cena zakupu w `sensor.energi_data_service` zawiera już wszystkie opłaty/taryfy; **nie naliczać ich ponownie**.
-- Cena sprzedaży w `sensor.energi_data_spotpris` jest już po prowizji; **nie odejmować ponownie 0,0215 DKK/kWh**.
-- `raw_today/raw_tomorrow` i `current_price` mają te same semantyki, niezależnie od odmiennych precyzji danych.
-- W danych historycznych i syntetycznych fiksturach ceny sprzedaży są domyślnie **netto**. Jeśli test hipotetycznie porównuje stawkę brutto i netto, musi to powiedzieć *jawnie*; produkcyjny parser nie stosuje dodatkowych potrąceń.
-- Nie kodować 0,0215 jako prowizji do odliczania. Pozostaje wyłącznie historycznym opisem warunków handlowych, a nie operacją na cenie z HA.
+- Oba szeregi `raw_today/raw_tomorrow` wchodzą do planera **bez zmian wartości**.
+- Co-Pilot nie prowadzi kalkulacji składników ceny, nie odejmuje i nie dodaje żadnych opłat.
+- `current_price` służy do diagnostyki bieżącej ceny; różnica jego precyzji względem listy godzinowej nie jest powodem przeliczenia cen.
 
 ## 2. Cena minimalna i decyzja switch
 
-**Konfigurowalna wartość początkowa:** `min_pv_export_price_dkk_kwh = 0.40` (DKK/kWh **netto**, zgodnie z ceną HA).
+**Konfigurowalna wartość początkowa:** `min_pv_export_price_dkk_kwh = 0.40` (DKK/kWh z encji HA, bez przeliczeń).
 
 **Zasada podstawowa** (warunki dla decyzji na podstawie opublikowanej ceny bieżącej):
 
@@ -51,8 +49,8 @@ W backtestach i baseline obowiązuje **ten sam próg i jednostki polityki Co-Pil
 - `PVE-01`: stawka encji spot 0,399 DKK/kWh → PV export OFF.
 - `PVE-02`: stawka dokładnie 0,400 DKK/kWh → PV export ON (zezwolenie).
 - `PVE-03`: stawka 0,401 DKK/kWh → PV export ON.
-- `PVE-04`: 0,400 w źródle HA zawiera już prowizję → wynik pozostaje 0,400; nie 0,3785 DKK/kWh.
-- `PVE-05`: 1,922 w `raw_today` → cena sprzedaży 1,922, nie 1,9005.
+- `PVE-04`: 0,400 w encji HA → Co-Pilot przyjmuje 0,400 bez korekt; eksport PV dozwolony.
+- `PVE-05`: 1,922 w `raw_today` → cena sprzedaży 1,922, bez dodatkowych działań.
 - `PVE-06`: cena zakupu 2,406 z `energi_data_service` → 2,406 końcowo, bez ponownego naliczania taryf.
 - `PVE-07`: 0,20 poniżej minimum, PV=3 kW, dom=1 kW, bateria pełna → `solar_sell` OFF; plan nie zapisuje 2 kW jako rzeczywistego eksportu.
 - `PVE-08`: cena 0,80, PV=3 kW, dom=1 kW, bateria może się ładować → eksport dozwolony, ale wybór magazynowania/eksportu zależy od pełnego planu.
@@ -66,7 +64,7 @@ W backtestach i baseline obowiązuje **ten sam próg i jednostki polityki Co-Pil
 - `PVE-16`: ceny na jutro nieopublikowane → nie programować jutra arbitralną ceną; replan dopiero po otrzymaniu prawidłowych cen.
 - `PVE-17`: piętnaście minut po poprzedniej decyzji cena i stan pozostają identyczne → zero zbędnych zapisów switch.
 - `PVE-18`: aktywny przyszły slot ma cenę sprzedaży 0,35 i sam PV mógłby przynieść przychód → zakaz eksportu zgodnie z **wybranym przez użytkownika progiem**, mimo dodatniej ceny.
-- `PVE-19`: cena −0,10 → eksport OFF, brak ponownego naliczania prowizji ani obcinania ceny do zera.
+- `PVE-19`: cena −0,10 → eksport OFF, cena pozostaje −0,10 bez obcinania do zera.
 - `PVE-20`: dobrowolny ręczny tryb `monitor/dry_run` → propozycja ON/OFF i log, **bez** wywołania usługi HA.
 
-**Warunek odbioru:** testy sprawdzają operację na cenie netto **wprost z HA** i autonomię tylko dla **PV**. Dokumentacja zawiera jedno źródło prawdy dla progu i ceny; stare sformułowania `spot − 0,0215` są nieaktualne i nie mogą sterować implementacją.
+**Warunek odbioru:** testy sprawdzają użycie **niezmienionej ceny z HA** i autonomię tylko dla PV. Nie implementować żadnego rozliczania prowizji, podatków, taryf ani innych korekt cenowych.
