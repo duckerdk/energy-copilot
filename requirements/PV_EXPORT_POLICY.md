@@ -1,0 +1,72 @@
+# Polityka automatycznego eksportu PV — Energy Co-Pilot
+
+**Status: decyzja użytkownika 20.10.2026.** Obowiązuje w projekcie; nie trzeba ponownie pytać o prowizję ani wysokość progu. Wdrożenie sprzętowe nadal wymaga ukończenia fazy monitor/dry-run i zatwierdzenia uruchomienia automatyki.
+
+## 1. Cena — bez podwójnego potrącania
+
+**Użytkownik jednoznacznie wyjaśnił:** cena w istniejącej encji `sensor.energi_data_spotpris` **już uwzględnia prowizję sprzedażową**. Dlatego:
+
+```text
+C_buy[t]      = sensor.energi_data_service.attributes.raw_*.price[t]
+C_sell_net[t] = sensor.energi_data_spotpris.attributes.raw_*.price[t]
+```
+
+- Cena zakupu w `sensor.energi_data_service` zawiera już wszystkie opłaty/taryfy; **nie naliczać ich ponownie**.
+- Cena sprzedaży w `sensor.energi_data_spotpris` jest już po prowizji; **nie odejmować ponownie 0,0215 DKK/kWh**.
+- `raw_today/raw_tomorrow` i `current_price` mają te same semantyki, niezależnie od odmiennych precyzji danych.
+- W danych historycznych i syntetycznych fiksturach ceny sprzedaży są domyślnie **netto**. Jeśli test hipotetycznie porównuje stawkę brutto i netto, musi to powiedzieć *jawnie*; produkcyjny parser nie stosuje dodatkowych potrąceń.
+- Nie kodować 0,0215 jako prowizji do odliczania. Pozostaje wyłącznie historycznym opisem warunków handlowych, a nie operacją na cenie z HA.
+
+## 2. Cena minimalna i decyzja switch
+
+**Konfigurowalna wartość początkowa:** `min_pv_export_price_dkk_kwh = 0.40` (DKK/kWh **netto**, zgodnie z ceną HA).
+
+**Zasada podstawowa** (warunki dla decyzji na podstawie opublikowanej ceny bieżącej):
+
+| Cena eksportu netto | Zezwolenie na eksport PV przez `switch.sun12k_solar_sell` |
+| --- | --- |
+| `C_sell_net < 0.40` | **OFF** — nie sprzedawać PV za cenę poniżej minimum |
+| `C_sell_net >= 0.40` | **ON / eksport dozwolony**; planner może wykorzystać PV także na dom lub ładowanie baterii |
+
+`ON` jest **zezwoleniem**, nie poleceniem wysłania całej nadwyżki PV na sprzedaż; przy cenie powyżej minimum Co-Pilot nadal optymalizuje magazynowanie, autokonsumpcję i eksport zgodnie z kosztem energii w całym znanym horyzoncie. `OFF` może powodować curtailment, gdy bateria jest pełna, co należy logować i uwzględnić w prognozie potencjalnej PV.
+
+**Histereza cenowa:** nie dodawać arbitralnego marginesu cenowego modyfikującego próg (użytkownik podał dokładnie 0,40). Ograniczyć powtarzane zapisy tylko przy zmianie faktycznego stanu oraz stosować walidację świeżości/ważności ceny i potwierdzenie wykonania. Jedna stawka godzinowa nie powinna powodować zapisu co 15 minut bez zmiany decyzji.
+
+## 3. Autonomia i uprawnienia
+
+- Użytkownik **upoważnił Co-Pilota do samodzielnego podejmowania decyzji o eksporcie PV**; docelowy wykonawca używa `switch.sun12k_solar_sell` przez usługę HA `switch.turn_on`/`switch.turn_off`, bez ręcznej zgody na każdy slot.
+- Ta autonomia **nie oznacza zgody na celowe eksportowanie energii z baterii**. Taki eksport nadal wymaga osobnej, ważnej zgody na dany plan, limit i czas.
+- Przed aktywacją zapisów live upewnić się, że włączenie `switch.sun12k_solar_sell` nie powoduje niezamierzonego eksportu z baterii. Brak potwierdzonej separacji ogranicza funkcję wykonawczą, ale **nie unieważnia reguły biznesowej**.
+- Deye **zachowuje ostatnie nastawy po awarii HA**. Dla `OFF` jest to przede wszystkim ryzyko ekonomiczne (utracony eksport), dla `ON` trzeba uwzględnić możliwość przepływu z baterii przy innych nastawach TOU. Przed automatycznymi zapisami obowiązuje kontrakt bezpieczeństwa [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md).
+- **Zgoda na autonomię projektową nie jest poleceniem wykonania teraz usług na HA**. Monitor/dry-run mogą od razu symulować tę politykę; fizyczny executor włączamy tylko po odrębnej zgodzie na uruchomienie i testach P0.
+
+## 4. Wykorzystanie w modelu
+
+W bazowym optymalizatorze MPC przy `C_sell_net < 0.40` obowiązuje `s_x=0` dla automatycznego eksportu PV; w `C_sell_net >= 0.40` jest dopuszczony przepływ `s_x>=0`, z fizycznymi limitami i ekonomiczną optymalizacją. Jeśli PV nie może zostać zużyte lub przyjęte do baterii przy wyłączonym eksporcie, jawnie wykazać `s_c` jako ograniczoną produkcję **tylko w symulacji i w granicach wiarygodnej prognozy**; nie uznawać prognozy minus produkcja za zmierzony curtailment.
+
+W backtestach i baseline obowiązuje **ten sam próg i jednostki polityki Co-Pilot**, ale strategia porównawcza bazowa może utrzymywać inne, rzeczywiście istniejące ustawienia Deye; nie narzucać jej nowych reguł po fakcie. Log decyzji ma pokazać `sell_price_now`, próg 0,40, `pv_export_allowed`, proponowany przełącznik, status wykonania i koszt alternatywny braku eksportu. Zapisać powód `PV_EXPORT_BELOW_MIN_PRICE` / `PV_EXPORT_ALLOWED`.
+
+## 5. Testy akceptacyjne — specyfikacja (nie wykonano)
+
+- `PVE-01`: stawka encji spot 0,399 DKK/kWh → PV export OFF.
+- `PVE-02`: stawka dokładnie 0,400 DKK/kWh → PV export ON (zezwolenie).
+- `PVE-03`: stawka 0,401 DKK/kWh → PV export ON.
+- `PVE-04`: 0,400 w źródle HA zawiera już prowizję → wynik pozostaje 0,400; nie 0,3785 DKK/kWh.
+- `PVE-05`: 1,922 w `raw_today` → cena sprzedaży 1,922, nie 1,9005.
+- `PVE-06`: cena zakupu 2,406 z `energi_data_service` → 2,406 końcowo, bez ponownego naliczania taryf.
+- `PVE-07`: 0,20 poniżej minimum, PV=3 kW, dom=1 kW, bateria pełna → `solar_sell` OFF; plan nie zapisuje 2 kW jako rzeczywistego eksportu.
+- `PVE-08`: cena 0,80, PV=3 kW, dom=1 kW, bateria może się ładować → eksport dozwolony, ale wybór magazynowania/eksportu zależy od pełnego planu.
+- `PVE-09`: cena poniżej progu, Deye przełącznik już OFF → brak powtórnego zapisu.
+- `PVE-10`: cena powyżej progu, Deye przełącznik już ON → brak powtórnego zapisu.
+- `PVE-11`: przejście z 0,39 na 0,41 → jedna zamierzona zmiana OFF→ON, o ile istnieje live approval i kompletne warunki wykonawcy.
+- `PVE-12`: nieznana/stara cena lub `raw_today` z luką → nie wydawać automatycznej komendy przełącznika, zgłosić brak danych.
+- `PVE-13`: wysoka cena eksportu i SOC pozwala na rozładowanie do domu, lecz brak zgody na eksport baterii → brak planowanego `b_x`, także gdy `solar_sell=ON`.
+- `PVE-14`: `switch.sun12k_solar_sell` ON bez zweryfikowanej fizycznej separacji od eksportu baterii → brak zezwolenia na ryzykowny zapis w live; monitor/dry-run nadal pokazują decyzję polityki.
+- `PVE-15`: HA przerwany po ustawieniu OFF → diagnostyka możliwej utraty eksportu, bez fikcyjnego twierdzenia, że Deye automatycznie włączy go ponownie.
+- `PVE-16`: ceny na jutro nieopublikowane → nie programować jutra arbitralną ceną; replan dopiero po otrzymaniu prawidłowych cen.
+- `PVE-17`: piętnaście minut po poprzedniej decyzji cena i stan pozostają identyczne → zero zbędnych zapisów switch.
+- `PVE-18`: aktywny przyszły slot ma cenę sprzedaży 0,35 i sam PV mógłby przynieść przychód → zakaz eksportu zgodnie z **wybranym przez użytkownika progiem**, mimo dodatniej ceny.
+- `PVE-19`: cena −0,10 → eksport OFF, brak ponownego naliczania prowizji ani obcinania ceny do zera.
+- `PVE-20`: dobrowolny ręczny tryb `monitor/dry_run` → propozycja ON/OFF i log, **bez** wywołania usługi HA.
+
+**Warunek odbioru:** testy sprawdzają operację na cenie netto **wprost z HA** i autonomię tylko dla **PV**. Dokumentacja zawiera jedno źródło prawdy dla progu i ceny; stare sformułowania `spot − 0,0215` są nieaktualne i nie mogą sterować implementacją.
