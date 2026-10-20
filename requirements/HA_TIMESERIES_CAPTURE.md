@@ -1,6 +1,6 @@
-# Pomocniczy odczyt HA: atrybuty prognoz PV
+# Archiwalny pomocniczy szablon atrybutów cen i PV — nie jest wymagany
 
-**Stan na 20.10.2026:** **format obu serii cen jest już potwierdzony** bezpośrednio na atrybutach HA i zamknięty w [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md). Nie wymaga dalszych pytań do użytkownika. Ten starszy szablon zachowujemy tylko jako pomoc w odczycie **godzinowych prognoz PV**, których struktury jeszcze nie pokazano. Dane cenowe z szablonu są zbędne do ponownej walidacji.
+**Stan na 20.10.2026:** ceny są już udokumentowane w [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md), a dla godzinowego PV preferowany jest **natywny zwrot akcji** `forecast_solar.get_forecast` zgodnie z [PV_FORECAST_CONTRACT.md](PV_FORECAST_CONTRACT.md). Poniższy starszy szablon pozostaje wyłącznie materiałem diagnostycznym na wypadek niedostępności akcji w konkretnej wersji HA. **Nie prosić użytkownika o jego wykonanie jako standardowego następnego kroku.**
 
 Home Assistant → **Narzędzia deweloperskie → Szablony**. Wkleić poniższy szablon, wynik skopiować do pliku `ceny_prognozy.txt` i udostępnić. Działanie jest **wyłącznie odczytowe**, nie zmienia żadnej encji, nie wywołuje usług.
 
