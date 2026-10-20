@@ -19,3 +19,10 @@
 ## P2 — przed dystrybucją
 - [ ] Trwały rejestr decyzji, bezpieczna retencja, UX STOP, zgody i dashboard. **M4/M5, Codex**.
 - [ ] Test kompatybilności HA, dokument instalacji, ewentualna dystrybucja HACS. **M5/M6, Codex**.
+
+## P1 — ustalenia z diagnostyki HA 20.10.2026, 13:31 CEST
+- [ ] **Recorder, krytyczne dla M2/M3:** 96/96 kwadransów zwróconych; 0 poprawnych. Powody wg źródła: `home:snapshot_not_synchronous=48`, `home:invalid_input=60`, `pv:historical_quality_unverifiable=51`, `pv:stale_input=51`, `pv:invalid_input=1`, `battery:invalid_input=1`, `grid:invalid_input=1`. Liczby się nakładają. Najpierw sprawdzić rzeczywiste zmiany i znaczniki czasu, pochodzenie `home` jako sumy PV+grid+battery, aktualizacje template/Recorder oraz właściwe rozróżnienie braku danych od stałego pomiaru. Nie ukrywać błędów przez luzowanie progów lub wpisywanie zera. Dodać testy regresyjne i dowód z nowej diagnostyki. **Codex M2; observed: prywatna diagnostyka, cause: unverified**.
+- [ ] **Forecast.Solar i horyzont:** opublikowane ceny obejmują 35 godzin: 20.10.2026 11:00 UTC–21.10.2026 22:00 UTC; `raw_today=24`, `raw_tomorrow=24`, `tomorrow_valid=true`. Przedziały prognozy: 20.10 12:00 UTC–21.10 16:06:30 UTC. Ustalić czy brak pokrycia do 22:00 UTC wynika z godzin nocnych, a także zbadać brak pierwszej godziny; nie zakładać tego bez dowodu z usługi. Dopiero potem zdefiniować regułę brakujących godzin i testy DST. **Codex M2; observed: zakresy, przyczyna: unverified**.
+
+## P2 — wersjonowanie wydawanej integracji
+- [ ] **Obowiązkowe wydania:** wdrożyć SemVer w manifeście, tag `vX.Y.Z`, GitHub Release, walidację CI, rozpoznawalną zainstalowaną wersję w diagnostyce/HA i instrukcję HACS. Kolejna publikacja musi mieć wersję różną od `0.1.0`; nie podawać arbitralnego numeru bez procesu. Ostatni raport z rzeczywistym nowym kodem pokazał nadal `0.1.0`. **Codex + release workflow; observed: manifest 0.1.0, versioning missing**.
