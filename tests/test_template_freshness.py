@@ -124,8 +124,8 @@ def test_stable_zero_non_native_pv_is_accepted():
     states = {r: make_state(r) for r in ("pv", "grid", "battery", "home")}
     states["pv"] = make_state("pv", 0, at=NOW - timedelta(hours=8))
     values, _, issues = measurements(states, NOW)
-    assert "home" not in values
-    assert Issue("stale_input", "pv") in issues
+    assert "home" in values
+    assert Issue("stale_input", "pv") not in issues
 
 
 def test_old_home_must_match_pv_sum_grid_battery():
@@ -148,7 +148,7 @@ def test_pv_recovery_needs_new_template_report():
         source_recovery_at={"pv": NOW - timedelta(seconds=20)},
     )
     assert "pv" not in values and "home" not in values
-    assert Issue("stale_input", "pv") in issues
+    assert Issue("derived_predates_source_recovery", "pv") in issues
 
 
 def test_input_mapping_is_only_pv_sum():
