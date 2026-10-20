@@ -44,7 +44,7 @@ W logu Home Assistant z **03.08.2026** (nie z bieżącego odczytu stanów) wyst�
 | `sensor.sun12k_daily_energy_bought` | Dzienna zakupiona energia kWh; sprawdzić reset i punkt pomiaru |
 | `sensor.sun12k_daily_energy_sold` | Dzienna sprzedana energia kWh; sprawdzić reset i punkt pomiaru |
 | `sensor.sun12k_daily_energy_bought_cost` | Historyczny koszt zakupu dziennego; sprawdzić walutę, opłaty i sposób naliczania |
-| `sensor.sun12k_daily_energy_sold_compensation` | Historyczny przychód z eksportu; sprawdzić prowizję i taryfę |
+| `sensor.sun12k_daily_energy_sold_compensation` | Historyczny pomocniczy przychód z eksportu; **nie używać do wyznaczania ceny sprzedaży** — ta pochodzi bezpośrednio z `sensor.energi_data_spotpris` |
 | `sensor.sun12k_daily_production` | Dzienna produkcja PV; czy uwzględnia DC→bateria i curtailment |
 | `sensor.sun12k_total_pv_production` | Narastająca produkcja PV; w logu **ostrzeżenie o niezgodności `state_class=measurement` z `device_class=energy`** |
 | `sensor.sun12k_today_charge_of_the_battery` | Dzienna energia ładowania magazynu; sprawdzić jednostkę, straty i źródła PV/sieć |
