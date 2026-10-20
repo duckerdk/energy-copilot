@@ -66,6 +66,8 @@ W odczycie z 19.10.2026 występowały encje `switch.battery_controller_optimizat
 
 **Ustalone:** istnienie wielu potrzebnych encji, ich jednostki, obecne stany i dwie wewnętrzne kontrole bilansu (MPPT→PV i PV+bateria→dom+eksport). Znamy bieżące wartości spot, kandydata ceny zakupu, baterii, PV, domu i mocy eksportu.
 
+**Uzupełnienie 20.10.2026: format przyszłych cen zakupu i spot został później potwierdzony w [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md). Poniższy opis dotyczył stanu wiedzy **wyłącznie w chwili odczytu `wynik.txt`**.
+
 **Nadal nieustalone na podstawie `wynik.txt`:** struktura i kompletność **przyszłych cen kupna/spot** (szablon nie eksportował atrybutów); godzinowe sloty Forecast.Solar; wiarygodność punktów pomiaru DC/AC przy ładowaniu i rozładowaniu; realne limity BMS; ewentualne rzeczywiście aktywne obce sterowanie zapisami; osobne i mierzalne polecenie eksportu **z baterii**; przywrócenie trybu po utracie HA.
 
 **Wniosek bezpieczeństwa:** **nie** włączać sprzętowego executora na podstawie tego zrzutu. Następnym źródłem dowodowym są wyłącznie atrybuty konkretnie zidentyfikowanych źródeł cen i prognoz. Testy akcji wymagają osobnego, świadomie nadzorowanego kroku.
