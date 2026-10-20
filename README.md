@@ -54,3 +54,9 @@ python3.14 -m venv .venv
 ```
 
 Testy blokują sieć IP; dopuszczają lokalne gniazda Unix potrzebne pętli asyncio. Obejmują natywny cykl życia HA, rzeczywisty Recorder SQLite w pamięci, implementację usługi Forecast.Solar z kontrolowanym estymatem oraz regresje danych/cen/UTC/DST. Nie komunikują się z falownikiem ani prywatną instancją HA. CI wykonuje te same kontrole. Gotowość do dodania jako repozytorium niestandardowe HACS nie oznacza zgłoszenia do domyślnego katalogu HACS.
+
+## Wydania i identyfikacja zainstalowanego kodu
+
+Stan na 20.10.2026: `manifest.json` zawiera `0.1.0`, choć do `main` scalono późniejsze zmiany, w tym PR #3. To **nie jest wiarygodne wersjonowanie wdrożeń**. Raport HA z 20.10.2026 13:31 czasu duńskiego nadal pokazuje `0.1.0`; obecność nowych pól diagnostyki potwierdza zmianę kodu, ale sam numer wersji nie identyfikuje commitów.
+
+**Kontrakt wydawniczy do wdrożenia przez Codexa:** SemVer w `custom_components/energy_copilot/manifest.json` + odpowiadający niezmienny tag `vX.Y.Z` + GitHub Release. Każdy kod dostarczany do HACS ma nowy, unikalny numer; nie przepisywać wydań i nie używać `main` jako substytutu wydania. CI sprawdza zgodność manifestu z tagiem, uruchamia testy przed publikacją, a changelog wydania wskazuje zakres zmian. W diagnostyce HA udostępnić `installed_version` i, jeśli możliwe, identyfikator rewizji wbudowany podczas wydania, bez zbierania danych prywatnych. W README opisać sprawdzenie zainstalowanej wersji oraz aktualizację przez HACS. **Weryfikacja instalacji: numer `integration_manifest.version` w pobranej diagnostyce.** Do czasu wdrożenia procedury wydawniczej nie wnioskować o zainstalowanej rewizji wyłącznie z `0.1.0`.
