@@ -1,36 +1,28 @@
 # Instrukcje dla Codexa — Energy Co-Pilot
 
-Przeczytaj README.md i wszystkie dokumenty w requirements/ przed rozpoczęciem pracy. Jeśli dokumenty się różnią, zgłoś sprzeczność; **nie rozstrzygaj jej domysłem**. Historyczny kod, archiwalne commity i nazwy encji nie są dowodem działania aktualnej instalacji.
+## Pierwsze kroki
 
-## Zakres
-
-Buduj **niestandardową integrację Home Assistant** w custom_components/energy_copilot. Wykorzystuj natywne API HA, konfigurację przez UI (config flow/options flow) i aktualne zalecenia developers.home-assistant.io. Nie twórz osobnego serwera, kontenera, tokenów REST do własnej instancji HA ani zależności od LLM do decyzji wykonawczych. Algorytm ekonomiczny ma być deterministyczny i testowalny.
-
-**Granica techniczna:** pracuj wyłącznie z istniejącymi encjami Home Assistant — odczyty ich stanów i atrybutów oraz (po spełnieniu P0) natywne usługi HA skierowane do tych encji. **Nigdy nie implementuj własnego klienta Modbus, odczytu/zapisu rejestrów ani bezpośredniego połączenia z falownikiem.** Nie modyfikuj ESPHome, YAML, firmware, istniejących automatyzacji HA ani konfiguracji mostka. Plik `deye-esp.yaml` jest jedynie referencją objaśniającą mapę istniejących encji; adres rejestru nie jest polem konfiguracji Energy Co-Pilot. Nie zapisuj tokenów, adresów prywatnych, surowych danych historii użytkownika ani diagnostyki z sekretami.
-
-## Kolejność pracy
-
-1. Szkielet integracji: manifest, config flow, translations, entry setup/unload, testy. **Bez aktywnego sterowania**.
-2. Konfigurowalne mapowanie istniejących encji HA i walidacja typów, jednostek, atrybutów, znaków mocy, aktualności i prognoz. **Parser cen:** [requirements/HA_PRICE_SERIES_CONTRACT.md](requirements/HA_PRICE_SERIES_CONTRACT.md). **BEZWZGLĘDNE: Co-Pilot używa zakupu z `sensor.energi_data_service` i sprzedaży z `sensor.energi_data_spotpris` bez żadnych zmian kwoty. Nie oblicza prowizji, podatków ani taryf, nie dodaje i nie odejmuje od ceny.** **Prognoza PV:** [requirements/PV_FORECAST_CONTRACT.md](requirements/PV_FORECAST_CONTRACT.md), użytkownik potwierdził obecność natywnej akcji HA `forecast_solar.get_forecast` w Narzędzia deweloperskie → Akcje; w M2 przetestuj odpowiedź `wh_period`/`watts`, wpis konfiguracji i jednostki. **Prognoza obciążenia:** [requirements/LOAD_FORECAST_CONTRACT.md](requirements/LOAD_FORECAST_CONTRACT.md), natywna historia Recorder sensora `sensor.home_energy_consumption` i deterministyczny, uczciwy model profilu; nie używaj encji `battery_controller.*`. **Bilans fizyczny:** [requirements/MEASUREMENT_CONTRACT.md](requirements/MEASUREMENT_CONTRACT.md). **Użytkownik podał dokładny wzór `home_energy_consumption = pv_sum + total_grid_power + battery_output_power`. Przyjmij go bez dyskusji jako operacyjną encję domu; zero residual jest konsekwencją wzoru, nie testem niezależności. Nie wymagaj nowych liczników ani przekładników.** Ponieważ w szablonie zastosowano `float(0)`, sprawdzaj dostępność 3 encji składowych, zanim użyjesz obliczonej wartości. Sprawdź dostępność akcji w tej wersji HA, nie zgaduj jej; nie żądaj ręcznego kopiowania atrybutów jako warunku projektowania. Gdy brak akcji, jawnie oznacz brak tej zdolności, bez dopowiadania profilu godzinowego z dziennej sumy.
-3. Deterministyczny silnik danych, model kosztów, plan, diagnostyka oraz encje prezentujące wyniki. **Od pierwszego dry-run obowiązkowy rejestr podstaw KAŻDEJ decyzji zgodny z requirements/DECISION_LOGGING.md**, widoczny w HA: ceny, prognozy, koszt alternatyw, decyzja, powód i status. Domyślnie tryb **monitor/dry-run**.
-4. Testy z fikcyjnymi encjami i zanonimizowanymi, legalnie udostępnionymi danymi historycznymi; walidacja `walk-forward` bez przyszłych prognoz, z zachowaniem ograniczenia PV (curtailment), zgodnie z requirements/BACKTEST_VALIDATION.md. Bez wywołania usług sterujących.
-5. Dopiero po spełnieniu blokad opisanych w OPEN_ITEMS.md przygotuj osobny, możliwy do włączenia przez użytkownika moduł wykonawczy. **Nie włączaj go samodzielnie**.
-
-**Sterowanie w czasie:** przeczytaj [requirements/CONTROL_STRATEGY.md](requirements/CONTROL_STRATEGY.md), [requirements/CURRENT_CONTROLLER_MODEL.md](requirements/CURRENT_CONTROLLER_MODEL.md) oraz [requirements/PV_EXPORT_POLICY.md](requirements/PV_EXPORT_POLICY.md). **Użytkownik zezwala Co-Pilot na autonomiczne ON/OFF `switch.sun12k_solar_sell` od progu ceny z HA `0,40 DKK/kWh`; eksport baterii wymaga osobnej zgody.** Bazowy translator planu używa istniejących encji HA do regulowania **limitów** prądu; zachowuje zastany TOU, dopóki nie udowodniono korzyści i bezpieczeństwa dynamicznego przepisywania okien. Same limity A nie realizują bezpośrednio mocy kW ani celu SOC. Każda nastawa Deye zostaje po utracie HA — uwzględnij to w planie i testach. Nie programuj zmian TOU według każdej ceny kwadransowej.
+1. Przeczytaj [README.md](README.md), [requirements/GOALS_AND_REQUIREMENTS.md](requirements/GOALS_AND_REQUIREMENTS.md), [requirements/SYSTEM_BASELINE.md](requirements/SYSTEM_BASELINE.md) i [requirements/OPEN_ITEMS.md](requirements/OPEN_ITEMS.md).
+2. Czytaj **tylko właściwe dla zadania** kontrakty z tabeli w README. Nie wczytuj automatycznie całego repozytorium do jednego kontekstu.
+3. Gdy dwa kontrakty są sprzeczne, **nie wybieraj arbitralnie**: podaj ścieżki, sprzeczne reguły i proponowaną korektę. Oznacz status dowodu: `observed`, `user_confirmed`, `assumed`, `unverified`.
+4. Wykonuj wyłącznie wyraźnie zamówiony zakres. Nie uruchamiaj M6 ani nie wykonuj testów zapisu na realnym HA z własnej inicjatywy.
 
 ## Niezmienniki
 
-- Nie utożsamiaj eksportu PV ze sprzedażą z baterii; przełącznik zezwolenia na eksport nie dowodzi kontroli źródła eksportowanej energii. **Cena PV export <0,40 z HA → OFF; >=0,40 → ON zezwolenia**, po osobnym dopuszczeniu trybu live i spełnieniu zabezpieczeń.
-- Projektowo przyjmij właściwe funkcje trzech istniejących encji prądowych HA: `number.sun12k_maximum_battery_charge_current` 0–50 A (ładowanie ogólne, w tym PV), `number.sun12k_maximum_battery_discharge_current` 0–100 A (rozładowanie) oraz `number.sun12k_maximum_battery_grid_charge_current` 0–50 A (ładowanie z sieci). To założenia funkcjonalne bez pozwolenia na zapis; przed fizycznym sterowaniem konieczny nadzorowany test i P0.
-- Nie zgaduj encji importu, eksportu, mocy baterii, docelowego SOC, rozładowania ani fabrycznego harmonogramu.
-- Nie zapisuj nic do urządzeń przy unknown/unavailable, starych cenach/prognozach, niespójnych jednostkach, utracie potwierdzenia lub przeterminowanej zgodzie.
-- Proponowany plan nie jest komendą; wywołanie usługi nie jest potwierdzeniem skutku. Wymagane osobne sprawdzenie odczytu i bezpieczny tryb wyjścia.
-- Nie deklaruj, że awaria HA automatycznie przywróci fabryczny tryb: bez sprzętowo niezależnego mechanizmu jest to nieudowodnione.
-- Nie buduj własnego frontendu, dopóki natywne encje HA i standardowy dashboard nie zostaną ocenione jako niewystarczające.
+- Buduj natywną integrację HA `custom_components/energy_copilot`; UI config flow/options flow, typed `ConfigEntry.runtime_data`, poprawne `async_setup_entry`/`async_unload_entry`, natywne API stanów/usług oraz Recorder. Bez klienta Modbus, zmian ESPHome/YAML/firmware, osobnego serwera ani LLM w decyzjach.
+- `sensor.energi_data_service` = cena zakupu, `sensor.energi_data_spotpris` = cena sprzedaży; wartości HA **bez przeliczeń i dodatkowych opłat**. Parsowanie UTC/DST, właściwy horyzont tylko opublikowanych cen: [kontrakt cen](requirements/HA_PRICE_SERIES_CONTRACT.md).
+- Eksport PV jest dozwolony od ceny sprzedaży **0,40 DKK/kWh**; przełącznik `switch.sun12k_solar_sell` nie dowodzi rozdzielenia energii PV i baterii. Bez potwierdzenia tego rozdzielenia **brak zapisu**. Celowy eksport baterii wymaga odrębnej zgody dla niezmiennej propozycji.
+- `forecast_solar.get_forecast` to usługa z `config_entry` i wynikiem `wh_period`; użytkownik potwierdził widoczność akcji w UI, **ale odpowiedź w tej instalacji nie została przetestowana**. W M2 sprawdź interfejs i odpowiedź; nie twórz profilu z dobowej sumy.
+- Dom: `sensor.home_energy_consumption = sensor.pv_sum + sensor.sun12k_total_grid_power + sensor.sun12k_battery_output_power`. To **pochodna**, z `float(0)` przy brakach danych; zerowy residual nie potwierdza fizycznego pomiaru. Waliduj składniki także **historycznie**, nie tylko w aktualnym stanie: [pomiary](requirements/MEASUREMENT_CONTRACT.md).
+- `number.sun12k_maximum_battery_charge_current` 0–50 A, `number.sun12k_maximum_battery_discharge_current` 0–100 A, `number.sun12k_maximum_battery_grid_charge_current` 0–50 A: granice **polityki** użytkownika, nie dowód wsparcia przez urządzenie. Wartość 0 A i fizyczne skutki wymagają nadzorowanych testów. Limit A ≠ zadana moc ani gwarantowany SOC.
+- Podstawowy backend: **current-first** przy niezmienionym TOU. Wszystkie komendy mają skutki trwałe po utracie HA; nie dopuszczaj czasowo niebezpiecznej operacji bez niezależnego mechanizmu zakończenia.
+- Zasada `monitor/dry_run` od pierwszego uruchomienia. Plan, zaplanowany zapis, potwierdzony odczyt encji i zaobserwowany fizyczny skutek to odrębne stany. Nie udawaj, że uruchomienie usługi jest dowodem wykonania.
+- Każda decyzja (także `idle`, `blocked`) ma od początku rejestr: wersje cen i prognoz, stan wejść, koszt rozważanych wariantów, powód i wykonalność. Bez tajnych danych, surowych prywatnych historii i połączeń do internetu poza standardowym HA.
+- Osierocone `battery_controller.*` są nieaktywnymi pozostałościami i **nie służą** jako wejścia ani blokery. Konflikty zgłaszaj tylko po zaobserwowaniu faktycznie aktywnego konkurencyjnego wykonawcy.
 
-## Warunki oddania każdej zmiany
+## Implementacja i odbiór
 
-- Wskaż zrealizowany zakres, **niepotwierdzone założenia**, zmiany w dostępnych akcjach i aktualne blokady.
-- Dodaj/uruchom odpowiednie testy pytest, lint i typowanie zgodnie z przyjętym narzędziem projektu. Obsłuż setup/unload, restart, braki danych i DST Europe/Copenhagen.
-- Jeżeli jakikolwiek test był niemożliwy do wykonania, napisz to wprost; nie opisuj testów planowanych jako wykonanych.
-- Aktualizuj dokumentację **tylko dla potwierdzonych zmian**; nie duplikuj tych samych wymagań w kolejnych plikach.
+- Kolejne etapy M1–M6 opisuje README; **M1–M5 bez jakiegokolwiek zapisu do urządzeń**. Przy implementacji najpierw testy fikcyjnych danych i regresji (`requirements/TEST_SCENARIOS.md` i testy `PRICE/PVF/LOAD/MTR/CUR/EXE` w kontraktach).
+- Uwzględnij `unknown/unavailable`, nieaktualne dane, braki slotów, 23/25 godzin DST `Europe/Copenhagen`, restart, unload, kwantyzację limitu prądu i różnicę stron AC/DC.
+- Walidacja `walk-forward`: prognozy wydane przed `t0`, nie używać wiedzy przyszłej i nie przypisywać curtailment błędowi prognozy.
+- Dla każdej zmiany przedstaw testy faktycznie wykonane (pytest/lint/typing, gdy istnieje kod), ograniczenia testów, brakujące dowody i aktualizację odpowiednich specyfikacji. Nie opisuj planowanych testów jako zaliczonych. Nie dopisuj nowego pliku specyfikacji, jeżeli istniejący kontrakt wystarcza.
