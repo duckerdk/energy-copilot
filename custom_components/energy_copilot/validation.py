@@ -46,7 +46,7 @@ def measurement(role, state, now, *, historical=False):
     try:
         value = number(state.state)
         at = utc(state.last_updated if historical else state.last_reported)
-    except ValueError, TypeError, OverflowError:
+    except AttributeError, ValueError, TypeError, OverflowError:
         raise ValueError("invalid_input") from None
     if at > now + MAX_FUTURE_OFFSET:
         raise ValueError("stale_input")
@@ -125,7 +125,7 @@ def live_timing(states, samples=None):
     }
 
 
-def _derived_measurements(states, values, issues, now, templates, recovery):
+def _derived_measurements(values, issues, templates, recovery):
     """Check derived HA values against available sources and observed recoveries."""
     if (
         "pv" in values
@@ -183,10 +183,8 @@ def measurements(
             issues.append(Issue(str(err), role))
     if not historical:
         _derived_measurements(
-            states,
             values,
             issues,
-            now,
             derived_templates or {},
             source_recovery_at or {},
         )
