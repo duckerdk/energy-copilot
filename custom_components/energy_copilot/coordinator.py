@@ -22,7 +22,12 @@ from .const import (
 from .forecast_history import ForecastHistory
 from .forecast_quality import forecast_coverage
 from .history import HistoryReadError, RecorderHistoryReader
-from .live_measurements import SOURCE_ROLES, LiveMeasurementWindow, LiveSourceContext
+from .live_measurements import (
+    WATCHED_ROLES,
+    LiveMeasurementWindow,
+    LiveSourceContext,
+    derived_templates,
+)
 from .models import InputSnapshot, Issue
 from .quality import quality_report
 from .solar import solar_evidence
@@ -71,16 +76,22 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         # State-change events preserve short outages between the 30-second polls.
         @callback
         def source_changed(event):
-            for role in SOURCE_ROLES:
+            templates = derived_templates(self.hass, self.entities)
+            for role in WATCHED_ROLES:
+                if role in {"pv1", "pv2"} and "pv" not in templates:
+                    continue
                 if self.entities[role] == event.data["entity_id"]:
                     self.live_context.observe(
-                        role, event.data["new_state"], dt_util.utcnow()
+                        role,
+                        event.data["new_state"],
+                        dt_util.utcnow(),
+                        derived=role in templates,
                     )
 
         self.config_entry.async_on_unload(
             async_track_state_change_event(
                 self.hass,
-                [self.entities[role] for role in SOURCE_ROLES if self.entities[role]],
+                [self.entities[role] for role in WATCHED_ROLES if self.entities[role]],
                 source_changed,
             )
         )
@@ -97,8 +108,10 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             role: self.hass.states.get(entity_id) if entity_id else None
             for role, entity_id in self.entities.items()
         }
+        templates = derived_templates(self.hass, self.entities)
         self.measurement_source_timing = {}
-        for role in HISTORY_ROLES:
+        timing_roles = (*HISTORY_ROLES, *templates.get("pv", ()))
+        for role in timing_roles:
             state = states[role]
             reported = getattr(state, "last_reported", None)
             updated = getattr(state, "last_updated", None)
@@ -117,11 +130,34 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                 "available": state is not None
                 and state.state not in {"unknown", "unavailable"},
             }
-        for role in SOURCE_ROLES:
-            self.live_context.observe(role, states[role], now)
+        for role in WATCHED_ROLES:
+            if role in {"pv1", "pv2"} and "pv" not in templates:
+                self.live_context.recovery_at.pop(role, None)
+                continue
+            if self.entities[role]:
+                self.live_context.observe(
+                    role, states[role], now, derived=role in templates
+                )
         snapshot.measurements, snapshot.flows_kw, snapshot.issues = measurements(
-            states, now, source_recovery_at=self.live_context.recovery_at
+            states,
+            now,
+            source_recovery_at=self.live_context.recovery_at,
+            derived_templates=templates,
         )
+        for role, timing in self.measurement_source_timing.items():
+            sample = snapshot.measurements.get(role)
+            timing.update(
+                {
+                    "native_state_template": role in templates,
+                    "context_oldest_report_utc": sample.context_at.isoformat()
+                    if sample and sample.context_at
+                    else None,
+                    "configured_sources": list(templates.get(role, ())),
+                    "template_dependency_graph_verified": False,
+                }
+            )
+            if sample and sample.context_at:
+                timing["freshness_time_basis"] = "validated_configured_sources"
         self.live_context.accept_home(snapshot.measurements.get("home"))
         self.live_window.record(states, now, snapshot.measurements, snapshot.issues)
         for role in OPTIONAL_ENTITY_ROLES:

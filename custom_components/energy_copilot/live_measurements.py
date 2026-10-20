@@ -4,13 +4,36 @@ import math
 from collections import Counter, deque
 from datetime import timedelta
 
-from .const import HISTORY_ROLES
-from .validation import live_timing, measurement, utc
+from homeassistant.components.template.sensor import StateSensorEntity
+from homeassistant.helpers.entity_component import DATA_INSTANCES
+
+from .validation import DERIVED_SOURCES, live_timing, measurement, utc
 
 SOURCE_ROLES = ("pv", "grid", "battery")
+WATCHED_ROLES = (*SOURCE_ROLES, "pv1", "pv2")
 WINDOW = timedelta(minutes=30)
 MAX_POLLS = 120
-UNCERTAINTY_CODES = {"measurement_time_skew", "home_context_lag"}
+UNCERTAINTY_CODES = {
+    "measurement_time_skew",
+    "home_context_lag",
+    "derived_value_from_fresh_sources",
+}
+
+
+def derived_templates(hass, entities):
+    """Recognize loaded native state-based templates, including YAML without IDs.
+
+    Never infer template provenance from a friendly name, zero or entity ID.
+    Registry-only, unloaded, trigger-based and non-native sources fail closed.
+    """
+    component = hass.data.get(DATA_INSTANCES, {}).get("sensor")
+    if component is None:
+        return {}
+    return {
+        role: tuple(r for r in required if entities.get(r))
+        for role, required in DERIVED_SOURCES.items()
+        if isinstance(component.get_entity(entities[role]), StateSensorEntity)
+    }
 
 
 class LiveSourceContext:
@@ -23,9 +46,9 @@ class LiveSourceContext:
     def __init__(self):
         self.recovery_at = {}
 
-    def observe(self, role, state, now):
+    def observe(self, role, state, now, *, derived=False):
         try:
-            measurement(role, state, now)
+            measurement(role, state, now, allow_old_report=derived)
         except ValueError:
             self.recovery_at[role] = None
         else:
@@ -78,11 +101,11 @@ class LiveMeasurementWindow:
 
     def record(self, states, now, values, issues):
         self._expire(now)
-        timing = live_timing(states)
+        timing = live_timing(states, values)
         metrics = {key: value for key, value in timing.items() if value is not None}
         source_changed = False
         previous = self._polls[-1]["at"] if self._polls else None
-        for role in HISTORY_ROLES:
+        for role in (*WATCHED_ROLES, "home"):
             state = states.get(role)
             try:
                 reported, changed = utc(state.last_reported), utc(state.last_updated)
@@ -97,7 +120,7 @@ class LiveMeasurementWindow:
         reasons = {
             f"{i.source}:{i.code}"
             for i in issues
-            if i.source in HISTORY_ROLES
+            if i.source in (*WATCHED_ROLES, "home")
             and i.code not in UNCERTAINTY_CODES | {"negative_home_normalized"}
         }
         if len(self._polls) >= MAX_POLLS:

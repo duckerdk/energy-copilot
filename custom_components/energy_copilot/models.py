@@ -16,6 +16,8 @@ class Sample:
     at: datetime
     # Local provenance only; standard diagnostics never serialize samples.
     raw_value: float | None = None
+    # Oldest supporting source report; never replaces this entity's own report.
+    context_at: datetime | None = None
 
 
 @dataclass(frozen=True)

@@ -20,7 +20,11 @@ def quality_report(issues, forecast_coverage=None):
                 if night_only
                 else "forecast_horizon_unresolved"
             )
-        elif code in {"measurement_time_skew", "home_context_lag"}:
+        elif code in {
+            "measurement_time_skew",
+            "home_context_lag",
+            "derived_value_from_fresh_sources",
+        }:
             category, effect = "uncertainty", "as_of_values_not_atomic_measurement"
         elif code == "negative_home_normalized":
             category, effect = "informational", "user_approved_home_normalization"

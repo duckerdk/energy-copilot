@@ -21,8 +21,8 @@
 | MTR-02 | `home_energy_consumption` ma liczbę z `float(0)` dla niedostępnego źródła | `invalid_input` także historycznie |
 | MTR-03 | PV1 2387W + PV2 647W | PV DC=3034W, bez dodania ponownie PV→bateria |
 | MTR-04 | 15–40s rozrzutu świeżych raportów Modbus, skoki wejść, opóźniony dom | Dom as-of zachowany z `measurement_time_skew` / `home_context_lag`, `uncertain`; brak dowodu atomowego/fizycznego bilansu |
-| MTR-05 | Nocne PV=0, raport vs zmiana; brak, zły format/jednostka, raport >300s lub przyszły >10s | Niezmienny świeży raport ważny, rzeczywiste braki nadal blokują dom; bez sztucznego heartbeat |
-| MTR-06 | Awaria i powrót źródła pomiędzy pollami, liczbowy stary szablon, reload/unload | `home_predates_source_recovery` do nowego raportu domu; listener usunięty, nowe okno po setup |
+| MTR-05 | Prawdziwe szablony HA: >300s PV=0 i stały dom, aktywne składowe; osobno martwe/brakujące/błędne składowe, niepełne mapowania PV1/PV2 | Stary zgodny szablon zachowany z osobnym świeżym kontekstem i `uncertainty`, oryginalny czas bez zmian; brak dowodów to `stale_input`/`derived_freshness_unverifiable`, rzeczywiste braki blokują dom; bez sztucznego heartbeat |
+| MTR-06 | Awaria i powrót źródła pomiędzy pollami, liczbowy stary szablon, reload/unload | `home_predates_source_recovery` do nowego raportu domu; listener (także PV1/PV2) usunięty, nowe okno po setup; po awarii składowej stary szablon PV wymaga rzeczywistego raportu po odzyskaniu |
 | MTR-07 | Syntetyczne 30min odczytów i limity okna | Liczniki przyjęć/odrzuceń i percentyle poprawne, bez surowych W; weryfikacja rzeczywistego okna HA osobno w OPEN_ITEMS |
 | PVF-01 | brak/nieznana odpowiedź Forecast.Solar | Diagnostyka, bez wymyślonej prognozy |
 | PVF-02 | pełny SOC, Solar Sell OFF, słoneczna pogoda | Brak nauki błędu prognozy z ograniczonej produkcji PV |

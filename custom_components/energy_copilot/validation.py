@@ -17,6 +17,8 @@ from .models import (
 )
 
 COPENHAGEN = ZoneInfo("Europe/Copenhagen")
+DERIVED_SOURCES = {"pv": ("pv1", "pv2"), "home": ("pv", "grid", "battery")}
+DERIVED_SUM_TOLERANCE_W = 1
 
 
 def number(value):
@@ -37,7 +39,7 @@ def utc(value):
     return result.astimezone(UTC)
 
 
-def measurement(role, state, now, *, historical=False):
+def measurement(role, state, now, *, historical=False, allow_old_report=False):
     """Validate a signed sample; home normalization needs the full source context."""
     if state is None or state.state in ("unknown", "unavailable"):
         raise ValueError("invalid_input")
@@ -46,7 +48,7 @@ def measurement(role, state, now, *, historical=False):
         at = utc(state.last_updated if historical else state.last_reported)
     except ValueError, TypeError, OverflowError:
         raise ValueError("invalid_input") from None
-    if at > now + MAX_FUTURE_OFFSET or now - at > MAX_AGE:
+    if at > now + MAX_FUTURE_OFFSET or (not allow_old_report and now - at > MAX_AGE):
         raise ValueError("stale_input")
     unit = state.attributes.get("unit_of_measurement")
     expected = (
@@ -82,7 +84,7 @@ def measurement(role, state, now, *, historical=False):
     return Sample(value, at)
 
 
-def live_timing(states):
+def live_timing(states, samples=None):
     """Compare reports separately from changes in the derived home's inputs.
 
     A fresh unchanged report is not a new value requiring template evaluation.
@@ -98,8 +100,8 @@ def live_timing(states):
             continue
     sources = ("pv", "grid", "battery")
 
-    def skew(roles):
-        times = [reported[r] for r in roles if r in reported]
+    def skew(roles, timestamps):
+        times = [timestamps[r] for r in roles if r in timestamps]
         return (
             (max(times) - min(times)).total_seconds()
             if len(times) == len(roles)
@@ -107,8 +109,14 @@ def live_timing(states):
         )
 
     return {
-        "source_report_skew_seconds": skew(sources),
-        "all_report_skew_seconds": skew(HISTORY_ROLES),
+        "source_report_skew_seconds": skew(sources, reported),
+        "source_context_skew_seconds": skew(
+            sources,
+            {r: s.context_at or s.at for r, s in samples.items()}
+            if samples is not None
+            else reported,
+        ),
+        "all_report_skew_seconds": skew(HISTORY_ROLES, reported),
         "home_context_lag_seconds": max(
             0, (max(changed[r] for r in sources) - reported["home"]).total_seconds()
         )
@@ -117,7 +125,67 @@ def live_timing(states):
     }
 
 
-def measurements(states, now, *, historical=False, source_recovery_at=None):
+def _derived_measurements(states, values, issues, now, templates, recovery):
+    """Validate configured sums against fresh leaves, never invent a heartbeat.
+
+    Only native state-based templates qualify. The role's documented arithmetic
+    is checked, not a private HA dependency graph or a physical AC/DC model.
+    An observed outage still requires a subsequent actual template report.
+    """
+    for role, required in DERIVED_SOURCES.items():
+        if role not in templates:
+            continue
+        configured = templates[role]
+        if any(r not in values for r in configured):
+            values.pop(role, None)
+            issues.append(Issue("derived_source_invalid", role))
+            continue
+        try:
+            original = measurement(role, states.get(role), now, allow_old_report=True)
+        except ValueError:
+            continue  # Payload, units and future timestamps never get an exemption.
+        if any(
+            r in recovery and (recovery[r] is None or original.at < recovery[r])
+            for r in configured
+        ):
+            values.pop(role, None)
+            issues.append(Issue("derived_predates_source_recovery", role))
+            continue
+        if role in values:
+            if (
+                all(r in configured and r in values for r in required)
+                and abs(original.value - sum(values[r].value for r in required))
+                <= DERIVED_SUM_TOLERANCE_W
+            ):
+                values[role] = Sample(
+                    original.value,
+                    original.at,
+                    context_at=min(
+                        values[r].context_at or values[r].at for r in required
+                    ),
+                )
+            continue  # A fresh report continues using the ordinary validation path.
+        if not all(r in configured and r in values for r in required):
+            issues.append(Issue("derived_freshness_unverifiable", role))
+            continue
+        if (
+            abs(original.value - sum(values[r].value for r in required))
+            > DERIVED_SUM_TOLERANCE_W
+        ):
+            issues.append(Issue("derived_value_inconsistent", role))
+            continue
+        context_at = min(values[r].context_at or values[r].at for r in required)
+        if now - context_at > MAX_AGE:
+            issues.append(Issue("derived_freshness_unverifiable", role))
+            continue
+        values[role] = Sample(original.value, original.at, context_at=context_at)
+        issues.remove(Issue("stale_input", role))
+        issues.append(Issue("derived_value_from_fresh_sources", role))
+
+
+def measurements(
+    states, now, *, historical=False, source_recovery_at=None, derived_templates=None
+):
     values, issues = {}, []
     for role, state in states.items():
         if role in {"buy", "sell"}:
@@ -126,6 +194,21 @@ def measurements(states, now, *, historical=False, source_recovery_at=None):
             values[role] = measurement(role, state, now, historical=historical)
         except ValueError as err:
             issues.append(Issue(str(err), role))
+    if not historical:
+        _derived_measurements(
+            states,
+            values,
+            issues,
+            now,
+            derived_templates or {},
+            source_recovery_at or {},
+        )
+        for role in DERIVED_SOURCES:
+            if (
+                Issue("stale_input", role) in issues
+                and Issue("derived_freshness_unverifiable", role) not in issues
+            ):
+                issues.append(Issue("derived_freshness_unverifiable", role))
     sources = [values[r] for r in HISTORY_ROLES if r in values]
     if len(sources) != len(HISTORY_ROLES):
         values.pop("home", None)
@@ -137,9 +220,9 @@ def measurements(states, now, *, historical=False, source_recovery_at=None):
         values.pop("home", None)
         issues.append(Issue("home_predates_source_recovery", "home"))
     else:
-        timing = live_timing(states)
+        timing = live_timing(states, values)
         for key, code in (
-            ("source_report_skew_seconds", "measurement_time_skew"),
+            ("source_context_skew_seconds", "measurement_time_skew"),
             ("home_context_lag_seconds", "home_context_lag"),
         ):
             if timing[key] is not None and timing[key] > MAX_SKEW.total_seconds():
@@ -147,7 +230,9 @@ def measurements(states, now, *, historical=False, source_recovery_at=None):
         if (home := values["home"]).value < 0:
             # User policy applies after availability, units, freshness and recovery.
             # As-of timing uncertainty remains visible alongside normalization.
-            values["home"] = Sample(0, home.at, raw_value=home.value)
+            values["home"] = Sample(
+                0, home.at, raw_value=home.value, context_at=home.context_at
+            )
             issues.append(Issue("negative_home_normalized", "home"))
     flows = {}
     for role, positive, negative in (

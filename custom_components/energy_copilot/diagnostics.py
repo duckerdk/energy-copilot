@@ -6,6 +6,7 @@ from copy import deepcopy
 from homeassistant.util import dt as dt_util
 
 from .const import OPTIONAL_ENTITY_ROLES
+from .validation import DERIVED_SUM_TOLERANCE_W
 
 
 def history_diagnostics(summary):
@@ -111,6 +112,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "live_freshness_seconds": 300,
             "live_as_of_skew_warning_seconds": 10,
             "live_future_timestamp_tolerance_seconds": 10,
+            "derived_sum_tolerance_w": DERIVED_SUM_TOLERANCE_W,
             "recent_history_lookback_hours": 24,
             "history_on_demand_max_days": 366,
             "history_chunk_hours": 24,
