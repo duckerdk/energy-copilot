@@ -9,7 +9,7 @@
 - [Kontrakt encji HA](requirements/ENTITY_CONTRACT.md) — historyczne identyfikatory, braki i warunki walidacji.
 - [Architektura i bezpieczeństwo](requirements/ARCHITECTURE.md) — **jak** budować i testować rozwiązanie.
 - [Model optymalizacji](requirements/OPTIMIZATION_MODEL.md) — bilans PV/sieć/dom/bateria, koszty, dynamiczny SOC, zmienny horyzont znanych cen, walidacja prognozy przy curtailment.
-- [Scenariusze testowe](requirements/TEST_SCENARIOS.md) — 37 przypadków z danymi i kryteriami akceptacji: bilans, koszty, dynamiczny SOC, ceny, curtailment, bezpieczeństwo i mapowanie encji HA.
+- [Scenariusze testowe](requirements/TEST_SCENARIOS.md) — 40 przypadków z danymi i kryteriami akceptacji: bilans, koszty, dynamiczny SOC, ceny, curtailment, bezpieczeństwo i mapowanie encji HA.
 - [Wykonawca HA](requirements/EXECUTION_CONTRACT.md) — kontrakt poleceń, weryfikacja skutków, zgody, stany i awarie; 12 dodatkowych testów EXE.
 - [Panel Home Assistant](requirements/HA_DASHBOARD.md) — widok pomiarów, planu, kosztów, SOC, zgód i diagnostyki; 10 testów UI.
 - [Rejestr decyzji](requirements/DECISION_LOGGING.md) — wymagane od pierwszego rozruchu ceny, prognozy, koszty, porównanie alternatyw i historia w HA.
@@ -30,6 +30,7 @@
 - Ładowanie z sieci może działać automatycznie **dopiero po walidacji toru sterowania**.
 - Celowe rozładowanie baterii na eksport wymaga indywidualnej, ważnej zgody użytkownika.
 - **Domyślnie tylko odczyt i symulacja.** Brak danych, zatwierdzonego mapowania lub bezpiecznego powrotu = zakaz zapisu.
+- **Własne granice prądu regulatorów Deye (polityka Co-Pilot): 0–50 A ładowanie, 0–100 A rozładowanie, 0–50 A grid charge**; nie korzystać z błędnych granic encji HA. Wartość 0 A nie oznacza potwierdzonego fizycznego wyłączenia.
 - Zasada ceny sprzedaży przekazana przez użytkownika: cena spot minus 0,0215 DKK/kWh; pełne warunki rozliczeń nadal wymagają testu na fakturze.
 
 ## Historia
