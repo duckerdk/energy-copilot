@@ -15,7 +15,7 @@
 | Koszt magazynu | **19 000 DKK** według użytkownika |
 | Lokalizacja rozliczeń | Dania, obszar DK1 / Nordjylland; N1; Elforbundet/Vindstød |
 | Prognoza PV | Forecast.Solar w HA; godzinowa seria **niezweryfikowana** |
-| Ceny | Energi Data Service i istniejące encje HA; atrybuty przyszłych cen **niezweryfikowane** |
+| Ceny | Energi Data Service: obie encje HA mają `raw_today`/`raw_tomorrow`, `tomorrow_valid` i rekordy `hour`+`price` DKK/kWh (potwierdzone 20.10.2026); [kontrakt](HA_PRICE_SERIES_CONTRACT.md). Końcowa cena zakupu zawiera wszystkie opłaty i taryfy; sprzedaż netto = spot − 0,0215 DKK/kWh |
 | Historia | Recorder / Energy; użytkownik ma historię z kilku lat, rozdzielczość i kompletność **niezweryfikowane** |
 
 W zrzucie potwierdzono m.in. `sensor.sun12k_total_grid_power` (−2470 W przy eksporcie), `sensor.sun12k_battery_output_power` (+19 W), `sensor.pv_sum` (3034 W), `sensor.home_energy_consumption` (583 W) i `sensor.sun12k_battery_capacity` (97%). Bilans chwilowy zgadza się arytmetycznie, ale kierunki znaków i punkty pomiarowe przy innych trybach **wymagają testu**. Fabryczny harmonogram i możliwość wymuszonego rozładowania istnieją wg użytkownika; nie znamy odpowiednich usług/encji, ograniczeń ani potwierdzeń wykonania.
