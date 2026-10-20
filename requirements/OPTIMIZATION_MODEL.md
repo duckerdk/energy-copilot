@@ -63,7 +63,7 @@ J = Σ_t Δt * (Grid_import[t] * C_buy[t]
 
 - `C_buy[t]`: **końcowa zmienna** cena zakupu z opłatami [DKK/kWh].
 - `C_sell[t] = sensor.energi_data_spotpris.raw_*.price[t]` [DKK/kWh] **bez przeliczeń**; analogicznie `C_buy[t]` jest wprost z `sensor.energi_data_service`. Co-Pilot **nie oblicza** prowizji, podatków ani taryf. Automatyczny eksport PV jest dozwolony tylko przy `C_sell[t] >= 0,40` zgodnie z [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md).
-- `Cost_degradation`: marginalne zużycie magazynu zależne od przepływu energii przez baterię; uwzględnia też ładowanie z PV. Model kosztu cyklu/żywotności wymaga kalibracji, nie zakładać z góry kosztu jednej kWh.
+- `Cost_degradation = 0,40 DKK/kWh × suma rozładowanej energii DC baterii [kWh]`: stała użytkownika z 20.10.2026, naliczana raz przy rozładowaniu. Dotyczy również energii zgromadzonej z PV; ekonomiczną opłacalność ładowania z sieci oceniać z kosztem przyszłego rozładowania. Nie dodawać drugiego kosztu przy ładowaniu. [CALIBRATION_POLICY.md](CALIBRATION_POLICY.md).
 - Straty energii są już reprezentowane przez sprawności w bilansie. **Nie doliczać tych samych strat ponownie jako ryczałtowej opłaty.**
 - Ceny ujemne, dodatni eksport, rezygnacja z przychodu przez magazynowanie i możliwy curtailment wynikają z powyższego bilansu.
 - Rozdzielać koszt fakturowy (import − eksport) od wewnętrznego kosztu degradacji i miary ryzyka.
@@ -110,7 +110,7 @@ Pełne dane liczbowe, warunki testów i oczekiwane wyniki opisano w [TEST_SCENAR
 - Dokładne mapowanie przepływów i punktów pomiaru HA po DC i AC.
 - Zakresy i faktyczne skutki encji sterujących, łącznie z eksportem i trybami magazynu.
 - Rzeczywiste sprawności przy różnej mocy, limity mocy/prądów i rzeczywisty zakres SOC.
-- Funkcja kosztu degradacji: sposób oceny EFC i warianty wrażliwości w [CALIBRATION_POLICY.md](CALIBRATION_POLICY.md). Niewiadomą jest kalibracja fizyczna i trwałość, nie sama definicja obliczeń.
+- Fizyczna degradacja i trwałość nie są estymowane do decyzji wykonawczych: stała **0,40 DKK/kWh rozładowania DC** jest decyzją użytkownika; ewentualny monitoring żywotności stanowi osobną funkcję diagnostyczną. [CALIBRATION_POLICY.md](CALIBRATION_POLICY.md).
 - Statystyczny model błędów PV/zużycia i końcowy warunek energetyczny przy nieopublikowanych cenach.
 - Weryfikacja wyniku kosztowego na danych historycznych, bez zakładania nieistniejących cen — metodyka [BACKTEST_VALIDATION.md](BACKTEST_VALIDATION.md). Każda decyzja musi mieć odtwarzalne uzasadnienie w [DECISION_LOGGING.md](DECISION_LOGGING.md).
 
