@@ -37,7 +37,7 @@ E_next = E + Δt*(η_pv_bat*s_b + η_grid_bat*g_b
 
 `η_pv_ac`, `η_pv_bat`, `η_grid_bat`, `η_bat_ac` są osobnymi, zależnymi od toru konwersji współczynnikami (ewentualnie funkcjami mocy). Nie zakładać, że energia do baterii po DC przechodzi przez tor AC. **Nie podwajać energii po DC** w wielkościach PV, AC i baterii.
 
-Ten opis to **logiczny bilans**. Model obliczeniowy musi zostać dopasowany do rzeczywistych ograniczeń współpracy PV, przetwornika i magazynu: dostępności równoległych przepływów, limitów mocy oraz pomiarów potwierdzonych w HA. Nie przyjmować, że każda kombinacja matematyczna jest wykonalna przez falownik.
+Ten opis to **logiczny bilans**. Mapowanie faktycznych czujników HA, konwencji znaków, czasu próbki i niezależności źródeł opisano w [MEASUREMENT_CONTRACT.md](MEASUREMENT_CONTRACT.md). W szczególności **zerowy residual jednej migawki nie dowodzi poprawnego modelu**, jeżeli pomiar domu jest szablonem pochodnym. Model obliczeniowy musi zostać dopasowany do rzeczywistych ograniczeń współpracy PV, przetwornika i magazynu: dostępności równoległych przepływów, limitów mocy oraz pomiarów potwierdzonych w HA. Nie przyjmować, że każda kombinacja matematyczna jest wykonalna przez falownik.
 
 ## 3. Ograniczenia fizyczne i uprawnienia
 
