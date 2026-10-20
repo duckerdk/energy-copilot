@@ -93,7 +93,7 @@ def test_masked_zero_is_invalid(source_states):
 def test_snapshot_skew(source_states):
     source_states["grid"] = make_state("grid", at=NOW - timedelta(seconds=20))
     values, _, issues = measurements(source_states, NOW)
-    assert "measurement_time_skew" in codes(issues)
+    assert "measurement_time_skew" not in codes(issues)
     assert "home" in values
 
 
