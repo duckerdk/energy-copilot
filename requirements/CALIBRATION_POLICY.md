@@ -7,7 +7,7 @@
 | Parametr | Wartość startowa/źródło | Status i użycie |
 | --- | --- | --- |
 | Pojemność nominalna | 10,24 kWh | Potwierdzona przez użytkownika; może być bazą odniesienia dla SOC, nie jest zmierzoną pojemnością użyteczną AC |
-| SOC | 20–100% | Przyjęte przez użytkownika; faktyczne limity BMS mają pierwszeństwo |
+| SOC | **20–100%** | **Twarde minimum polityki Co-Pilot = 20%** (potwierdzone 20.10.2026); BMS/falownik mogą wymagać wyższego minimum. Plan nigdy nie zakłada celowego rozładowania poniżej 20% |
 | Moc ładowania/rozładowania | 2,5 kW / 5 kW | Zadeklarowane parametry pracy do walidacji na stronie AC/DC |
 | Instalacja PV | 8,4 kWp, sprzężenie DC | Potwierdzone w projekcie; zmierzone granice zależne od falownika |
 | Koszt zakupu magazynu | 19 000 DKK | Dane do szacowania marginalnego kosztu cyklu, nie koszt operacyjny doliczany w całości |
@@ -15,7 +15,7 @@
 | Sprawność rozładowania | 0,9487 | Taki sam status; produkt obu wartości ≈ 0,9000, ale nie stanowi dowodu sprawności każdego toru |
 | Sprawność toru PV po DC | 0,97 | Wartość pomocnicza skonfigurowana w zrzucie; **nie zakładać**, że opisuje sprawność całego toru PV→bateria ani PV→AC |
 | Cena sprzedaży | `sensor.energi_data_spotpris.raw_*.price` | **Bez żadnych potrąceń**; użyć dokładnie danych z HA |
-| Koszt cyklu / liczba EFC | nieznane | Nie podstawiać trwale parametru z głowy; sposób obliczania poniżej |
+| Koszt degradacji baterii | **0,40 DKK/kWh energii rozładowanej z baterii DC** | **Stała decyzja użytkownika 20.10.2026**, stosować do wszystkich porównań ekonomicznych, w tym ładowania z sieci; nie estymować z ceny zakupu baterii |
 
 **Zrzut Battery Controller jest jedynie historycznym źródłem wartości początkowych. Nowy optymalizator nie może zależeć od tej integracji ani odziedziczyć jej decyzji, czujników wirtualnych, waluty „EUR” czy kosztów kupna/sprzedaży.** W zrzucie nazwy źródłowych czujników są ukryte jako `REDACTED`. Sama konfiguracja nie dowodzi kalibracji na pracującym systemie.
 
@@ -29,27 +29,19 @@ W modelu rozdzielać `η_pv_bat`, `η_grid_bat`, `η_bat_ac` i `η_pv_ac` w zgod
 4. Zweryfikować na odłożonym zbiorze danych, policzyć zakres niepewności i powtarzać kalibrację po zmianach baterii lub instalacji.
 5. Przy braku danych mocowych można pokazać symulację z parametrami skonfigurowanymi, lecz oznaczyć `efficiency_quality = assumed`; nie deklarować zysku netto jako zweryfikowanego.
 
-## 3. Marginalny koszt degradacji — bez arbitralnej stawki
+## 3. Stały koszt degradacji — decyzja użytkownika
 
-Rozdzielamy dwie rzeczy: rachunek za energię i modelowy koszt utraty żywotności magazynu. Nie doliczamy całych 19 000 DKK do pojedynczego dnia.
+**Przyjęta stawka:** `battery_degradation_cost_dkk_per_kwh = 0.40` DKK/kWh, określona przez użytkownika 20.10.2026. To koszt ekonomiczny eksploatacji magazynu, **nie** składnik ceny zakupu energii z HA ani minimalna cena eksportu PV (ta ostatnia niezależnie wynosi 0,40 DKK/kWh).
 
-Jako **jawny model testowy**, do analizy wrażliwości, można użyć EFC (equivalent full cycles), całkowitej energii przepływającej przez baterię i liczby referencyjnych cykli `N_EFC`:
+**Konwencja rozliczenia w modelu:** naliczać **raz od energii rozładowanej z baterii na jej zaciskach DC** (`E_battery_discharge_dc_kwh`), bez ponownego naliczania przy wcześniejszym ładowaniu:
 
-`E_window = 10,24 × (1,00 − 0,20) = 8,192 kWh`
+`Cost_degradation_DKK = 0.40 * E_battery_discharge_dc_kwh`
 
-`cost_per_EFC = 19 000 / N_EFC [DKK/cykl]`
+Przykład: 2 kWh rozładowania z baterii DC kosztuje modelowo 0,80 DKK zużycia baterii. Cena zakupu energii, sprawności konwersji i koszt degradacji to odrębne składniki. Żadnego kosztu nie naliczać dwukrotnie za ładowanie i rozładowanie tego samego cyklu.
 
-`cost_per_kWh_bidirectional_DC = 19 000 / (2 × 8,192 × N_EFC) [DKK/kWh przepływu przez baterię]`
+**Przy zakupie energii w celu późniejszego ładowania i rozładowania** planner musi już podczas decyzji o zakupie uwzględnić przewidywany koszt przyszłego rozładowania, straty energii i wartość SOC po horyzoncie. To, że koszt księgowany jest na przepływie rozładowania, nie pozwala traktować taniego ładowania jako darmowego cyklu. Ta sama stawka dotyczy energii uprzednio zgromadzonej z PV.
 
-Całkowity koszt marginalny uproszczonego cyklu to `cost_per_kWh_bidirectional_DC × (E_charge_in + E_discharge_out)`, **gdy obie energie są mierzone po tej samej stronie DC i zdefiniowane spójnie**. Przy pełnym cyklu od 20 do 100% i z powrotem energia `E_charge_in + E_discharge_out = 16,384 kWh` DC, co daje 19 000/N_EFC DKK na cykl. Straty AC/DC modelowane są osobno; nie doliczać ich drugi raz.
-
-| `N_EFC` — ilustracyjna trwałość, **nie** dane producenta | Modelowy koszt pełnego EFC | Modelowy koszt 1 kWh przepływu DC łącznie |
-| ---: | ---: | ---: |
-| 3 000 | 6,3333 DKK | 0,3866 DKK |
-| 6 000 | 3,1667 DKK | 0,1933 DKK |
-| 10 000 | 1,9000 DKK | 0,1160 DKK |
-
-**Uwaga:** liczba EFC to ilustracja, nie potwierdzona specyfikacja BSLBATT ani prognoza czasu wymiany. Rzeczywista degradacja zależy od głębokości cyklu, temperatury, C-rate, SOC i starzenia kalendarzowego; koszt *marginalny* może znacząco odbiegać od liniowego amortyzowania pierwotnego zakupu. Podstawową decyzję ekonomiczną testować dla kilku możliwych modeli i tylko potem przyjąć profil produkcyjny.
+To jest **parametr polityki ekonomicznej wybrany przez użytkownika**, nie zmierzona degradacja BSLBATT ani wyliczenie z 19 000 DKK i liczby cykli. Nie blokować planera z powodu nieznanego `N_EFC`; nie zastępować tej stawki autonomiczną estymacją.
 
 ## 4. Czy wykonać marginalnie opłacalny cykl?
 
@@ -57,7 +49,7 @@ Całkowity koszt marginalny uproszczonego cyklu to `cost_per_kWh_bidirectional_D
 
 - Dla porównywalnych wariantów policzyć `incremental_gain_dkk`, oddzielnie koszt fakturowy, degradację, stratę fizyczną, końcową wartość SOC oraz ryzyko.
 - Jeżeli wiarygodny wynik jest dodatni nawet po uwzględnieniu rozsądnego zakresu niepewności → dopuścić do planowania (nie oznacza uprawnienia do wykonania).
-- Jeżeli znak wyniku zmienia się między wiarygodnymi wariantami kalibracji → `benefit_uncertain`, preferować brak **dodatkowego** cyklu lub niepotrzebnego przełączenia; pokazać dlaczego i z jakimi liczbami.
+- Jeżeli znak wyniku zmienia się między wiarygodnymi wariantami sprawności i prognozy (przy **stałej** degradacji 0,40 DKK/kWh) → `benefit_uncertain`, preferować brak **dodatkowego** cyklu lub niepotrzebnego przełączenia; pokazać dlaczego i z jakimi liczbami.
 - **Obowiązuje próg podany przez użytkownika:** minimalna cena eksportu PV `0,40 DKK/kWh` z `sensor.energi_data_spotpris` (konfigurowalna wartość startowa). Nie stosować progów arbitralnych do innych decyzji ekonomicznych. [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md).
 - Realizować zwykłą standardową pracę falownika zgodnie z dotychczasowym trybem, jeśli automat nie może wykazać dodatniego wyniku zmiany.
 
@@ -73,9 +65,9 @@ Całkowity koszt marginalny uproszczonego cyklu to `cost_per_kWh_bidirectional_D
 - `CAL-01`: parametry 0,9487/0,97 z konfiguracji obcej integracji otrzymują status `assumed`, a nie `measured`.
 - `CAL-02`: dwa pomiary tej samej energii DC i AC nie są dodawane jako dwa źródła PV.
 - `CAL-03`: koszt fizycznych strat w rachunku nie jest ponownie doliczany jako osobna „opłata za straty”.
-- `CAL-04`: pełen EFC daje odpowiednio 6,3333/3,1667/1,9000 DKK przy trzech ilustracyjnych N.
-- `CAL-05`: przy wynikach przeciwnych znaków w rozsądnych parametrach degradowania brak uruchomienia dodatkowego cyklu w automatyce; przy `dry_run` pokazany zakres.
+- `CAL-04`: rozładowanie 2 kWh DC → degradacja 0,80 DKK; wcześniejsze ładowanie tych 2 kWh nie powoduje drugiej opłaty.
+- `CAL-05`: zakup energii do ładowania z sieci musi porównać przyszłą oszczędność z ceną zakupu, stratami i degradacją 0,40 DKK/kWh przyszłego rozładowania; gdy zysk niepewny, brak dodatkowego cyklu.
 - `CAL-06`: brak reprezentatywnych migawek PV → `insufficient_history`, bez fałszywych procentów pewności.
 - `CAL-07`: zmiana parametru kalibracji aktualizuje wersję modelu i zapis uzasadnienia w [DECISION_LOGGING.md](DECISION_LOGGING.md).
 
-**Granica rozstrzygnięcia:** matematyczna zasada i sposób kalibracji są zdefiniowane; faktyczne `N_EFC`, parametry fizyczne i dokładność prognoz wymagają danych, a nie decyzji użytkownika „z głowy”.
+**Granica rozstrzygnięcia:** koszt degradacji i granica SOC to decyzje użytkownika; parametry fizyczne i dokładność prognoz wymagają danych, a nie kolejnych pytań o stawkę cyklu.
