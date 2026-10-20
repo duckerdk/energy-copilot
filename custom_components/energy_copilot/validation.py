@@ -71,8 +71,6 @@ def measurement(role, state, now, *, historical=False):
         role
         in {
             "pv",
-            "pv1",
-            "pv2",
             "voltage",
             "daily_pv",
             "daily_charge",
