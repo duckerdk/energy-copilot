@@ -20,7 +20,14 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "at": data.at.isoformat(),
             "measurement_roles": sorted(data.measurements),
             "price_slots": len(data.prices),
+            "price_first_start_utc": data.prices[0].start.isoformat() if data.prices else None,
+            "price_last_end_utc": data.prices[-1].end.isoformat() if data.prices else None,
+            "price_buy_raw_today_count": len((hass.states.get(coordinator.entities["buy"]).attributes.get("raw_today") or [])) if hass.states.get(coordinator.entities["buy"]) else None,
+            "price_buy_raw_tomorrow_count": len((hass.states.get(coordinator.entities["buy"]).attributes.get("raw_tomorrow") or [])) if hass.states.get(coordinator.entities["buy"]) else None,
+            "price_buy_tomorrow_valid": hass.states.get(coordinator.entities["buy"]).attributes.get("tomorrow_valid") if hass.states.get(coordinator.entities["buy"]) else None,
             "forecast_version": data.forecast.version if data.forecast else None,
+            "forecast_first_start_utc": data.forecast.periods[0].start.isoformat() if data.forecast and data.forecast.periods else None,
+            "forecast_last_end_utc": data.forecast.periods[-1].end.isoformat() if data.forecast and data.forecast.periods else None,
             "forecast_captured_at": data.forecast.captured_at.isoformat()
             if data.forecast
             else None,
