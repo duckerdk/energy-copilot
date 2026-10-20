@@ -46,11 +46,26 @@ class ForecastSnapshot:
 
 
 @dataclass(frozen=True)
+class HistoryGap:
+    start: datetime
+    end: datetime
+    issues: tuple[Issue, ...]
+
+
+@dataclass(frozen=True)
 class HistorySlot:
     start: datetime
     end: datetime
     home_kwh: float | None
     issues: tuple[Issue, ...] = ()
+    # Partial energy is only the integral over validated recorded subintervals.
+    # It is never a complete-quarter estimate or a verified physical AC load.
+    observed_home_kwh: float | None = None
+    observed_seconds: float = 0
+    unobserved_seconds: float = 0
+    unobserved_reason_seconds: tuple[tuple[str, float], ...] = ()
+    unobserved_intervals: tuple[HistoryGap, ...] = ()
+    unobserved_intervals_truncated: bool = False
 
 
 @dataclass

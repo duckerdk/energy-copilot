@@ -37,6 +37,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
         "installed_build": entry.runtime_data.installed_build,
         "mode": coordinator.settings.get("mode", "monitor"),
         "read_only": True,
+        "quality": coordinator.quality,
         "observed": {
             "at": data.at.isoformat(),
             "measurement_roles": sorted(data.measurements),
@@ -82,6 +83,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "history_chunk_hours": 24,
         },
         "unverified": [
+            "physical_home_consumption_and_ac_dc_model",
             "physical_ac_dc_efficiencies",
             "unconstrained_pv_production",
             "live_installation_compatibility",

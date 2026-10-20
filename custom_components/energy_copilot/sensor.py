@@ -45,6 +45,8 @@ class InputQualitySensor(CoordinatorEntity, SensorEntity):
             "release_tag": self._installed_build["tag"],
             "release_commit": self._installed_build["commit"],
             "issue_codes": sorted({issue.code for issue in data.issues}),
+            "issue_categories": self.coordinator.quality["categories"],
+            "planning_readiness": self.coordinator.quality["planning_readiness"],
             "price_slots": len(data.prices),
             "forecast_periods": len(data.forecast.periods) if data.forecast else 0,
             "history_valid_slots": sum(s.home_kwh is not None for s in data.history),

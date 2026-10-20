@@ -22,6 +22,8 @@ from .forecast_history import ForecastHistory
 from .forecast_quality import forecast_coverage
 from .history import HistoryReadError, RecorderHistoryReader
 from .models import InputSnapshot, Issue
+from .quality import quality_report
+from .solar import solar_evidence
 from .validation import forecast, measurements, prices
 
 _LOGGER = logging.getLogger(__name__)
@@ -59,6 +61,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self._last_external = None
         self.forecast_coverage = None
         self.measurement_source_timing = {}
+        self.quality = None
 
     async def _async_setup(self):
         try:
@@ -138,12 +141,28 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             snapshot.issues.append(Issue("stale_forecast", "forecast_solar"))
         self.forecast_coverage = None
         if snapshot.forecast:
+            # Use the selected PV location, never an unrelated default HA location.
+            solar_entry = self.hass.config_entries.async_get_entry(
+                self.settings.get("forecast_entry", "")
+            )
+            solar = None
+            if snapshot.prices:
+                solar = solar_evidence(
+                    solar_entry.data if solar_entry else {},
+                    max(now, snapshot.prices[0].start),
+                    snapshot.prices[-1].end,
+                    dt_util.utcnow(),
+                )
             self.forecast_coverage = forecast_coverage(
-                snapshot.forecast, snapshot.prices, now
+                snapshot.forecast, snapshot.prices, now, solar=solar
             )
             if self.forecast_coverage["missing_intervals"]:
                 snapshot.issues.append(
                     Issue("forecast_horizon_incomplete", "forecast_solar")
+                )
+            if self.forecast_coverage["unpublished_night_seconds"]:
+                snapshot.issues.append(
+                    Issue("forecast_night_unpublished", "forecast_solar")
                 )
             if self.forecast_coverage["partially_elapsed_periods"]:
                 snapshot.issues.append(
@@ -157,6 +176,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                 snapshot.issues.append(
                     Issue("forecast_energy_period_missing", "forecast_solar")
                 )
+        self.quality = quality_report(snapshot.issues, self.forecast_coverage)
         return snapshot
 
     async def _async_forecast(self, now):
@@ -225,3 +245,5 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             self._external_issues.append(
                 Issue("historical_quality_unverifiable", "recorder")
             )
+        # A configured template/measurement has not established physical AC demand.
+        self._external_issues.append(Issue("home_profile_unverified", "home"))

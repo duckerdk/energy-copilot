@@ -21,6 +21,7 @@ from .const import (
     MAX_FORECAST_RETENTION_DAYS,
     MAX_FORECAST_VERSIONS,
 )
+from .forecast_quality import periods_for_decision
 from .models import ForecastPeriod, ForecastSnapshot
 from .validation import forecast, number, utc
 
@@ -303,6 +304,11 @@ class ForecastHistory:
         return replace(
             forecast(payload, utc(row["captured_at"])), version=row["version"]
         )
+
+    def decision_periods_as_of(self, decision_at, *, source_entry=None):
+        """Read-only decision input; no future observation or full started-period Wh."""
+        snapshot = self.as_of(decision_at, source_entry=source_entry)
+        return periods_for_decision(snapshot, decision_at) if snapshot else ()
 
     def original_at(self, decision_at: datetime, *, source_entry=None) -> dict | None:
         """Original W/Wh values/site timezone keys; legacy originals cannot be invented."""

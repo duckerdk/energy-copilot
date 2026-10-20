@@ -11,6 +11,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 
 from .const import HISTORY_ROLES
+from .home_quality import negative_home_audit
 from .models import HistorySlot
 from .recorder_reconstruction import RecordingRun, reconstruct_history
 from .validation import number, utc
@@ -47,6 +48,20 @@ def rejection_audit(slots, runs=()):
             {
                 "start_utc": slot.start.isoformat(),
                 "end_utc": slot.end.isoformat(),
+                "observed_seconds": slot.observed_seconds,
+                "unobserved_seconds": slot.unobserved_seconds,
+                "unobserved_reason_seconds": dict(slot.unobserved_reason_seconds),
+                "unobserved_intervals": [
+                    {
+                        "start_utc": gap.start.isoformat(),
+                        "end_utc": gap.end.isoformat(),
+                        "issues": [
+                            {"code": i.code, "source": i.source} for i in gap.issues
+                        ],
+                    }
+                    for gap in slot.unobserved_intervals
+                ],
+                "unobserved_intervals_truncated": slot.unobserved_intervals_truncated,
                 "issues": [
                     {"code": issue.code, "source": issue.source}
                     for issue in slot.issues
@@ -138,6 +153,7 @@ class RecorderHistoryReader:
             "historical_filter_changes_verified": False,
             "history_source_format": "ha_backend_state",
             "negative_home_records_in_window": 0,
+            "negative_home_audit": None,
             "rejected_slots": 0,
             "rejected_intervals": [],
             "rejected_intervals_truncated": False,
@@ -146,6 +162,14 @@ class RecorderHistoryReader:
             "negative_home_or_recording_gap_slots": 0,
             "recording_runs": [],
             "recording_runs_truncated": False,
+            "whole_slot_policy": "complete_observed_quarter_required",
+            "partial_energy_extrapolated": False,
+            "physical_consumption_verified": False,
+            "observed_seconds": 0.0,
+            "unobserved_seconds": 0.0,
+            "unobserved_reason_seconds": {},
+            "observed_time_fraction": 0.0,
+            "partial_slots": 0,
         }
 
     @staticmethod
@@ -157,6 +181,16 @@ class RecorderHistoryReader:
             summary["valid_slots"] / summary["requested_slots"]
         )
         summary["chunks_read"] += 1
+        for key in ("observed_seconds", "unobserved_seconds", "partial_slots"):
+            summary[key] += chunk[key]
+        summary["observed_time_fraction"] = summary["observed_seconds"] / (
+            summary["requested_slots"] * QUARTER.total_seconds()
+        )
+        summary["unobserved_reason_seconds"] = dict(
+            Counter(summary["unobserved_reason_seconds"])
+            + Counter(chunk["unobserved_reason_seconds"])
+        )
+        summary["negative_home_audit_last_chunk"] = chunk["negative_home_audit"]
         summary["configured_retention_days"] = chunk["configured_retention_days"]
         summary["source_rows_last_chunk"] = chunk["source_rows"]
         summary["negative_home_records_in_window"] += chunk[
@@ -225,7 +259,12 @@ class RecorderHistoryReader:
                     partial(self._query_recorded_states, start, end)
                 )
                 # Decoding rows and interval reconstruction happen off the HA loop.
-                slots, bounds, source_rows = await self.hass.async_add_executor_job(
+                (
+                    slots,
+                    bounds,
+                    source_rows,
+                    home_audit,
+                ) = await self.hass.async_add_executor_job(
                     self._validate_rows, rows, start, end, runs, excluded_roles
                 )
             except HistoryReadError:
@@ -252,6 +291,19 @@ class RecorderHistoryReader:
             ),
         )
         summary.update(rejection_audit(slots, runs))
+        summary["negative_home_audit"] = home_audit
+        summary["observed_seconds"] = sum(s.observed_seconds for s in slots)
+        summary["unobserved_seconds"] = sum(s.unobserved_seconds for s in slots)
+        reason_seconds = Counter()
+        for slot in slots:
+            reason_seconds.update(dict(slot.unobserved_reason_seconds))
+        summary["unobserved_reason_seconds"] = dict(sorted(reason_seconds.items()))
+        summary["observed_time_fraction"] = (
+            summary["observed_seconds"] / (end - start).total_seconds()
+        )
+        summary["partial_slots"] = sum(
+            s.observed_seconds > 0 and s.unobserved_seconds > 0 for s in slots
+        )
         summary["negative_home_records_in_window"] = source_rows.get("home", {}).get(
             "negative_power_records_in_window", 0
         )
@@ -394,7 +446,12 @@ class RecorderHistoryReader:
             first.isoformat() if first else None,
             last.isoformat() if last else None,
         )
-        return slots, bounds, source_rows
+        return (
+            slots,
+            bounds,
+            source_rows,
+            negative_home_audit(rows, self.entities, start, end, runs, excluded_roles),
+        )
 
     async def async_read_window(
         self, start: datetime, end: datetime

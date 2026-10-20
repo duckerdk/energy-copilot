@@ -1,0 +1,32 @@
+{
+  "provenance": "Anonymized relative quarter positions and RecorderRuns durations from the user diagnostic after v0.1.2; timestamps are shifted to a synthetic day, all powers and per-record timings are synthetic. Not a private raw export or a replay of physical consumption. Additional real startup-unavailable durations are unknown and are not inferred from run gaps.",
+  "negative_quarters": [
+    3,
+    5,
+    79,
+    80,
+    81,
+    83,
+    85,
+    89,
+    94
+  ],
+  "negative_records_per_quarter": 3,
+  "gap_quarters": [
+    88,
+    91,
+    92
+  ],
+  "gap_seconds": [
+    10.578395,
+    8.398994,
+    8.14575
+  ],
+  "expected_valid_quarters": 84,
+  "expected_rejected_quarters": 12,
+  "gap_offsets_seconds": [
+    165.689077,
+    27.106647,
+    492.075655
+  ]
+}

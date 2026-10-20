@@ -1,0 +1,38 @@
+name: Update issue 5 review report
+on:
+  push:
+    branches: [fix/issue-5-forecast-contract]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update the existing review with the committed report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh api repos/duckerdk/energy-copilot/pulls/7 > /tmp/issue5-pr.json 2>/tmp/issue5-error; then
+            echo "::error::$(head -c 1000 /tmp/issue5-error)"
+            exit 1
+          fi
+          git log -1 --format=%B > /tmp/issue5-report.md
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          pr = json.loads(Path('/tmp/issue5-pr.json').read_text())
+          assert pr['head']['ref'] == 'fix/issue-5-forecast-contract'
+          assert pr['base']['ref'] == 'main' and pr['state'] == 'open'
+          marker = '<!-- energy-copilot-issue5-report -->'
+          old = (pr.get('body') or '').split(marker, 1)[0].rstrip()
+          report = Path('/tmp/issue5-report.md').read_text().split('\n', 2)[-1].strip()
+          payload = {'title': 'Fix M2 #5: Recorder coverage and evidence-based solar-night quality', 'body': (old + '\n\n' if old else '') + marker + '\n' + report}
+          Path('/tmp/issue5-update.json').write_text(json.dumps(payload))
+          PY
+          if ! gh api repos/duckerdk/energy-copilot/pulls/7 --method PATCH --input /tmp/issue5-update.json >/dev/null 2>/tmp/issue5-error; then
+            echo "::error::$(head -c 1000 /tmp/issue5-error)"
+            exit 1
+          fi
