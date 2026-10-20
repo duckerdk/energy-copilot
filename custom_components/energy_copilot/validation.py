@@ -199,7 +199,7 @@ def _derived_measurements(states, values, issues, now, templates, recovery):
             continue
         context_at = min(values[r].context_at or values[r].at for r in required)
         pv_time_unknown = Issue("pv_template_time_unverified", "pv") in issues
-        if now - context_at > MAX_AGE and not pv_time_unknown:
+        stable_zero_pv = "pv" in configured and values["pv"].value == 0\n        if now - context_at > MAX_AGE and not (\n            pv_time_unknown or stable_zero_pv\n        ):
             issues.append(Issue("derived_freshness_unverifiable", role))
             continue
         values[role] = Sample(original.value, original.at, context_at=context_at)
