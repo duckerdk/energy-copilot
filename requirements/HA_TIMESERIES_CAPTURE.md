@@ -1,6 +1,6 @@
-# Następny odczyt HA: atrybuty przyszłych cen i prognoz
+# Pomocniczy odczyt HA: atrybuty prognoz PV
 
-**Cel:** jednorazowo ustalić strukturę listy cen (czas, waluta, VAT/taryfy, dostępność jutra) i godzinowy profil potencjalnej produkcji PV. Poprzedni odczyt `wynik.txt` potwierdził bieżące `entity_id` i wartości, **nie pobierał atrybutów prognoz**.
+**Stan na 20.10.2026:** **format obu serii cen jest już potwierdzony** bezpośrednio na atrybutach HA i zamknięty w [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md). Nie wymaga dalszych pytań do użytkownika. Ten starszy szablon zachowujemy tylko jako pomoc w odczycie **godzinowych prognoz PV**, których struktury jeszcze nie pokazano. Dane cenowe z szablonu są zbędne do ponownej walidacji.
 
 Home Assistant → **Narzędzia deweloperskie → Szablony**. Wkleić poniższy szablon, wynik skopiować do pliku `ceny_prognozy.txt` i udostępnić. Działanie jest **wyłącznie odczytowe**, nie zmienia żadnej encji, nie wywołuje usług.
 
@@ -59,10 +59,8 @@ Home Assistant → **Narzędzia deweloperskie → Szablony**. Wkleić poniższy 
 
 ## Na podstawie wyniku sprawdzimy
 
-1. Czy `sensor.energi_data_service` udostępnia serię przyszłych cen **końcowych**, czy jedynie wartość bieżącą i czy VAT/taryfy są rzeczywiście wliczone.
-2. Czy `sensor.energi_data_spotpris` lub odpowiedni atrybut zawiera timestampowane spot na dziś/jutro, rozdzielczość i czas dostępności.
-3. Czy Forecast.Solar dostarcza rozkład godzinowy `wh_hours`/`wh_period` lub podobny, z datami; jaki jest właściwy punkt pomiaru PV.
-4. Czy `sensor.pv_forecast_next_24h` ma określoną jednostkę i okres, a jeśli nie — nie mapować go do modelu.
-5. Czy wymagany jest kolejny **wąski** odczyt jednej listy po poznaniu jej rzeczywistych kluczy, czy wszystkie dane można mapować bez dalszego pytania.
+1. **Ceny: zamknięte** — obie encje mają `raw_today/raw_tomorrow` oraz flagę `tomorrow_valid`; patrz [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md).
+2. Ustalić, czy Forecast.Solar dostarcza godzinowy rozkład `wh_hours`/`wh_period` lub podobny, z datami i jednostkami oraz jaki jest punkt pomiaru PV.
+3. `sensor.pv_forecast_next_24h`: ustalić jednostkę i okres albo **nie** mapować do bilansu.
 
 Nie pobierać pełnych stanów innych urządzeń. Brak atrybutów prognoz oznacza, że trzeba znaleźć źródłową encję/integrację Forecast.Solar lub price series, ale **nie** wypełniać ich prognozami wymyślonymi przez model.
