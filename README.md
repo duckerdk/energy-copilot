@@ -22,6 +22,7 @@
 - [Potwierdzony kontrakt cen HA](requirements/HA_PRICE_SERIES_CONTRACT.md) — `raw_today/raw_tomorrow`, `tomorrow_valid`, DST, taryfy, parser i 18 testów PRICE.
 - [Kontrakt godzinowej prognozy PV](requirements/PV_FORECAST_CONTRACT.md) — natywna akcja HA `forecast_solar.get_forecast`, odpowiedź `wh_period`/`watts`, normalizacja i 18 testów PVF.
 - [Prognoza zużycia domu](requirements/LOAD_FORECAST_CONTRACT.md) — profil poboru z historii Recorder, punkt pomiarowy, DST i 16 testów LOAD.
+- [Kontrakt pomiarów i bilansu](requirements/MEASUREMENT_CONTRACT.md) — rzeczywiste encje PV/sieć/bateria/dom, znaki i źródła pochodne, integracja kWh, 20 testów MTR.
 - [Archiwalny szablon diagnostyki HA](requirements/HA_TIMESERIES_CAPTURE.md) — opcjonalny; **nie** jest wymagany do pobrania cen ani prognoz.
 - [Walidacja historyczna](requirements/BACKTEST_VALIDATION.md) — test walk-forward bez wiedzy o przyszłości oraz uczciwa metoda liczenia korzyści.
 - [Przekazanie programiście](requirements/DEVELOPER_HANDOFF.md) — kolejność dokumentów, etapy M1–M6 i warunki odbioru.
