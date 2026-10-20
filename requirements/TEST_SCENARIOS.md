@@ -9,9 +9,9 @@ Podstawa: [OPTIMIZATION_MODEL.md](OPTIMIZATION_MODEL.md), [GOALS_AND_REQUIREMENT
 
 - Testy sprawdzają **wynik ekonomiczny, bilans fizyczny, ograniczenia i bezpieczeństwo**, a nie konkretną implementację solvera. Przy wielu równoważnych rozwiązaniach dopuszczać każdy optymalny plan spełniający niezmienniki; nie wymuszać dowolnego układu operacji.
 - Gdy nie podano inaczej, testowa bateria: `capacity = 10,24 kWh`, `SOC_min = 20%`, `SOC_max = 100%`, `P_charge_max = 2,5 kW`, `P_discharge_max = 5 kW`, sprawności wszystkich czterech torów `η = 1`, koszt degradacji `0 DKK`, bez ograniczeń sieci; `E_min = 2,048 kWh`, `E_max = 10,24 kWh`. To **idealizacja wyłącznie dla jednoznacznej arytmetyki testowej**, nie rzeczywisty model wydajności.
-- Cena zakupu `C_buy` oznacza **cenę z opłatami** [DKK/kWh]; cena eksportu `C_sell = spot − 0,0215 DKK/kWh`. Cena sprzedaży w teście podana wprost oznacza wartość **po prowizji**; odpowiadający jej spot jest wyższy o `0,0215`. Wszystkie kwoty DKK.
+- `C_buy` to wartość z `sensor.energi_data_service`, `C_sell` to wartość z `sensor.energi_data_spotpris` [DKK/kWh], **bez przeliczeń**. Wykonywalny plan automatycznego eksportu PV dopuszcza sprzedaż tylko przy `C_sell >= 0,40 DKK/kWh`; wszystkie kwoty w DKK. [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md).
 - Moc to **kW średniego przepływu w slocie**, energia to kWh; bazowy slot `Δt = 0,25 h`. W testach całogodzinnych/dłuższych profil jest identyczny w każdym kwadransie danego okresu. Gdy test wymaga stałej wartości SOC na końcu albo wartości końcowej energii, jest to **jawny warunek fikstury**, nie stała reguła projektu.
-- Domyślnie: **brak zgody na eksport energii z baterii**, zatem `b_x = 0`; eksport samego PV dopuszczony, o ile przypadek nie stanowi inaczej. Tryb sprzętowego executora nieaktywny (`dry_run`).
+- Domyślnie: **brak zgody na eksport energii z baterii**, zatem `b_x = 0`; automatyczny eksport PV dozwolony wyłącznie od 0,40 DKK/kWh z HA, o ile test nie stanowi inaczej. Tryb sprzętowego executora nieaktywny (`dry_run`).
 - Tolerancja sprawdzeń numerycznych: energia i moc `1e-6` odpowiednich jednostek, pieniądze `1e-4 DKK`, SOC `1e-4 punktu procentowego`. Nie wprowadzać tolerancji, która pozwala naruszyć granice bezpieczeństwa.
 - Każdy przypadek w raporcie ma `id`, dane wejściowe, rozwiązanie planu, obliczony koszt, naruszenia ograniczeń, wersję/ważność planu i rezultat `PASS/FAIL/BLOCKED`. `BLOCKED` oznacza brak koniecznego zweryfikowanego wejścia lub sterowania, nie zaliczony test.
 - **Rozdzielenie rezultatów:** stan `planned` nie jest wykonaniem `applied`, a `applied` bez pomiaru zwrotnego nie jest `confirmed`.
@@ -52,8 +52,8 @@ Podstawa: [OPTIMIZATION_MODEL.md](OPTIMIZATION_MODEL.md), [GOALS_AND_REQUIREMENT
 
 ### ECO-01 — Cena eksportu netto
 
-**Dane:** `spot = 0,8000 DKK/kWh`; drugi przypadek `spot = −0,1000 DKK/kWh`.  
-**Oczekiwane:** kolejno `C_sell = 0,7785` i `C_sell = −0,1215 DKK/kWh`. Nie stosować do sprzedaży ceny zakupu z opłatami.
+**Dane:** `sensor.energi_data_spotpris` podaje `0,8000 DKK/kWh`; drugi przypadek `−0,1000 DKK/kWh`.  
+**Oczekiwane:** kolejno `C_sell = 0,8000` i `C_sell = −0,1000 DKK/kWh`. **Nie wykonywać żadnych potrąceń ani dopłat**. W drugim przypadku automatyczny eksport PV jest wyłączony.
 
 ### ECO-02 — Opłacalne ładowanie z sieci na potrzeby domu
 
@@ -67,8 +67,8 @@ Podstawa: [OPTIMIZATION_MODEL.md](OPTIMIZATION_MODEL.md), [GOALS_AND_REQUIREMENT
 
 ### ECO-04 — PV do baterii korzystniejsze niż eksport
 
-**Dane:** teraz `PV = 1 kWh`, dom = 0, `C_sell_now = 0,30`; później dom = 1 kWh i `C_buy_later = 1,00`; brak innych PV, brak ładowania z sieci, `E_start = E_min`, `η = 1`, `E_end = E_min`.  
-**Oczekiwane:** 1 kWh PV → bateria → dom; koszt netto `0,00 DKK`. Alternatywa eksport 1 kWh i późniejszy zakup 1 kWh kosztuje `1,00 − 0,30 = 0,70 DKK`; optymalizator wybiera magazynowanie.
+**Dane:** teraz `PV = 1 kWh`, dom = 0, `C_sell_now = 0,50`; później dom = 1 kWh i `C_buy_later = 1,00`; brak innych PV, brak ładowania z sieci, `E_start = E_min`, `η = 1`, `E_end = E_min`.  
+**Oczekiwane:** 1 kWh PV → bateria → dom; koszt netto `0,00 DKK`. Alternatywa eksport 1 kWh i późniejszy zakup 1 kWh kosztuje `1,00 − 0,50 = 0,50 DKK`; optymalizator wybiera magazynowanie.
 
 ### ECO-05 — Sprzedaż PV teraz korzystniejsza niż magazynowanie
 
@@ -77,8 +77,8 @@ Podstawa: [OPTIMIZATION_MODEL.md](OPTIMIZATION_MODEL.md), [GOALS_AND_REQUIREMENT
 
 ### ECO-06 — Cena eksportu ujemna i brak możliwości magazynowania
 
-**Dane:** `spot = −0,10`, więc `C_sell = −0,1215`; potencjalne PV = 1 kWh, dom = 0, bateria pełna; dopuszczony curtailment.  
-**Oczekiwane:** nie eksportować 1 kWh ze stratą `0,1215 DKK`; w tym teście ograniczyć produkcję PV o 1 kWh, wynik finansowy 0 zamiast dodatniego kosztu eksportu. Nie stosować tej decyzji bez fizycznej możliwości ograniczania PV.
+**Dane:** `sensor.energi_data_spotpris` podaje `−0,10`, zatem `C_sell = −0,10` bez przeliczeń; potencjalne PV = 1 kWh, dom = 0, bateria pełna; dopuszczony curtailment.  
+**Oczekiwane:** nie eksportować 1 kWh ze stratą `0,10 DKK`; w tym teście ograniczyć produkcję PV o 1 kWh, wynik finansowy 0 zamiast dodatniego kosztu eksportu. Nie stosować tej decyzji bez fizycznej możliwości ograniczania PV.
 
 ### ECO-07 — Degradacja rozstrzyga marginalną opłacalność
 
@@ -110,28 +110,28 @@ Podstawa: [OPTIMIZATION_MODEL.md](OPTIMIZATION_MODEL.md), [GOALS_AND_REQUIREMENT
 
 Dla **SOC-01** i **SOC-02** wspólne:
 - Bateria startuje przy `SOC = 20%` = `E = 2,048 kWh`; `η = 1`, koszt degradacji 0, eksport z baterii zabroniony, ładowanie z sieci wyłączone, limit ładowania 2,5 kW.
-- Dzisiejsze PV `6 kWh` w ciągu **3 godzin** po 2 kW; w tym czasie dom = 0, `C_sell_today = 0,20 DKK/kWh`.
+- Dzisiejsze PV `6 kWh` w ciągu **3 godzin** po 2 kW; w tym czasie dom = 0, `C_sell_today = 0,80 DKK/kWh` (powyżej progu eksportu).
 - Nocą dom potrzebuje `4,608 kWh` przez **4 godziny** po 1,152 kW; brak PV; cena zakupu nocą `1,00 DKK/kWh`.
 - Ceny wszystkich godzin objętych scenariuszem zostały rzeczywiście podane w fiksturze, a więc dostępne w planie. Wartość końcowa każdego dodatkowego kWh w baterii powyżej minimum przyjmowana przez fiksturę wynosi `0,20 DKK/kWh`; to parametr testowy, nie produkcyjna nastawa.
 - Eksport PV jest dozwolony i technicznie wykonalny; ograniczeń punktu przyłącza brak.
 
 ### SOC-01 — Jutro dużo PV; optimum przed nocą wynosi 65%
 
-**Dodatkowe dane:** jutro rano `10 kWh` PV przez **4 godziny** po 2,5 kW, dom = 0; `C_sell_tomorrow = 0,10 DKK/kWh`. PV wystarcza do uzupełnienia baterii do 100% z 20%; rano dozwolony jednoczesny przepływ PV do baterii i eksport PV (bez jednoczesnego importu z sieci).  
+**Dodatkowe dane:** jutro rano `10 kWh` PV przez **4 godziny** po 2,5 kW, dom = 0; `C_sell_tomorrow = 0,50 DKK/kWh` (powyżej progu eksportu). PV wystarcza do uzupełnienia baterii do 100% z 20%; rano dozwolony jednoczesny przepływ PV do baterii i eksport PV (bez jednoczesnego importu z sieci).  
 **Oczekiwane:**
 
-1. Dziś do baterii z PV `4,608 kWh`, nadwyżkę `1,392 kWh` sprzedać po 0,20; przed nocą `E = 2,048 + 4,608 = 6,656 kWh`, **SOC = 65,0000%**.
+1. Dziś do baterii z PV `4,608 kWh`, nadwyżkę `1,392 kWh` sprzedać po 0,80; przed nocą `E = 2,048 + 4,608 = 6,656 kWh`, **SOC = 65,0000%**.
 2. W nocy bateria → dom `4,608 kWh`, import 0, rano `SOC = 20%`.
-3. Jutro PV → bateria `8,192 kWh`, eksport `1,808 kWh` po 0,10, końcowy SOC 100%.
-4. Przychód z PV = `1,392 × 0,20 + 1,808 × 0,10 = 0,4592 DKK`; zakup 0; koszt netto `−0,4592 DKK` (bez wewnętrznych kosztów). Wartość końcowa baterii jest taka sama dla rozważanych wariantów osiągających 100%, więc nie zmienia porównania.
-5. Zmagazynowanie dziś pełnych 6 kWh zamiast 4,608 przesuwałoby 1,392 kWh eksportu z godziny sprzedaży po 0,20 do jutra po 0,10, obniżając przychód o **0,1392 DKK**. Nie wymuszać 100% już dziś.
+3. Jutro PV → bateria `8,192 kWh`, eksport `1,808 kWh` po 0,50, końcowy SOC 100%.
+4. Przychód z PV = `1,392 × 0,80 + 1,808 × 0,50 = 2,0176 DKK`; zakup 0; koszt netto `−2,0176 DKK` (bez wewnętrznych kosztów). Wartość końcowa baterii jest taka sama dla rozważanych wariantów osiągających 100%, więc nie zmienia porównania.
+5. Zmagazynowanie dziś pełnych 6 kWh zamiast 4,608 przesuwałoby 1,392 kWh eksportu z godziny sprzedaży po 0,80 do jutra po 0,50, obniżając przychód o **0,4176 DKK**. Nie wymuszać 100% już dziś.
 
 **Warunek akceptacji:** model wyprowadza **65% jako wynik optymalizacji**, bez reguły typu „ustaw 65%”, i wskazuje ekonomiczną przyczynę (utracony przychód z eksportu dziś wobec jutrzejszej nadwyżki).
 
 ### SOC-02 — Jutro brak PV; cel SOC rośnie do 78,59375%
 
 **Zmiana względem SOC-01:** jutro rano **PV = 0**, a dom zużywa dodatkowo `1,392 kWh` po `1,00 DKK/kWh`. Nie można ładować z sieci.  
-**Oczekiwane:** dziś magazynować całe `6,000 kWh` dostępnego PV, przed nocą `E = 8,048 kWh`, **SOC = 78,59375%**; w nocy i rano pokryć z baterii razem `6,000 kWh`, zakończyć przy SOC 20% i imporcie 0. Eksport PV dziś 0. Sprzedaż dziś 1,392 kWh po 0,20 i zakup jutro 1,392 kWh po 1,00 pogorszyłyby wynik o `1,1136 DKK`.
+**Oczekiwane:** dziś magazynować całe `6,000 kWh` dostępnego PV, przed nocą `E = 8,048 kWh`, **SOC = 78,59375%**; w nocy i rano pokryć z baterii razem `6,000 kWh`, zakończyć przy SOC 20% i imporcie 0. Eksport PV dziś 0. Sprzedaż dziś 1,392 kWh po 0,80 i zakup jutro 1,392 kWh po 1,00 pogorszyłyby wynik o `0,2784 DKK`.
 
 **Warunek akceptacji:** zmiana jutrzejszej produkcji i zużycia automatycznie zmienia optymalny cel SOC, **bez ręcznej zmiany progu**.
 
@@ -217,7 +217,7 @@ Dla **SOC-01** i **SOC-02** wspólne:
 ### MAP-01 — Zakup i sprzedaż są odrębne
 
 **Dane:** źródło spot = `0,80 DKK/kWh`, cena końcowa zakupu w drugim źródle = `1,45 DKK/kWh`; te same znane znaczniki czasu.  
-**Oczekiwane:** `C_buy = 1,45`, `C_sell = 0,7785 DKK/kWh`. Nie wolno przyjąć ceny zakupu jako ceny sprzedaży ani samego spot jako finalnej ceny zakupu.
+**Oczekiwane:** `C_buy = 1,45`, `C_sell = 0,80 DKK/kWh` bez przeliczeń. Nie wolno używać jednej encji jako obu cen ani korygować otrzymanych wartości.
 
 ### MAP-02 — Zmiana jednostki mocy
 
