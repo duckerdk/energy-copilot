@@ -663,3 +663,18 @@ def test_temporal_pv_warning_is_not_counted_as_a_home_rejection_cause():
     assert summary["home_rejection_reasons"] == {
         "home:home_predates_source_recovery": 1
     }
+
+
+def test_independent_pv_rejection_does_not_blame_optional_stale_leaf():
+    states = sum_states("pv")
+    states["pv"] = make_state("pv", "unknown")
+    states["pv1"] = make_state("pv1", 400, at=NOW - timedelta(seconds=600))
+    values, _, issues = measurements(states, NOW)
+    window = LiveMeasurementWindow()
+    window.record(states, NOW, values, issues)
+    summary = window.summary(NOW)
+    assert summary["pv_rejection_reasons"] == {"pv:invalid_input": 1}
+    assert summary["home_rejection_reasons"] == {
+        "pv:invalid_input": 1,
+        "home:invalid_input": 1,
+    }

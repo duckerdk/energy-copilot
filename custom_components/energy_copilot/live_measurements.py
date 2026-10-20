@@ -119,6 +119,12 @@ class LiveMeasurementWindow:
                 source_changed = True
         uncertain = any(i.code in UNCERTAINTY_CODES for i in issues)
         rejected = "home" not in values
+        leaf_rejection_evidence = any(
+            i.source == "pv"
+            and i.code
+            in {"derived_source_invalid", "derived_source_freshness_unverifiable"}
+            for i in issues
+        )
         reasons = {
             f"{i.source}:{i.code}"
             for i in issues
@@ -131,7 +137,7 @@ class LiveMeasurementWindow:
                     for j in issues
                 )
             )
-            and not (i.source in {"pv1", "pv2"} and "pv" in values)
+            and not (i.source in {"pv1", "pv2"} and not leaf_rejection_evidence)
         }
         if len(self._polls) >= MAX_POLLS:
             self._polls.popleft()

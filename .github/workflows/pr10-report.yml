@@ -29,7 +29,7 @@ jobs:
           assert pr['head']['sha'] == os.environ['GITHUB_SHA']
           assert pr['base']['ref'] == 'main' and pr['state'] == 'open' and pr['draft']
           body = Path('/tmp/pr10-report.txt').read_text().split('\n', 2)[-1].strip()
-          assert 'Skonsolidowany audyt' in body and '331' in body
+          assert 'Skonsolidowany audyt' in body and '332' in body
           Path('/tmp/pr10-update.json').write_text(json.dumps({'body': body}))
           PY
           if ! gh api repos/duckerdk/energy-copilot/pulls/10 --method PATCH --input /tmp/pr10-update.json > /dev/null 2>/tmp/pr10-error; then
