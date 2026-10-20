@@ -10,9 +10,9 @@
 - [ ] **Eksport baterii (odrębna opcjonalna zdolność):** fizyczna separacja, pomiar baterii→sieci, indywidualna zgoda/limit kWh i mechanizm niezależnego zakończenia przy awarii HA. Bez tego tylko `proposal_only`. **M6, Codex + zatwierdzenie każdej operacji przez użytkownika**.
 
 ## P1 — jakość planu i ekonomii
-- [ ] Cena przy progu PV 0,40: surowe zaokrąglone sloty kontra dokładniejsza bieżąca cena; `PRICE_THRESHOLD_AMBIGUOUS`, DST, restart. **M2, Codex**.
-- [ ] Forecast.Solar: realna odpowiedź `forecast_solar.get_forecast`, config entry, sloty i UTC; rozpoznanie curtailment. **M2, Codex**.
-- [ ] Recorder: retencja/rozdzielczość trzech składowych `home_energy_consumption` i historyczne fałszywe zera `float(0)`. **M2, Codex**.
+- [ ] Cena przy progu PV 0,40: walidator i testy offline `PRICE_THRESHOLD_AMBIGUOUS`, UTC/DST 23/25 h są zaimplementowane; pozostaje potwierdzenie rzeczywistych danych encji i zachowania po restarcie prywatnej instalacji. **M2, Codex; observed: testy, unverified: instalacja**.
+- [ ] Forecast.Solar: natywna usługa Core 2026.10.2 została przetestowana z kontrolowanym estymatem (config entry, `wh_period` w Wh od początku interwału, UTC). Retencja jest ograniczona wiekiem, liczbą i rozmiarem, zachowuje pierwotne wartości i czas pierwszego odczytu oraz umożliwia odtworzenie obserwacji dostępnej w chwili decyzji; czas generacji u dostawcy nie jest dostępny w usłudze HA. Stare znormalizowane wersje nie odzyskują utraconych surowych danych. Podejrzenie curtailment jest diagnostyką, nie pomiarem utraconej produkcji. Pozostaje potwierdzenie odpowiedzi i pokrycia na prywatnej instalacji. **M2, Codex; observed: test kontraktu, unverified: instalacja**.
+- [ ] Recorder: adapter i odrzucanie zamaskowanych zer/nieweryfikowalnych okresów mają testy z rzeczywistym Recorder SQLite w pamięci. Dłuższe zakresy można czytać na żądanie porcjami do 24 h (maksymalnie 366 dni), bez kopii bazy ani automatycznego wielomiesięcznego odczytu; diagnostyka rozróżnia retencję ustawioną od pokrycia. Pozostaje potwierdzenie retencji/rozdzielczości i jakości trzech składowych `home_energy_consumption` na prywatnej instalacji; niezmienne stare próbki są konserwatywnie odrzucane. **M2, Codex; observed: testy, unverified: instalacja**.
 - [ ] Sprawność torów AC/DC, wiarygodność SOC i moc rzeczywiście dostępna przy BMS; parametry 0,9487/0,97 są tylko założeniami. **M3/M5, Codex**.
 - [ ] Model wykonalnych akcji i dynamicznego TOU, wartość końcowego SOC, backtest walk-forward na prawdziwych migawkach prognoz, bez future leakage. **M3/M5, Codex**.
 

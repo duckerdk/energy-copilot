@@ -4,6 +4,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 import re
 import sys
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = {
@@ -15,7 +16,11 @@ EXPECTED = {
 LINK = re.compile(r"(?<!!)\[[^\]\n]+\]\(([^)]+)\)")
 def main():
     errors = []
-    all_md = {p.relative_to(ROOT).as_posix() for p in ROOT.rglob("*.md") if ".git" not in p.parts}
+    # Ignore local virtualenv/test caches, including their generated README files.
+    all_md = set(subprocess.check_output(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "--", "*.md"],
+        cwd=ROOT, text=True,
+    ).splitlines())
     if all_md != EXPECTED:
         errors.append(f"Markdown layout mismatch: extra={sorted(all_md-EXPECTED)} missing={sorted(EXPECTED-all_md)}")
     count = 0

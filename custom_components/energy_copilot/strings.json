@@ -1,0 +1,90 @@
+{
+  "title": "Energy Co-Pilot",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Read-only sources",
+        "description": "M1/M2 only reads data. PV, grid, battery, SOC, home and purchase/sale prices are required. Other sources are optional diagnostics; missing or unavailable data is reported without sending inverter commands.",
+        "data": {
+          "pv": "Pv",
+          "pv1": "Pv1 (optional)",
+          "pv2": "Pv2 (optional)",
+          "grid": "Grid",
+          "battery": "Battery",
+          "voltage": "Voltage (optional)",
+          "current": "Current (optional)",
+          "soc": "Soc",
+          "home": "Home",
+          "grid_alternative": "Grid Alternative (optional)",
+          "daily_pv": "Daily Pv (optional)",
+          "daily_charge": "Daily Charge (optional)",
+          "daily_discharge": "Daily Discharge (optional)",
+          "buy": "Buy",
+          "sell": "Sell",
+          "mode": "Read-only mode",
+          "forecast_entry": "Forecast.Solar configuration entry (optional)",
+          "solar_sell": "PV export permission switch (optional, read only)",
+          "forecast_retention_days": "Forecast retention (days)",
+          "forecast_max_versions": "Maximum retained forecast versions"
+        }
+      }
+    },
+    "error": {
+      "entity_missing": "Select an existing entity with the correct domain.",
+      "duplicate_entity": "Each sensor role must use a distinct entity.",
+      "read_only": "Only monitor and dry_run are supported.",
+      "forecast_entry_missing": "Select an existing Forecast.Solar configuration entry.",
+      "invalid_retention": "Enter a whole number within the supported retention limits."
+    },
+    "abort": {
+      "already_configured": "Energy Co-Pilot is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Read-only sources",
+        "data": {
+          "pv": "Pv",
+          "pv1": "Pv1 (optional)",
+          "pv2": "Pv2 (optional)",
+          "grid": "Grid",
+          "battery": "Battery",
+          "voltage": "Voltage (optional)",
+          "current": "Current (optional)",
+          "soc": "Soc",
+          "home": "Home",
+          "grid_alternative": "Grid Alternative (optional)",
+          "daily_pv": "Daily Pv (optional)",
+          "daily_charge": "Daily Charge (optional)",
+          "daily_discharge": "Daily Discharge (optional)",
+          "buy": "Buy",
+          "sell": "Sell",
+          "mode": "Read-only mode",
+          "forecast_entry": "Forecast.Solar configuration entry (optional)",
+          "solar_sell": "PV export permission switch (optional, read only)",
+          "forecast_retention_days": "Forecast retention (days)",
+          "forecast_max_versions": "Maximum retained forecast versions"
+        }
+      }
+    },
+    "error": {
+      "entity_missing": "Select an existing entity with the correct domain.",
+      "duplicate_entity": "Each sensor role must use a distinct entity.",
+      "read_only": "Only monitor and dry_run are supported.",
+      "forecast_entry_missing": "Select an existing Forecast.Solar configuration entry.",
+      "invalid_retention": "Enter a whole number within the supported retention limits."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "input_quality": {
+        "name": "Input quality",
+        "state": {
+          "valid": "Valid",
+          "degraded": "Degraded"
+        }
+      }
+    }
+  }
+}
