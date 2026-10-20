@@ -83,7 +83,14 @@ def quality_report(issues, forecast_coverage=None):
         if current_counts["uncertainty"]
         else "valid",
         "quality_scope": "required_current_inputs",
-        "forecast_state": "incomplete" if any(i["source"] == "forecast_solar" and i["category"] == "blocking" for i in classified) else "available",
+        "forecast_state": (
+            "incomplete"
+            if any(
+                i["source"] == "forecast_solar" and i["category"] == "blocking"
+                for i in classified
+            )
+            else "available"
+        ),
         "planning_readiness": "not_evaluated_m2",
         "load_profile_readiness": "physical_validation_required",
         "live_measurement_acceptance": "pending_day_and_night_ha_evidence",
