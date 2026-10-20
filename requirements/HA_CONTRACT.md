@@ -16,7 +16,7 @@ Wymagania ekonomiczne i uprawnienia: [REQUIREMENTS.md](REQUIREMENTS.md). Fizyczn
 
 Normalizacja mocy: `grid_import=max(0,P_grid)`, `grid_export=max(0,-P_grid)`, `battery_discharge=max(0,P_bat)`, `battery_charge=max(0,-P_bat)`. Wszystkie wartości wejściowe początkowo [W], następnie konwersja na kW. Kierunki potwierdził użytkownik; nie zadawać mu znów tych pytań. `sensor.pv_sum` pokazuje **moc faktycznie przyjętą na wejściach falownika**, a nie potencjał produkcji ograniczonej (curtailment). Nie doliczać PV→bateria jako dodatkowej produkcji.
 
-**Jedyny pomiar PV:** `sensor.pv_sum`. Energy Co-Pilot nie odczytuje ani nie waliduje PV1/PV2. Dla natywnego szablonu HA, który nie raportuje ponownie niezmienionej wartości, zachowujemy liczbę z oryginalnym czasem i `pv_template_time_unverified` (`uncertainty`); nie tworzymy heartbeat ani domniemanych danych. `unknown`, `unavailable`, błędne jednostki i wartości nadal blokują PV. Dla pomiaru niebędącego rozpoznanym natywnym szablonem obowiązuje limit wieku 300 s.
+**Jedyny pomiar PV:** `sensor.pv_sum`. Energy Co-Pilot nie odczytuje ani nie waliduje PV1/PV2. Poprawna, dostępna wartość `sensor.pv_sum=0 W` jest ważna także przez całą noc, nawet bez nowych raportów HA. Nie wymagamy heartbeat ani synchronizacji czasów raportów różnych encji. Dla dodatniej mocy PV nadal wymagamy aktualnego raportu (maks. 300 s); niezmienne dodatnie PV nie może być traktowane bezterminowo jako świeży pomiar. Nie tworzymy heartbeat ani domniemanych danych. `unknown`, `unavailable`, błędne jednostki i wartości nadal blokują PV. Limit wieku 300 s obowiązuje dla dodatniej mocy PV i pozostałych pomiarów. Brak raportu nie jest błędem przy dostępnej, poprawnej wartości PV=0 W; `unknown` i `unavailable` pozostają błędami.
 
 **Dom jest szablonem:** `pv_sum + grid + battery`, nie niezależnym licznikiem. To jedyne trzy źródła kontrolowane w bieżącym bilansie. Przy niezgodnej świeżej sumie zgłaszamy `derived_sum_time_uncertain`, a przy starym zgodnym szablonie zachowujemy as-of z niepewnością. Wykryty zanik i powrót jednego z tych źródeł oznacza potrzebę ponownego raportowania domu. Ujemne ważne `home` normalizujemy zgodnie z wymaganiem do `max(0,home)`. Braki nie są zamieniane na zero. Nie twierdzimy, że bilans AC/DC jest fizycznie potwierdzony.
 
@@ -24,9 +24,9 @@ Normalizacja mocy: `grid_import=max(0,P_grid)`, `grid_export=max(0,-P_grid)`, `b
 | Sytuacja | Decyzja |
 |---|---|
 | Poprawny `sensor.pv_sum` | Jedyny pomiar PV; brak zależności od PV1/PV2 |
-| Niezmienny natywny szablon PV starszy niż 300 s | Zachowany z ostrzeżeniem `pv_template_time_unverified` |
+| Dostępny `pv_sum=0 W` bez raportu przez wiele godzin | Akceptowany bez ostrzeżenia o czasie; nadal odrzucać `unknown`/`unavailable` |
 | `pv_sum=unknown/unavailable` lub wadliwy | Odrzucony; dom niedostępny |
-| Stary raport domu zgodny z PV/sieć/bateria | Zachowany z jawną niepewnością |
+| Świeży dom zgodny z dostępnym PV=0 W, siecią i baterią | Zachowany; brak ostrzeżenia wyłącznie z powodu starego czasu PV |
 | Świeża suma domu różni się ponad 1 W | `derived_sum_time_uncertain`, bez twierdzeń o fizycznej awarii |
 | Zanik źródła i powrót | Wymagany nowy raport po odzyskaniu źródła |
 
@@ -71,3 +71,11 @@ Użytkownik potwierdził poprawne działanie nastaw 0 A i pozostałych regulator
 ## Jakość danych 0.1.5
 
 `Input quality` dotyczy wyłącznie bieżących wejść. Brak prognozy na noc nie degraduje bieżących pomiarów. `forecast_state=incomplete` oraz szczegółowe problemy prognozy pozostają dostępne. Przyszły planner nie może traktować nieopublikowanych Wh jako potwierdzonego zera.
+
+## Polityka od 0.1.6
+
+- Jedynym źródłem PV jest `sensor.pv_sum`; brak PV1/PV2.
+- Poprawny dostępny odczyt `0 W` jest prawidłowy niezależnie od `last_reported`; nie oznacza sam w sobie awarii ani rozbieżności pomiarów.
+- Dodatnia moc PV i inne wejścia zachowują kontrolę aktualności; `unknown`, `unavailable`, złe jednostki, niefinitywne i ujemne wartości pozostają błędami.
+- Różne czasy raportowania poprawnych, dostępnych źródeł nie są błędem wejścia. Rzeczywiste niespójności wartości i wykryte awarie/recovery nadal wymagają diagnostyki.
+- Brak nocnych godzin Forecast.Solar nie blokuje wejść. Brak prognozy w zmierzchu pozostaje jawny jako ograniczenie pokrycia prognozy, bez wstawiania wymyślonych Wh.
