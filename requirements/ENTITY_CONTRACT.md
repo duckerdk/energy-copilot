@@ -14,7 +14,7 @@
 | `number.sun12k_maximum_battery_discharge_current` | Maksymalny prąd rozładowania baterii | 0–100 A |
 | `number.sun12k_maximum_battery_grid_charge_current` | Dodatkowy maksymalny prąd ładowania z sieci | 0–50 A |
 
-Przyjmujemy, że **właściwe encje wykonują właściwe funkcje**. To **założenie projektowe**, nie wynik testu fizycznego. Nie blokuje projektowania algorytmu i mapowania akcji, ale nie upoważnia do uruchomienia zapisów; semantykę oraz skutek `0 A` zweryfikować dopiero w osobno uzgodnionym teście. Więcej: [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md).
+Użytkownik potwierdził 20.10.2026, że falownik przyjmuje zadane wartości i rzeczywiście na nie reaguje. To potwierdzenie działania regulacji od użytkownika, nie dowód poprawności dowolnej akcji automatyki. Nie pytać o każdy parametr osobno; przy integracji wykonać zwykłą kontrolę odczytu i skutku oraz walidację fizycznych limitów. Więcej: [EXECUTION_CONTRACT.md](EXECUTION_CONTRACT.md).
 
 ## Aktualne role — obserwacja z 19.10.2026
 
@@ -53,7 +53,7 @@ Energy Co-Pilot stosuje **własne zakresy dozwolonych nastaw w amperach**, całk
 
 **Ustalenie z 20.10.2026:** są to limity polityki Energy Co-Pilot (własna walidacja konfiguracji i planu), a **nie** potwierdzone granice sprzętowe Deye/BMS. Moduł wykonawczy odrzuca propozycje nastaw poza zakresami i nie korzysta z niewiarygodnych `min/max = ±16 777 220 A` ogłaszanych przez encje. Mniejszy limit wynikający ze sprzętu/BMS ma zawsze pierwszeństwo. Nie wolno przekładać amperów na sztywne kW bez aktualnego napięcia i ustalonej strony AC/DC.
 
-**Ważne:** przyjęcie **0 A jako dozwolonej wartości liczbowej** nie jest dowodem, że `number.set_value: 0` jest przez falownik akceptowane lub że wyłącza konkretny tor. Semantyka `0 A`, znaczenie regulatora `grid_charge_current`, granice faktycznie obsługiwane i bezpieczna procedura wyłączenia pozostają do nadzorowanego sprawdzenia **przed** jakimkolwiek zapisem. Brak pozytywnego testu oznacza pozostawienie tej zdolności w `read_only`/`disabled`.
+**Ważne:** wartość `0 A` jest dopuszczona w polityce i użytkownik potwierdził działanie nastaw. Nie utożsamiać jednak ogólnego limitu prądu z aktywacją Grid Charge ani nastawą SOC. Podczas wdrożenia sprawdzać na HA stan i fizyczny skutek komend oraz bezpieczną procedurę wyjścia bez dodatkowej ankiety użytkownika.
 
 **Reguła implementacji:** osobno walidować zakres przy konfiguracji, tworzeniu planu, przed wykonaniem akcji i po odczycie stanu. Nie podmieniać nieprawidłowej komendy przez ciche przycięcie do granicy; odrzucić ją i wyjaśnić powód w rejestrze decyzji.
 
@@ -76,7 +76,7 @@ Energy Co-Pilot stosuje **własne zakresy dozwolonych nastaw w amperach**, całk
 | `house_load_forecast_slots` | średnie kW, energia kWh, jakość pokrycia, czas i wersja modelu | **Algorytm zdefiniowany** w [LOAD_FORECAST_CONTRACT.md](LOAD_FORECAST_CONTRACT.md): lokalny Recorder dla `sensor.home_energy_consumption`, bez przyszłych danych; dostępność historycznych próbek zostanie sprawdzona w HA |
 | `curtailment_status` | `uncurtailed` / `curtailed_confirmed` / `curtailment_unknown` | Potrzebny zweryfikowany sygnał ograniczenia PV lub jawna klasyfikacja niepewności; pełna bateria i eksport OFF nie dowodzą ilości straconych kWh |
 
-**Granice baterii:** 10,24 kWh to suma nominalna; zakres SOC 20–100% reprezentuje nominalnie 8,192 kWh między granicami, **nie** gwarantowaną energię dostarczoną po AC.
+**Granice baterii:** 10,24 kWh to suma nominalna; twarda polityka minimum SOC **20%** oznacza zakres planowania 20–100% i nominalnie 8,192 kWh między granicami, **nie** gwarantowaną energię dostarczoną po AC. Nie planować rozładowania poniżej 20%; wyższy limit BMS/urządzenia ma pierwszeństwo.
 
 ### Schemat pojedynczego slotu
 
