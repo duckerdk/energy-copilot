@@ -76,14 +76,12 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         # State-change events preserve short outages between the 30-second polls.
         @callback
         def source_changed(event):
-            templates = derived_templates(self.hass, self.entities)
             for role in WATCHED_ROLES:
                 if self.entities[role] == event.data["entity_id"]:
                     self.live_context.observe(
                         role,
                         event.data["new_state"],
                         dt_util.utcnow(),
-                        derived=role in templates,
                     )
 
         self.config_entry.async_on_unload(
@@ -130,9 +128,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             }
         for role in WATCHED_ROLES:
             if self.entities[role]:
-                self.live_context.observe(
-                    role, states[role], now, derived=role in templates
-                )
+                self.live_context.observe(role, states[role], now)
         snapshot.measurements, snapshot.flows_kw, snapshot.issues = measurements(
             states,
             now,
