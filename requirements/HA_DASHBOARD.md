@@ -63,6 +63,8 @@ Propozycja na panelu zawiera **jednocześnie**: czas początku i końca, liczbę
 - Powiadomienie mobilne może prowadzić do panelu konkretnej propozycji; historyczna usługa `notify.mobile_app_pixel_7dk` jest opcjonalna, nie zakładać jej dostępności na stałe.
 - Nie prezentować przycisku „Zatwierdź”, gdy brak możliwości fizycznego, osobno mierzonego i bezpiecznie odwracalnego eksportu z baterii; ewentualny wariant pokazuje się jako **hipotetyczny**.
 
+**Kontrola zamiaru prądowego:** w widoku decyzji wskazać oddzielnie: wybrany limit ogólnego ładowania [A], limit sieci [A], limit rozładowania [A], bieżące napięcie baterii [V], przewidywany przepływ DC [kW] i faktyczny pomiar [kW], aktywny TOU oraz status wykonalności. Limit 5 A nie jest deklaracją, że cały czas płynie dokładnie 5 A; powód ograniczenia (PV/BMS/SOC/TOU) powinien być czytelny z rejestru decyzji. Szczegóły: [CURRENT_CONTROLLER_MODEL.md](CURRENT_CONTROLLER_MODEL.md).
+
 ## 6. Stop, blokady i awarie
 
 - Widoczny przełącznik wstrzymania automatyki może zablokować **nowe akcje**; nazwa ma wskazywać, że to nie sprzętowy E-STOP.
