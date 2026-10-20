@@ -46,16 +46,16 @@ jobs:
             deleted=$((deleted + 1))
             echo "Deleted merged branch: $branch"
           done <<'BRANCHES'
-1|audit/codex-spec-cleanup-2026-10-20|b127aaca4272434ab45a3f6d553605cc12a72358
-8|docs/negative-home-clamp-policy-2026-10-20|156b1f0ff3ad45adcaf9253a0dc81f4f128feac9
-4|docs/release-versioning-and-ha-quality-2026-10-20|6bc84f7a80c5f5eb879ec899ebf4eb413ec7f860
-6|docs/verify-real-ha-payload-2026-10-20|faa0b6cca44f01707250e72a2073d09922e4abec
-2|feat/m1-m2-read-only|af9c8bf90b8a8cc914d399426e23b2147c3ceca9
-3|fix/ha-real-data-diagnostics-2026-10-20|c85d20540df7d58b613bb6af39fb9c5d36036ac1
-7|fix/issue-5-forecast-contract|ff7948c2c655a476fde5cacd28cd2837b3c17a3c
-10|fix/issue-9-live-synchronization|7e805c3a4553457c24906406df5e4ee0d263f1c0
-11|fix/pvsum-only-release-v014|11429b187102ffb2b80baa9d50fd5d97af640d2b
-12|fix/0.1.5-night-quality|8e6526903cd9091da6bcf3e8320cb1464f517d28
+          1|audit/codex-spec-cleanup-2026-10-20|b127aaca4272434ab45a3f6d553605cc12a72358
+          8|docs/negative-home-clamp-policy-2026-10-20|156b1f0ff3ad45adcaf9253a0dc81f4f128feac9
+          4|docs/release-versioning-and-ha-quality-2026-10-20|6bc84f7a80c5f5eb879ec899ebf4eb413ec7f860
+          6|docs/verify-real-ha-payload-2026-10-20|faa0b6cca44f01707250e72a2073d09922e4abec
+          2|feat/m1-m2-read-only|af9c8bf90b8a8cc914d399426e23b2147c3ceca9
+          3|fix/ha-real-data-diagnostics-2026-10-20|c85d20540df7d58b613bb6af39fb9c5d36036ac1
+          7|fix/issue-5-forecast-contract|ff7948c2c655a476fde5cacd28cd2837b3c17a3c
+          10|fix/issue-9-live-synchronization|7e805c3a4553457c24906406df5e4ee0d263f1c0
+          11|fix/pvsum-only-release-v014|11429b187102ffb2b80baa9d50fd5d97af640d2b
+          12|fix/0.1.5-night-quality|8e6526903cd9091da6bcf3e8320cb1464f517d28
           BRANCHES
           echo "Merged branch refs deleted: $deleted"
       - name: Report branch cleanup result
