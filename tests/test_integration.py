@@ -10,6 +10,7 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
 )
 
+from custom_components.energy_copilot.config_flow import normalize
 from custom_components.energy_copilot.const import DOMAIN
 from custom_components.energy_copilot.diagnostics import (
     async_get_config_entry_diagnostics,
@@ -29,7 +30,7 @@ async def test_config_flow(hass, populated_hass, settings):
             result["flow_id"], settings
         )
         assert result["type"] is FlowResultType.CREATE_ENTRY
-        assert result["data"] == settings
+        assert result["data"] == normalize(settings)
         await hass.async_block_till_done()
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": "user"}
@@ -146,7 +147,7 @@ async def test_forecast_service_is_only_allowed_call(
         assert calls.call_args.args[3]["config_entry"] == solar.entry_id
         assert await hass.config_entries.async_reload(entry.entry_id)
         await hass.async_block_till_done()
-        assert len(entry.runtime_data.coordinator.versions) == 2
+        assert len(entry.runtime_data.coordinator.versions) == 1
         assert {c.args[1:3] for c in calls.call_args_list} == {
             ("forecast_solar", "get_forecast")
         }
@@ -242,3 +243,104 @@ async def test_forecast_capture_uses_response_time(
     assert data.forecast.captured_at == NOW + timedelta(seconds=2)
     assert data.forecast.periods[0].start == NOW + timedelta(hours=1)
     assert "forecast_horizon_incomplete" in {i.code for i in data.issues}
+
+
+async def test_minimal_mapping_runtime_diagnostics_reload_and_unload(
+    hass, populated_hass, entry
+):
+    from custom_components.energy_copilot.const import (
+        OPTIONAL_ENTITY_ROLES,
+        REQUIRED_ENTITY_ROLES,
+    )
+    from custom_components.energy_copilot.history import HistoryReadError
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    previous_reader = entry.runtime_data.coordinator.history_reader
+    minimal = {
+        k: v for k, v in entry.data.items() if k in REQUIRED_ENTITY_ROLES or k == "mode"
+    }
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], minimal
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    coordinator = entry.runtime_data.coordinator
+    assert coordinator.history_reader is not previous_reader
+    with pytest.raises(HistoryReadError, match="history_reader_closed"):
+        await previous_reader.async_read_window(NOW - timedelta(minutes=15), NOW)
+    assert all(coordinator.entities[r] is None for r in OPTIONAL_ENTITY_ROLES)
+    assert "voltage" not in coordinator.data.measurements  # No old data fallback.
+    assert coordinator.data.flows_kw["pv_dc"] == 3.034
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+    assert set(diag["observed"]["unconfigured_optional_roles"]) >= OPTIONAL_ENTITY_ROLES
+    assert {
+        i["source"]
+        for i in diag["issues"]
+        if i["code"] == "optional_entity_unconfigured"
+    } >= OPTIONAL_ENTITY_ROLES | {"solar_sell"}
+    assert diag["read_only"] is True
+    assert diag["observed"]["requested_history"] is None
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    with pytest.raises(HistoryReadError, match="history_reader_closed"):
+        await coordinator.history_reader.async_read_window(
+            NOW - timedelta(minutes=15), NOW
+        )
+
+
+async def test_selected_missing_optional_source_still_loads(
+    hass, populated_hass, entry
+):
+    hass.config_entries.async_update_entry(
+        entry, options={"voltage": "sensor.optional_missing"}
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+    assert {"code": "invalid_input", "source": "voltage"} in diag["issues"]
+    assert "voltage" not in diag["observed"]["measurement_roles"]
+    assert diag["read_only"] is True
+
+
+async def test_retention_options_reload_prunes_existing_versions(
+    hass, populated_hass, entry, freezer
+):
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    archive = entry.runtime_data.coordinator.forecast_history
+    for second in range(3):
+        freezer.move_to(NOW + timedelta(seconds=second))
+        response = forecast_response()
+        response["watts"][next(iter(response["watts"]))] += second
+        await archive.async_record(response, NOW + timedelta(seconds=second), "solar")
+    assert len(archive.versions) == 3
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {**entry.data, "forecast_max_versions": 1, "forecast_retention_days": 30},
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+    assert diag["observed"]["forecast_history"]["versions"] == 1
+    assert diag["observed"]["forecast_history"]["max_versions"] == 1
+    assert diag["observed"]["forecast_history"]["retention_days"] == 30
+
+
+async def test_bad_forecast_store_is_diagnostic_without_overwriting(
+    hass, populated_hass, entry
+):
+    from homeassistant.helpers.storage import Store
+
+    store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.forecasts")
+    original = {"format": 999, "versions": []}
+    await store.async_save(original)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+    assert diag["observed"]["forecast_history"]["available"] is False
+    assert {"code": "forecast_storage_unavailable", "source": "forecast_solar"} in diag[
+        "issues"
+    ]
+    assert await store.async_load() == original

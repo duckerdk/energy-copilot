@@ -36,7 +36,10 @@ async def async_reload_entry(hass: HomeAssistant, entry: EnergyConfigEntry) -> N
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: EnergyConfigEntry) -> bool:
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        return False
+    await entry.runtime_data.coordinator.history_reader.async_close()
+    return True
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: EnergyConfigEntry) -> None:

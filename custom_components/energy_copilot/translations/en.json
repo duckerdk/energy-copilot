@@ -4,26 +4,28 @@
     "step": {
       "user": {
         "title": "Read-only sources",
-        "description": "M1/M2 only reads data. Missing or unavailable data will be reported; no inverter commands are sent.",
+        "description": "M1/M2 only reads data. PV, grid, battery, SOC, home and purchase/sale prices are required. Other sources are optional diagnostics; missing or unavailable data is reported without sending inverter commands.",
         "data": {
           "pv": "Pv",
-          "pv1": "Pv1",
-          "pv2": "Pv2",
+          "pv1": "Pv1 (optional)",
+          "pv2": "Pv2 (optional)",
           "grid": "Grid",
           "battery": "Battery",
-          "voltage": "Voltage",
-          "current": "Current",
+          "voltage": "Voltage (optional)",
+          "current": "Current (optional)",
           "soc": "Soc",
           "home": "Home",
-          "grid_alternative": "Grid Alternative",
-          "daily_pv": "Daily Pv",
-          "daily_charge": "Daily Charge",
-          "daily_discharge": "Daily Discharge",
+          "grid_alternative": "Grid Alternative (optional)",
+          "daily_pv": "Daily Pv (optional)",
+          "daily_charge": "Daily Charge (optional)",
+          "daily_discharge": "Daily Discharge (optional)",
           "buy": "Buy",
           "sell": "Sell",
           "mode": "Read-only mode",
           "forecast_entry": "Forecast.Solar configuration entry (optional)",
-          "solar_sell": "PV export permission switch (read only)"
+          "solar_sell": "PV export permission switch (optional, read only)",
+          "forecast_retention_days": "Forecast retention (days)",
+          "forecast_max_versions": "Maximum retained forecast versions"
         }
       }
     },
@@ -31,7 +33,8 @@
       "entity_missing": "Select an existing entity with the correct domain.",
       "duplicate_entity": "Each sensor role must use a distinct entity.",
       "read_only": "Only monitor and dry_run are supported.",
-      "forecast_entry_missing": "Select an existing Forecast.Solar configuration entry."
+      "forecast_entry_missing": "Select an existing Forecast.Solar configuration entry.",
+      "invalid_retention": "Enter a whole number within the supported retention limits."
     },
     "abort": {
       "already_configured": "Energy Co-Pilot is already configured."
@@ -43,23 +46,25 @@
         "title": "Read-only sources",
         "data": {
           "pv": "Pv",
-          "pv1": "Pv1",
-          "pv2": "Pv2",
+          "pv1": "Pv1 (optional)",
+          "pv2": "Pv2 (optional)",
           "grid": "Grid",
           "battery": "Battery",
-          "voltage": "Voltage",
-          "current": "Current",
+          "voltage": "Voltage (optional)",
+          "current": "Current (optional)",
           "soc": "Soc",
           "home": "Home",
-          "grid_alternative": "Grid Alternative",
-          "daily_pv": "Daily Pv",
-          "daily_charge": "Daily Charge",
-          "daily_discharge": "Daily Discharge",
+          "grid_alternative": "Grid Alternative (optional)",
+          "daily_pv": "Daily Pv (optional)",
+          "daily_charge": "Daily Charge (optional)",
+          "daily_discharge": "Daily Discharge (optional)",
           "buy": "Buy",
           "sell": "Sell",
           "mode": "Read-only mode",
           "forecast_entry": "Forecast.Solar configuration entry (optional)",
-          "solar_sell": "PV export permission switch (read only)"
+          "solar_sell": "PV export permission switch (optional, read only)",
+          "forecast_retention_days": "Forecast retention (days)",
+          "forecast_max_versions": "Maximum retained forecast versions"
         }
       }
     },
@@ -67,7 +72,8 @@
       "entity_missing": "Select an existing entity with the correct domain.",
       "duplicate_entity": "Each sensor role must use a distinct entity.",
       "read_only": "Only monitor and dry_run are supported.",
-      "forecast_entry_missing": "Select an existing Forecast.Solar configuration entry."
+      "forecast_entry_missing": "Select an existing Forecast.Solar configuration entry.",
+      "invalid_retention": "Enter a whole number within the supported retention limits."
     }
   },
   "entity": {

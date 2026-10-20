@@ -3,17 +3,24 @@
 import asyncio
 import logging
 from datetime import timedelta
-from functools import partial
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
-from .const import DEFAULT_ENTITIES, DOMAIN, HISTORY_ROLES, UPDATE_INTERVAL
+from .const import (
+    DEFAULT_ENTITIES,
+    DEFAULT_FORECAST_MAX_VERSIONS,
+    DEFAULT_FORECAST_RETENTION_DAYS,
+    DOMAIN,
+    OPTIONAL_ENTITY_ROLES,
+    UPDATE_INTERVAL,
+)
+from .forecast_history import ForecastHistory
+from .history import HistoryReadError, RecorderHistoryReader
 from .models import InputSnapshot, Issue
-from .validation import forecast, history_slots, measurements, prices
+from .validation import forecast, measurements, prices
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,33 +39,49 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             role: self.settings.get(role, default)
             for role, default in DEFAULT_ENTITIES.items()
         }
-        self.forecast_store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.forecasts")
-        self.versions: list[dict] = []
+        self.forecast_history = ForecastHistory(
+            hass,
+            entry.entry_id,
+            retention_days=self.settings.get(
+                "forecast_retention_days", DEFAULT_FORECAST_RETENTION_DAYS
+            ),
+            max_versions=self.settings.get(
+                "forecast_max_versions", DEFAULT_FORECAST_MAX_VERSIONS
+            ),
+        )
+        self.history_reader = RecorderHistoryReader(hass, self.entities)
+        self._archive_available = True
         self._forecast = None
         self._history = ()
         self._external_issues = []
         self._last_external = None
 
     async def _async_setup(self):
-        stored = await self.forecast_store.async_load()
-        if isinstance(stored, dict) and isinstance(stored.get("versions"), list):
-            self.versions = stored["versions"][-48:]
+        try:
+            await self.forecast_history.async_load(dt_util.utcnow())
+        except HomeAssistantError:
+            # Preserve an unreadable/unknown store; do not overwrite it.
+            self._archive_available = False
 
     async def _async_update_data(self):
         now = dt_util.utcnow()
         snapshot = InputSnapshot(now)
         states = {
-            role: self.hass.states.get(entity_id)
+            role: self.hass.states.get(entity_id) if entity_id else None
             for role, entity_id in self.entities.items()
         }
         snapshot.measurements, snapshot.flows_kw, snapshot.issues = measurements(
             states, now
         )
+        for role in OPTIONAL_ENTITY_ROLES:
+            if not self.entities[role]:
+                snapshot.issues.append(Issue("optional_entity_unconfigured", role))
         snapshot.prices, issues = prices(states["buy"], states["sell"], now)
         snapshot.issues.extend(issues)
-        solar_sell = self.hass.states.get(
-            self.settings.get("solar_sell", "switch.sun12k_solar_sell")
-        )
+        solar_sell_id = self.settings.get("solar_sell", "switch.sun12k_solar_sell")
+        solar_sell = self.hass.states.get(solar_sell_id) if solar_sell_id else None
+        if not solar_sell_id:
+            snapshot.issues.append(Issue("optional_entity_unconfigured", "solar_sell"))
         soc = snapshot.measurements.get("soc")
         if solar_sell is None or solar_sell.state not in {"on", "off"}:
             snapshot.issues.append(Issue("invalid_input", "solar_sell"))
@@ -69,6 +92,17 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             minutes=15
         ):
             self._external_issues = []
+            if self._archive_available:
+                try:
+                    await self.forecast_history.async_prune(now)
+                except HomeAssistantError:
+                    self._external_issues.append(
+                        Issue("forecast_storage_failed", "forecast_solar")
+                    )
+            else:
+                self._external_issues.append(
+                    Issue("forecast_storage_unavailable", "forecast_solar")
+                )
             await self._async_forecast(now)
             await self._async_history(now)
             self._last_external = now
@@ -122,63 +156,33 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                 Issue("forecast_unavailable_or_invalid", "forecast_solar")
             )
             return
-        self.versions.append(
-            {
-                "captured_at": now.isoformat(),
-                "version": self._forecast.version,
-                "periods": [
-                    {
-                        "start": p.start.isoformat(),
-                        "end": p.end.isoformat(),
-                        "kwh": p.kwh,
-                    }
-                    for p in self._forecast.periods
-                ],
-            }
-        )
-        self.versions = self.versions[-48:]
-        try:
-            await self.forecast_store.async_save({"versions": self.versions})
-        except HomeAssistantError:
-            self._external_issues.append(
-                Issue("forecast_storage_failed", "forecast_solar")
-            )
+        if self._archive_available:
+            try:
+                self._forecast = await self.forecast_history.async_record(
+                    response, now, entry_id
+                )
+            except HomeAssistantError:
+                self._external_issues.append(
+                    Issue("forecast_storage_failed", "forecast_solar")
+                )
+            except ValueError, TypeError, OverflowError:
+                self._external_issues.append(
+                    Issue("forecast_history_invalid", "forecast_solar")
+                )
+
+    @property
+    def versions(self):
+        """Retained observation metadata, without duplicating original payloads."""
+        return self.forecast_history.versions
 
     async def _async_history(self, now):
         self._history = ()
-        if "recorder" not in self.hass.config.components:
-            self._external_issues.append(Issue("recorder_unavailable", "recorder"))
-            return
-        from homeassistant.components.recorder import get_instance
-        from homeassistant.components.recorder.history import get_significant_states
-        from sqlalchemy.exc import SQLAlchemyError
-
-        # Only complete UTC quarter hours, bounded to 24h; full attributes required for units.
         end = now.replace(minute=now.minute // 15 * 15, second=0, microsecond=0)
         start = end - timedelta(days=1)
         try:
-            rows = await get_instance(self.hass).async_add_executor_job(
-                partial(
-                    get_significant_states,
-                    self.hass,
-                    start,
-                    end,
-                    entity_ids=[self.entities[r] for r in HISTORY_ROLES],
-                    include_start_time_state=True,
-                    significant_changes_only=False,
-                    minimal_response=False,
-                    no_attributes=False,
-                )
-            )
-            self._history = await self.hass.async_add_executor_job(
-                history_slots,
-                rows,
-                self.entities,
-                start,
-                end,
-            )
-        except HomeAssistantError, SQLAlchemyError, ValueError, TypeError:
-            self._external_issues.append(Issue("recorder_query_failed", "recorder"))
+            self._history = await self.history_reader.async_read_window(start, end)
+        except HistoryReadError as err:
+            self._external_issues.append(Issue(err.code, "recorder"))
             return
         if any(s.home_kwh is None for s in self._history):
             self._external_issues.append(

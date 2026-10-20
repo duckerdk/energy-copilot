@@ -25,3 +25,14 @@ DEFAULT_ENTITIES = {
 }
 POWER_ROLES = {"pv", "pv1", "pv2", "grid", "battery", "home", "grid_alternative"}
 HISTORY_ROLES = ("pv", "grid", "battery", "home")
+
+# Core sources needed for measurements, SOC and the published price horizon.
+# Other sources corroborate the core measurements without blocking configuration.
+REQUIRED_ENTITY_ROLES = frozenset(
+    {"pv", "grid", "battery", "soc", "home", "buy", "sell"}
+)
+OPTIONAL_ENTITY_ROLES = frozenset(DEFAULT_ENTITIES) - REQUIRED_ENTITY_ROLES
+DEFAULT_FORECAST_RETENTION_DAYS = 90
+MAX_FORECAST_RETENTION_DAYS = 366
+DEFAULT_FORECAST_MAX_VERSIONS = 10_000
+MAX_FORECAST_VERSIONS = 50_000
