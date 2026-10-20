@@ -117,7 +117,7 @@ Wg użytkownika **wszystkie** nastawy Deye z HA pozostają zapisane po zaniku HA
 | Nowy plan w trakcie operacji | Zatrzymaj dalsze kroki, zweryfikuj skutek ostatniego i zastosuj przetestowaną procedurę bezpiecznego wyjścia |
 | Dane `unknown` / `unavailable` / przeterminowane | Zakaz nowych poleceń; aktywny tryb kończyć tylko zweryfikowaną procedurą |
 | Usługa zwróciła sukces, brak efektu w pomiarach | `failed` lub `uncertain`; nie oznaczać jako sukces |
-| Inna automatyzacja zmieniła nastawę | Zgłoś konflikt i `blocked`; nie walcz z nią ciągłym nadpisywaniem |
+| Ręczna zmiana przy aktywnym Co-Pilot | Co-Pilot może nadpisać ją przy następnym planie; bez pętli zapisów. STOP i bezpieczeństwo mają pierwszeństwo |
 | Restart HA lub integracji | Najpierw odczyt i uzgodnienie stanów; bez odtwarzania poprzedniej aktywnej akcji ani poprzedniej zgody |
 | Wyłączenie/odinstalowanie | Wstrzymaj nowe akcje; nie twierdź, że urządzenie wróciło do normalnego trybu bez fizycznego dowodu |
 | Awaria całego HA/Wi-Fi | Ostatnie nastawy Deye pozostają aktywne — **zaakceptowane przez użytkownika**. Fizyczna ochrona BMS/falownika i twarde min SOC 20% pozostają wymogiem; nie wykonywać nowych akcji. Po powrocie odczyt i nowy plan. Dla ograniczonych zgód, np. eksportu baterii, wymagać niezależnego zakończenia |
