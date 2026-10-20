@@ -75,6 +75,8 @@ J = Σ_t Δt * (Grid_import[t] * C_buy[t]
 - Poza horyzontem **nie publikujemy cen nieopublikowanych**. Fizyczne potrzeby energetyczne oraz historycznie skalibrowana, wyraźnie niepewna wartość kontynuacyjna mają zapobiegać sztucznemu rozładowaniu przy końcu listy cen; to **nie jest** prognoza ceny po północy ani arbitralna stała rezerwa SOC. Gdy kalibracja jest niewystarczająca, podawać zakres/niepewność i unikać dodatkowych cykli o niewiarygodnym zysku. Szczegóły: [FORECAST_POLICY.md](FORECAST_POLICY.md).
 - Replanowanie po faktycznej publikacji nowych cen aktualizuje całą trajektorię i cel SOC.
 
+**Realizowalność planu w instalacji Deye:** referencyjne równania opisują ekonomicznie optymalny przepływ, ale w bieżącej konfiguracji sterowanie ogólnym prądem ładowania jest wyłącznie **limitem maksimum**, a nie dokładną nastawą przepływu. Translator nie może deklarować, że zadał np. 2 kW ładowania, jeśli jedynie ustawił limit w A. Docelowe/minimalne SOC nie jest natywnie realizowane samą encją limitu prądu. Przy bieżącej pracy TOU SOC określa głównie warunki rozładowania, a Grid Charge plus SOC może umożliwiać cel sieciowego ładowania. Wymagane **oddzielne warianty matematycznego optimum, current-first przy niezmienianym TOU i opcjonalnego dynamicznego TOU**, z zachowaniem trwałych ostatnich nastaw po utracie HA. Metoda: [CONTROL_STRATEGY.md](CONTROL_STRATEGY.md).
+
 ## 6. Wyjście i zasady wykonania
 
 Dla każdego slotu udostępnić: początek/koniec, ceny, prognozę `S` i `L`, osiem przepływów, `Grid_import` i `Grid_export`, SOC przed/po, koszt, oszacowanie ryzyka oraz przesłanki decyzji. Bieżące wyjścia: zamierzony tryb (PV/sieć/mieszany, dom/eksport), moc, docelowy SOC, prognozy, stan dostępności danych i identyfikator planu.
