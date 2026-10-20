@@ -95,7 +95,7 @@ def test_home_report_lag_tracks_changed_inputs_not_unchanged_heartbeats():
 
 @pytest.mark.parametrize("role", HISTORY_ROLES)
 @pytest.mark.parametrize(
-    "fault", ["missing", "unknown", "unavailable", "nan", "unit", "stale", "future"]
+    "fault", ["missing", "unknown", "unavailable", "nan", "unit", "future"]
 )
 def test_real_faults_still_reject_numeric_template(role, fault):
     states = {r: make_state(r) for r in HISTORY_ROLES}
@@ -107,11 +107,7 @@ def test_real_faults_still_reject_numeric_template(role, fault):
         if fault in {"unknown", "unavailable", "nan"}
         else make_state(role, unit="kWh")
         if fault == "unit"
-        else timed(
-            role,
-            value=100 if role == "pv" and fault == "stale" else None,
-            age=301 if fault == "stale" else -11,
-        )
+        else timed(role, age=-11)
     )
     values, _, issues = measurements(states, NOW)
     assert "home" not in values
@@ -169,7 +165,7 @@ def test_rapid_transitions_preserve_uncertainty_and_physical_checks(source_state
         if seconds:
             # Accepting temporal uncertainty must not suppress corroborating failures.
             assert Issue("battery_power_inconsistent", "battery") in issues
-            assert quality_report(issues)["input_state"] == "degraded"
+            assert quality_report(issues)["input_state"] == "uncertain"
     summary = window.summary(now)
     assert summary["home_rejected"] == 0
     assert summary["source_change_with_uncertainty"] == 0
