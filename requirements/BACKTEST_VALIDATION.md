@@ -46,6 +46,8 @@ W razie braku historycznych migawek prognoz, nie wolno zastępować ich późnie
 
 Różnicę `B − C` można nazywać **modelową korzyścią wobec baseline**; różnicę `A − C` przedstawiać tylko z wyraźnym zaznaczeniem kontrfaktycznego charakteru C i błędu modelu. Nie deklarować „zaoszczędzono X DKK” na podstawie samego historycznego backtestu. Rzeczywisty efekt wymaga wdrożenia, pomiarów i adekwatnej korekty czynników zewnętrznych.
 
+**Odrębna ocena sposobu wykonania:** dla każdej decyzji energetycznej porównywać nie tylko wynik idealnego MPC, ale też ograniczoną wykonalność przy **current-first z niezmienianym TOU** i opcjonalnie **dynamic TOU**. Uwzględnić ograniczoną liczbę okien, utrzymywanie się nastaw po zaniku HA, utratę okazji PV przy limicie 5 A, ryzyko pozostawionego ładowania sieciowego i liczbę zmian encji. Wartość prądu A jest maksymalnym dopuszczeniem, a nie wymuszoną mocą; nie symulować idealnej realizacji przepływów, jeśli brak fizycznej walidacji. Szczegóły i testy CTRL: [CONTROL_STRATEGY.md](CONTROL_STRATEGY.md).
+
 ## 5. Ta sama energia końcowa i sprawiedliwy okres porównania
 
 Wyrównanie końcowego SOC albo jawna **wartość końcowej energii w magazynie** jest konieczne do interpretacji zysków. Nie zaliczać do oszczędności przypadkowego wypróżnienia baterii w ostatniej godzinie testu, jeśli baseline pozostawił więcej energii.
