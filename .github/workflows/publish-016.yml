@@ -1,4 +1,4 @@
-name: Publish v0.1.6 to HACS
+name: Publish Energy Co-Pilot v0.1.6 to HACS
 on:
   push:
     branches: [main]
