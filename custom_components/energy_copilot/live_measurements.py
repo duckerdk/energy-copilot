@@ -53,9 +53,9 @@ class LiveSourceContext:
     def __init__(self):
         self.recovery_at = {}
 
-    def observe(self, role, state, now, *, derived=False):
+    def observe(self, role, state, now):
         try:
-            measurement(role, state, now, allow_old_report=derived)
+            measurement(role, state, now)
         except ValueError:
             self.recovery_at[role] = None
         else:
