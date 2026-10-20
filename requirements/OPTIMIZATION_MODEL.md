@@ -8,7 +8,7 @@
 - Optymalizacja krocząca (MPC) z podstawowym krokiem `Δt = 0,25 h`; moc jest średnią w slocie [kW], energia to `P × Δt` [kWh].
 - **Horyzont cenowy jest zmienny**, zakończony ostatnim slotem z faktycznie opublikowaną ceną zakupu i sprzedaży. **Format danych potwierdzony:** `raw_today/raw_tomorrow`, `tomorrow_valid`, timestamp `hour` w obydwu encjach, a do planera tylko wspólne zweryfikowane przedziały. Szczegóły: [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md). Nie tworzyć fikcyjnej prognozy cen po ostatnim opublikowanym slocie.
 - Zwykle przed publikacją około 13:00 mamy ceny do końca **dzisiejszej** doby; po opublikowaniu cen następnej doby mamy również **jutro 00:00–23:59**, czyli bezpośrednio po 13:00 około 35 h. O obecności jutra decydują kompletne timestampy danych, nie sam zegar: publikacja może się opóźnić.
-- Replanowanie co 15 min, po publikacji nowej doby cenowej oraz przy istotnej zmianie wejść; każda decyzja jest powiązana z wersją planu i okresem ważności.
+- Replanowanie co 15 min, po publikacji nowej doby cenowej oraz przy istotnej zmianie wejść; każda decyzja jest powiązana z wersją planu i okresem ważności. Profil prognozy PV przez [PV_FORECAST_CONTRACT.md](PV_FORECAST_CONTRACT.md) (akcja natywna HA), obciążenia przez [LOAD_FORECAST_CONTRACT.md](LOAD_FORECAST_CONTRACT.md) (Recorder).
 - Rozkład cen uwzględnia rzeczywistą rozdzielczość źródła (godzinowa/15-minutowa); nie interpolować cen ani nie tworzyć brakujących slotów. Obsłużyć 23/25 godzin przy zmianie DST w Europe/Copenhagen.
 
 ## 2. Podstawowy bilans przepływów
