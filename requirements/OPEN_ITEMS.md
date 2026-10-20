@@ -18,7 +18,7 @@
 - [ ] **Forecast.Solar:** użytkownik potwierdził obecność akcji w UI, lecz nie jej odpowiedzi. W M2 zweryfikować wybrany `config_entry`, strukturę `wh_period`, UTC i pokrycie. Dalsza kalibracja tylko na przedziałach bez curtailment. [PV_FORECAST_CONTRACT](PV_FORECAST_CONTRACT.md).
 - [ ] **Historia Recorder:** sprawdzić retencję, rozdzielczość i jakość źródłowych trzech serii składających się na `home_energy_consumption` **w każdym historycznym slocie**, nie tylko stan obecny; zamiana `unavailable` na zero może zatruć model. [LOAD_FORECAST_CONTRACT](LOAD_FORECAST_CONTRACT.md), [MEASUREMENT_CONTRACT](MEASUREMENT_CONTRACT.md).
 - [ ] **Dane do ekonomii — stawka degradacji zamknięta:** użytkownik ustalił stałe **0,40 DKK/kWh rozładowania baterii DC**, liczone jednokrotnie i uwzględniane również przy decyzjach o zakupie energii na ładowanie. Minimum SOC = **20% twardo**. Do pomiarów / walidacji implementacyjnej pozostają sprawności AC/DC, użyteczna pojemność, rzeczywiste ograniczenia BMS i jakość prognoz; 0,9487 to ilustracja, nie pomiar. [CALIBRATION_POLICY](CALIBRATION_POLICY.md).
-- [ ] **MPC i uczciwy benchmark:** modelowalny zbiór działań current-first z istniejącym TOU, wartość SOC po końcu opublikowanych cen, migawki prognoz sprzed chwili decyzji, porównanie `walk-forward` z realnym stanem bazowym. Nie raportować hipotetycznego zysku jako oszczędności. [BACKTEST_VALIDATION](BACKTEST_VALIDATION.md).
+- [ ] **MPC i uczciwy benchmark:** porównać optymalizację z autonomicznym grid charge i dynamicznym TOU z realnym baseline, wartość SOC po końcu opublikowanych cen, migawki prognoz sprzed chwili decyzji, porównanie `walk-forward` z realnym stanem bazowym. Nie raportować hipotetycznego zysku jako oszczędności. [BACKTEST_VALIDATION](BACKTEST_VALIDATION.md).
 
 ## P2 — przed dystrybucją
 
@@ -28,4 +28,13 @@
 
 ## Decyzje zamknięte (nie są blokadami)
 
-Integracja natywna HA, bez Modbus/ESPHome; zakup i sprzedaż dokładnie z dwóch encji HA; cena progowa eksportu PV 0,40 DKK/kWh; brak eksportu baterii bez zgody; podstawowy backend current-first; początek `monitor/dry_run`; brak dodatkowej rezerwy SOC na blackout ponad **twarde minimum 20%**; stała degradacja **0,40 DKK/kWh rozładowania DC**, uwzględniana przy decyzjach zakupowych; akceptacja ostatnich nastaw po awarii HA. Pozostałe szczegóły w dokumentach normatywnych, nie powielać tutaj.
+Integracja natywna HA, bez Modbus/ESPHome; zakup i sprzedaż dokładnie z dwóch encji HA; cena progowa eksportu PV 0,40 DKK/kWh; brak eksportu baterii bez zgody; **użytkownik zatwierdził autonomiczne ładowanie z sieci i zmianę sześciu TOU**; ręczne zmiany w trakcie automatyki mogą być nadpisane przy następnym planie (STOP ma pierwszeństwo); eksport baterii tylko po indywidualnej zgodzie; **jedyny cel: minimalizacja łącznego kosztu w dostępnym horyzoncie**; początek `monitor/dry_run`; brak dodatkowej rezerwy SOC na blackout ponad **twarde minimum 20%**; stała degradacja **0,40 DKK/kWh rozładowania DC**, uwzględniana przy decyzjach zakupowych; akceptacja ostatnich nastaw po awarii HA. Pozostałe szczegóły w dokumentach normatywnych, nie powielać tutaj.
+
+
+## Uprawnienia projektowe potwierdzone 20.10.2026 (nie pytać ponownie)
+
+- Automatyczne ładowanie z sieci bez potwierdzania każdego cyklu, wyłącznie gdy opłacalne po cenie zakupu, stratach i degradacji.
+- Autonomiczne zmiany **wszystkich sześciu TOU** są dopuszczone, o ile plan jest poprawny i bezpiecznie wykonywalny; wcześniejszy zakaz automatyki TOU dotyczył etapu implementacyjnego, nie uprawnień użytkownika.
+- Co-Pilot jest nadrzędnym sterownikiem w trybie automatycznym: ręczna zmiana zwykłej nastawy może zostać nadpisana przy kolejnym planie. STOP/wyłączenie automatyki i limity bezpieczeństwa mają pierwszeństwo.
+- Eksport baterii zachować jako opcjonalną funkcję z **osobnym zatwierdzeniem każdej operacji**; brak zgody = brak eksportu baterii.
+- Cel nadrzędny: **minimalizacja całkowitego kosztu energii w całym dostępnym horyzoncie**, nie priorytet autokonsumpcji. Uwzględniać ceny, sprzedaż PV, degradację, sprawność, SOC i wartość końcową baterii; priorytet autokonsumpcji nie może zastąpić funkcji celu.
