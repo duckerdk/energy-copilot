@@ -28,8 +28,6 @@ def settings():
 def make_state(role, value=None, at=NOW, unit=None):
     values = {
         "pv": 3034,
-        "pv1": 2387,
-        "pv2": 647,
         "grid": 1200,
         "grid_alternative": 1200,
         "battery": 1000,
