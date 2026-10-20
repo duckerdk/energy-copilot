@@ -73,9 +73,7 @@ def test_unchanged_live_context_still_allows_approved_home_normalization(
     source_states, role, value
 ):
     source_states["home"] = make_state("home", -20)
-    source_states[role] = make_state(
-        role, value, at=NOW - timedelta(hours=8)
-    )
+    source_states[role] = make_state(role, value, at=NOW - timedelta(hours=8))
     values, _, issues = measurements(source_states, NOW)
     assert values["home"].value == 0
     assert values["home"].raw_value == -20
