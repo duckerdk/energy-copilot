@@ -1,81 +1,60 @@
-# Kontrakt Home Assistant — źródła danych i sterowanie
+# Kontrakt Home Assistant — źródła i sterowanie
 
-Wymagania ekonomiczne i uprawnienia: [REQUIREMENTS.md](REQUIREMENTS.md). Fizyczna realizacja: [EXECUTION.md](EXECUTION.md).
+Źródła decyzji i limitów: [REQUIREMENTS.md](REQUIREMENTS.md). Wykonanie: [EXECUTION.md](EXECUTION.md). Poniższy kontrakt opisuje działające M1/M2 i przyszłe encje sterujące; nie upoważnia do wysyłania komend.
 
-## Czujniki
-| Rola | Encja | Interpretacja |
-|---|---|---|
-| Produkcja PV | `sensor.pv_sum` | Wyłączne źródło mocy PV w Energy Co-Pilot |
-| Sieć | `sensor.sun12k_total_grid_power` | **Dodatnie = import, ujemne = eksport** |
-| Bateria | `sensor.sun12k_battery_output_power` | **Dodatnie = rozładowanie, ujemne = ładowanie** |
-| Napięcie/prąd baterii | `sensor.sun12k_battery_voltage`, `sensor.sun12k_battery_output_current` | Weryfikować relację P≈V·I i stronę DC z danymi HA |
-| SOC | `sensor.sun12k_battery_capacity` | %; twarda dolna granica polityki w REQUIREMENTS |
-| Zużycie domu | `sensor.home_energy_consumption` | Pochodna `pv_sum + total_grid_power + battery_output_power` |
-| Alternatywny odczyt sieci | `sensor.sun12k_out_of_grid_total_power_2` | Nie dodawać do `total_grid_power` |
-| Energia dzienna | `sensor.sun12k_daily_production`, `sensor.sun12k_today_charge_of_the_battery`, `sensor.sun12k_today_discharge_of_the_battery` | Kumulowane kWh, nie odrębne źródła mocy |
+## Pomiary
 
-Normalizacja mocy: `grid_import=max(0,P_grid)`, `grid_export=max(0,-P_grid)`, `battery_discharge=max(0,P_bat)`, `battery_charge=max(0,-P_bat)`. Wszystkie wartości wejściowe początkowo [W], następnie konwersja na kW. Kierunki potwierdził użytkownik; nie zadawać mu znów tych pytań. `sensor.pv_sum` pokazuje **moc faktycznie przyjętą na wejściach falownika**, a nie potencjał produkcji ograniczonej (curtailment). Nie doliczać PV→bateria jako dodatkowej produkcji.
+| Rola | Encja | Zasada |
+| --- | --- | --- |
+| Moc PV | `sensor.pv_sum` | **Jedyne** źródło produkcji przyjętej na wejściu falownika, w W |
+| Sieć | `sensor.sun12k_total_grid_power` | Dodatnie = import, ujemne = eksport |
+| Bateria | `sensor.sun12k_battery_output_power` | Dodatnie = rozładowanie, ujemne = ładowanie |
+| Dom | `sensor.home_energy_consumption` | Szablon `PV + grid + battery`, nie niezależny licznik AC |
+| SOC | `sensor.sun12k_battery_capacity` | %; dolna granica polityki 20% |
+| Napięcie i prąd baterii | `sensor.sun12k_battery_voltage`, `sensor.sun12k_battery_output_current` | V i A; weryfikować stronę DC oraz P≈V×I |
+| Sieć — odczyt dodatkowy | `sensor.sun12k_out_of_grid_total_power_2` | Nie sumować z głównym odczytem sieci |
+| Liczniki dzienne | `sensor.sun12k_daily_production`, `sensor.sun12k_today_charge_of_the_battery`, `sensor.sun12k_today_discharge_of_the_battery` | kWh, nie dodatkowe źródła mocy |
 
-**Jedyny pomiar PV:** `sensor.pv_sum`. Energy Co-Pilot nie odczytuje ani nie waliduje PV1/PV2. Poprawna, dostępna wartość `sensor.pv_sum=0 W` jest ważna także przez całą noc, nawet bez nowych raportów HA. Nie wymagamy heartbeat ani synchronizacji czasów raportów różnych encji. Dla dodatniej mocy PV nadal wymagamy aktualnego raportu (maks. 300 s); niezmienne dodatnie PV nie może być traktowane bezterminowo jako świeży pomiar. Nie tworzymy heartbeat ani domniemanych danych. `unknown`, `unavailable`, błędne jednostki i wartości nadal blokują PV. Limit wieku 300 s obowiązuje dla dodatniej mocy PV i pozostałych pomiarów. Brak raportu nie jest błędem przy dostępnej, poprawnej wartości PV=0 W; `unknown` i `unavailable` pozostają błędami.
+Normalizacja: `grid_import=max(0,P_grid)`, `grid_export=max(0,-P_grid)`, `battery_discharge=max(0,P_bat)`, `battery_charge=max(0,-P_bat)`. Jednostki wejściowe mocy to W. Nie liczyć PV→bateria jako drugiej produkcji. `sensor.pv_sum` nie informuje, jaka produkcja PV byłaby możliwa bez ograniczenia (curtailment). Integracja **nie używa PV1/PV2**.
 
-**Dom jest szablonem:** `pv_sum + grid + battery`, nie niezależnym licznikiem. To jedyne trzy źródła kontrolowane w bieżącym bilansie. Przy niezgodnej świeżej sumie zgłaszamy `derived_sum_time_uncertain`, a przy starym zgodnym szablonie zachowujemy as-of z niepewnością. Wykryty zanik i powrót jednego z tych źródeł oznacza potrzebę ponownego raportowania domu. Ujemne ważne `home` normalizujemy zgodnie z wymaganiem do `max(0,home)`. Braki nie są zamieniane na zero. Nie twierdzimy, że bilans AC/DC jest fizycznie potwierdzony.
+## Walidacja bieżących odczytów — v0.1.6
 
-## Bieżące szablony — statusy walidacji M2
-| Sytuacja | Decyzja |
-|---|---|
-| Poprawny `sensor.pv_sum` | Jedyny pomiar PV; brak zależności od PV1/PV2 |
-| Dostępny `pv_sum=0 W` bez raportu przez wiele godzin | Akceptowany bez ostrzeżenia o czasie; nadal odrzucać `unknown`/`unavailable` |
-| `pv_sum=unknown/unavailable` lub wadliwy | Odrzucony; dom niedostępny |
-| Świeży dom zgodny z dostępnym PV=0 W, siecią i baterią | Zachowany; brak ostrzeżenia wyłącznie z powodu starego czasu PV |
-| Świeża suma domu różni się ponad 1 W | `derived_sum_time_uncertain`, bez twierdzeń o fizycznej awarii |
-| Zanik źródła i powrót | Wymagany nowy raport po odzyskaniu źródła |
+- Prawidłowy dostępny `sensor.pv_sum=0 W` jest ważny niezależnie od wieku `last_reported` — także przez całą noc. Nie wymagamy heartbeat.
+- Dodatnia moc PV oraz inne bieżące pomiary wymagają aktualnego raportu (limit 300 s). `unknown`, `unavailable`, błędne jednostki, wartości niefinitywne i niedozwolone ujemne wartości blokują pomiar; **nie** są zastępowane zerem.
+- Poprawne czujniki mogą raportować asynchronicznie. Sam rozrzut ich znaczników czasu nie oznacza błędu danych ani utraty domu. Rzeczywista różnica sumy `home` względem PV + sieć + bateria jest raportowana (`derived_sum_time_uncertain`); algebraiczna zgodność nie potwierdza niezależnego fizycznego bilansu AC/DC.
+- Dom jest pochodną trzech źródeł. Po wykrytej awarii źródła i jego powrocie wymagany jest właściwy nowy raport szablonu; stare liczby nie dowodzą odzyskania danych. Nienumeryczne źródła blokują wynik, nawet jeśli szablon HA z `float(0)` dalej pokazuje liczbę.
+- Prawidłowe liczbowe ujemne `home` są normalizowane wewnątrz Co-Pilot do `max(0, home)`, także przy całkowaniu Recorder. Oryginalna encja i jej historia nie są modyfikowane.
+
+`last_reported` to czas raportu backendowego Python State; `last_updated` oznacza aktualizację stanu i nie musi być heartbeat urządzenia. Frontendowy eksport HA może nie udostępniać `last_reported`. Nie przypisywać czasowi zmiany historycznej Recorder limitu świeżości bieżących raportów.
 
 ## Ceny
-- `sensor.energi_data_service`: końcowa cena zakupu; `sensor.energi_data_spotpris`: cena sprzedaży. Ceny z HA są danymi końcowymi; **bez dodawania lub odejmowania opłat**.
-- Obie encje udostępniają `attributes.raw_today`, `raw_tomorrow`, `tomorrow_valid` oraz rekordy `hour` i `price`. Odczytaj tylko rzeczywiście opublikowane dane, wspólne ważne przedziały kupna i sprzedaży.
-- Parsuj godzinę do UTC, zachowaj strefę Europe/Copenhagen i zmiany DST (23/25 godzin), wykryj puste, duplikowane, przeterminowane i rozbieżne sloty. **Nie dopisuj cen nieopublikowanych**.
-- Surowe ceny godzinowe mogą być zaokrąglone do 3 miejsc, a `current_price` dokładniejsze. Gdy np. `raw.price=0.400` i `current_price=0.3996` dają sprzeczne decyzje co do eksportu PV, oznacz `PRICE_THRESHOLD_AMBIGUOUS`, bez polecenia ON. Nie modyfikuj progu cenowego „histerezą”.
 
-## Prognozy
-- Forecast.Solar w HA: użytkownik potwierdził widoczność `forecast_solar.get_forecast`. Przy M2 sprawdź rzeczywisty `config_entry`, odpowiedź, `wh_period`/jednostki, daty, UTC i pokrycie. Nie rekonstruuj fikcyjnych przedziałów z samej sumy dziennej.
-- Forecast PV i historia: przechowuj wersje prognoz oraz ich czas **sprzed** prognozowanego okresu. Pełna bateria i Solar Sell OFF mogą oznaczać curtailment; nie ucz błędu Forecast.Solar na takich przedziałach bez potwierdzenia, że produkcja była nieograniczona.
-- Prognoza zapotrzebowania: Recorder z `home_energy_consumption`, profil na 15 min z porą dnia/tygodnia/sezonem i kontrolą źródeł historycznych. Używaj tylko danych znanych w chwili decyzji.
-- Sprawności PV→bateria, grid→bateria, bateria→AC, PV→AC są osobne. Parametry `0.9487` i `0.97` to historyczne wartości konfiguracyjne, **nie zmierzone wyniki**. Kalibrować z obserwowalnych okresów, raportując niepewność.
+- Zakup: `sensor.energi_data_service`, sprzedaż: `sensor.energi_data_spotpris`; jednostki **DKK/kWh**. Wartości HA są końcowe, bez ponownego doliczania taryf czy opłat.
+- `attributes.raw_today` i `raw_tomorrow` zawierają rekordy `{hour: ISO-8601 z offsetem, price: liczba}`; `tomorrow_valid` kontroluje publikację cen na jutro. Łączyć tylko wspólne prawidłowe opublikowane godziny kupna i sprzedaży.
+- Parsować do UTC z uwzględnieniem Europe/Copenhagen i DST 23/25 h. Nie wytwarzać nieopublikowanych cen, nie scalać błędnych ani zduplikowanych godzin.
+- Surowe ceny mogą być zaokrąglone do 3 miejsc, a `current_price` dokładniejsze. Gdy np. `0.400` kontra `0.3996` zmienia decyzję progową, zgłosić `PRICE_THRESHOLD_AMBIGUOUS` i nie wydawać polecenia ON. Nie zmieniać progu poprzez sztuczną histerezę.
 
-## Kontrakt potwierdzony surowym eksportem HA — 20.10.2026
+## Forecast.Solar i Recorder
 
-Źródło: eksport z działającego HA 2026.10.2, wykonany 20.10.2026 14:15 CEST, dla wersji Energy Co-Pilot 0.1.1; pełnego pliku zawierającego prywatną historię gospodarstwa domowego **nie umieszczać w repozytorium**. Rozdzielać format i obserwacje od walidacji fizycznej.
+- Używać natywnej usługi HA `forecast_solar.get_forecast` i wybranego config entry. Odpowiedź ma `watts` oraz `wh_period`, ze znacznikami czasu i strefą. **`wh_period[t_i]` opisuje energię Wh przedziału `(t_(i-1), t_i]` — czas oznacza KONIEC, nie początek.** Ostatni krótki przedział zachodu zachowuje rzeczywistą energię; pierwsza energia bez wcześniejszej granicy nie może być przypisana do nieznanego przedziału.
+- Brak publikacji nocnych godzin **nie degraduje** `Input quality`; `forecast_state` nadal pokazuje niepełność horyzontu. Brakujące okresy dnia/zmierzchu pozostają jawnie nierozstrzygnięte. Nie uzupełniać brakujących Wh zerami ani nie dzielić całego Wh rozpoczętego okresu według arbitralnego ułamka czasu.
+- Magazyn zachowuje wersję prognozy i czas jej dostępności do backtestu bez informacji z przyszłości. Pełna bateria i wyłączony Solar Sell mogą oznaczać ograniczenie produkcji — nie traktować tego automatycznie jako błędu prognozy.
+- Historia Recorder rekonstruuje zmiany stanów i kwadranse z prawdziwymi granicami zapisów. Jawne `unknown/unavailable`, nieznane przerwy i brakujące źródła wykluczają fragment danych. Niezmienna wartość nocnego PV nie jest luką sama w sobie. Nie utożsamiać formatu eksportu WebSocket (`s`, `a`, `lu`, `lc`) z backendowymi obiektami Python State.
+- Model obciążenia i sprawności dla M3/M5 wymaga kalibracji. Historyczne `0.9487` i `0.97` to parametry przyjęte, nie zmierzone sprawności.
 
-- **Pomiary bieżące:** 11 wskazanych encji istnieje, wszystkie mają oczekiwane jednostki (`W`, `V`, `A`, `%`, `DKK/kWh`). Przykładowe wartości: `pv_sum=185 W=51+134 W`; `home=3802 W=185+11+3606 W`; `battery=3606 W` i `V×I≈3606.57 W`. Znaczniki `last_updated` poszczególnych źródeł różnią się (PV 12:14:35.354 UTC, grid 12:14:50.498 UTC; **15,144 s**). Eksport z frontendowego `hass.states` ma `last_reported=null`; **nie dowodzi to**, że wewnętrzny obiekt Python HA nie ma `last_reported`.
-- **Ceny:** obie encje zawierają `raw_today` i `raw_tomorrow` — po 24 rekordy `{hour: ISO 8601 z offsetem, price: liczba DKK/kWh}`; `tomorrow_valid=true`; brak luk/duplikatów, zgodność godzin zakupu i sprzedaży. `current_price` ma większą precyzję niż `raw`. Tego dnia (bez zmiany DST) 48 opublikowanych godzin, od 20.10 00:00 CEST do 22.10 00:00 CEST.
-- **Forecast.Solar:** rzeczywista odpowiedź usługi HA `forecast_solar.get_forecast` zawiera `watts` i `wh_period`, każda po 24 znaczniki czasu ze strefą. **Kluczowe: `wh_period[t_i]` to Wh dla przedziału `(t_(i-1), t_i]`, czyli znacznika KOŃCA przedziału**, a nie początku. Obliczenie całki trapezowej z dwóch sąsiednich `watts` i rzeczywistego czasu między nimi potwierdza tę semantykę dla **23/23 przedziałów**, błąd absolutny ≤0,5 Wh (zaokrąglenie). Np. `wh_period[10:00]=614 Wh` odpowiada 09:00–10:00 (434→793 W). `wh_period[18:06:30]=9 Wh` odpowiada ostatniemu przedziałowi 18:00–18:06:30, a **nie** nieograniczonemu okresowi po zachodzie. Na granicach wschodu/zachodu i nocy czasy nie muszą być pełnymi godzinami. Zmiana przypisania energii ma krytyczne znaczenie dla planowania.
-- **Recorder:** frontendowe WebSocket `history/history_during_period` oddaje obiekty skrócone `s` (stan), `a` (atrybuty), `lu` (Unix epoch seconds) i niekiedy `lc`; to **format eksportu WebSocket**, nie tożsamy z Pythonowymi obiektami State/LazyState używanymi przez integrację. W czterech sześciogodzinnych porcjach 24 h wystąpiło: PV 3741, sieć 4412, bateria 4322, dom 12446 rekordów (wraz z wartościami na granicach okien). PV=0 pozostaje niezmienne wiele godzin nocą — brak zmiany stanu nie jest dowodem utraty aktualności sprzętu.
-- **Potwierdzone anomalie:** trzy krótkie, zbieżne epizody `pv:unknown` i `grid/battery:unavailable` (20.10 około 12:48, 13:30, 13:53 CEST); `home` pozostaje liczbowy również podczas epizodów. Dodatkowo `home` ma **26 ujemnych rekordów w 8 różnych kwadransach**, minimum -1768 W. Wszystkie 12446 rekordów `home` zgadzają się z sumą ostatnich zanotowanych `pv+grid+battery` w granicach 1 W, lecz algebraiczna zgodność szablonu **nie dowodzi poprawnego fizycznego zużycia domu**. Surowe ujemne wartości nie są normalnym poborem: zgodnie z nadrzędną decyzją używamy do obliczeń ich normalizacji `max(0, home)` wyłącznie przy ważnych źródłach i audytujemy korekty. Ocena błędu profilu wymaga weryfikacji synchronizacji i semantyki DC/AC, ale nie jest warunkiem zastosowania zatwierdzonej polityki. Eksport WebSocket nie zawiera pełnych informacji o przebiegach procesów Recorder i ustawieniach filtrów.
+Kontrakt czasów i końcowego indeksowania `wh_period` zweryfikowano na rzeczywistych danych HA 2026.10.2 z 20.10.2026. Szczegółowych próbek prywatnej historii nie przechowywać w repozytorium.
 
-**Konsekwencje dla Codexa:** zachować poprawione indeksowanie `wh_period` według KOŃCA przedziału, energię ostatniej granicy i regresje UTC/DST. Odróżniać niezmienny stan nocnego PV od braku źródła. Normalizować ujemny `home` według REQUIREMENTS dopiero po walidacji kontekstu; nie tworzyć zer z braków ani nie przedstawiać równania szablonu jako dowodu fizycznego pomiaru. Implementacja kodu tylko przez Codexa.
+## Encje wykonawcze (dopiero M6)
 
-## Encje wykonawcze
-| Akcja | Encja |
-|---|---|
-| Limit prądu ładowania 0–50 A | `number.sun12k_maximum_battery_charge_current` |
-| Limit rozładowania 0–100 A | `number.sun12k_maximum_battery_discharge_current` |
-| Limit ładowania z sieci 0–50 A | `number.sun12k_maximum_battery_grid_charge_current` |
+| Funkcja | Encja |
+| --- | --- |
+| Prąd ładowania 0–50 A | `number.sun12k_maximum_battery_charge_current` |
+| Prąd rozładowania 0–100 A | `number.sun12k_maximum_battery_discharge_current` |
+| Prąd ładowania z sieci 0–50 A | `number.sun12k_maximum_battery_grid_charge_current` |
 | Global Grid Charge | `switch.sun12k_grid_charge` |
-| Eksport nadwyżki PV | `switch.sun12k_solar_sell` |
-| TOU ON/OFF | `switch.sun12k_time_of_use` |
-| TOU 1…6: start, power, capacity | `number.sun12k_time_point_N_start`, `number.sun12k_time_point_N_power`, `number.sun12k_time_point_N_capacity` |
-| TOU 1…6: Grid Charge | `switch.sun12k_time_point_N_charge_enable` |
+| Solar Sell (eksport nadwyżki PV) | `switch.sun12k_solar_sell` |
+| TOU globalne | `switch.sun12k_time_of_use` |
+| TOU 1…6: początek, moc, SOC | `number.sun12k_time_point_N_start`, `number.sun12k_time_point_N_power`, `number.sun12k_time_point_N_capacity` |
+| TOU 1…6: zezwolenie na Grid Charge | `switch.sun12k_time_point_N_charge_enable` |
 
-Użytkownik potwierdził poprawne działanie nastaw 0 A i pozostałych regulatorów. W oprogramowaniu nadal walidować zakres/odczyt; HA potrafi zgłaszać absurdalne min/max ±16 777 220 A. Nie stosować ich. Limity są maksimum, **nie gwarantowaną mocą**. Nie używać nieaktywnych pozostałości `battery_controller.*`. Nie zmieniać YAML/ESPHome/Modbus. Testy: [VALIDATION.md](VALIDATION.md).
-
-## Jakość danych 0.1.5
-
-`Input quality` dotyczy wyłącznie bieżących wejść. Brak prognozy na noc nie degraduje bieżących pomiarów. `forecast_state=incomplete` oraz szczegółowe problemy prognozy pozostają dostępne. Przyszły planner nie może traktować nieopublikowanych Wh jako potwierdzonego zera.
-
-## Polityka od 0.1.6
-
-- Jedynym źródłem PV jest `sensor.pv_sum`; brak PV1/PV2.
-- Poprawny dostępny odczyt `0 W` jest prawidłowy niezależnie od `last_reported`; nie oznacza sam w sobie awarii ani rozbieżności pomiarów.
-- Dodatnia moc PV i inne wejścia zachowują kontrolę aktualności; `unknown`, `unavailable`, złe jednostki, niefinitywne i ujemne wartości pozostają błędami.
-- Różne czasy raportowania poprawnych, dostępnych źródeł nie są błędem wejścia. Rzeczywiste niespójności wartości i wykryte awarie/recovery nadal wymagają diagnostyki.
-- Brak nocnych godzin Forecast.Solar nie blokuje wejść. Brak prognozy w zmierzchu pozostaje jawny jako ograniczenie pokrycia prognozy, bez wstawiania wymyślonych Wh.
+Użytkownik potwierdził działanie nastaw 0 A. Przy zapisie walidować zakresy polityki i odczyt po zmianie; zgłaszane przez HA skrajne `min/max` nie muszą odpowiadać granicom sprzętu. Prąd zadany jest limitem, nie gwarancją przepływu. Nie używać nieaktywnych `battery_controller.*` ani nie modyfikować YAML/ESPHome/Modbus. Regresje: [VALIDATION.md](VALIDATION.md).
