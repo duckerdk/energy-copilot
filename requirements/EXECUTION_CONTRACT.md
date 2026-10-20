@@ -53,6 +53,14 @@ Dla trzech regulatorów Deye executor stosuje **twarde zakresy polityki użytkow
 - Przed zmianą prądu moduł musi mieć status `validated_write`, potwierdzoną jednostkę, bezpieczne wartości, pomiar zwrotny i sposób wyjścia. Żadne z tych ograniczeń nie aktywuje automatyki samo.
 - Encje `battery_controller.*` są zgodnie z wyjaśnieniem użytkownika osieroconymi pozostałościami i **nie służą do blokowania** Energy Co-Pilot, rozpoznawania konfliktów ani wyznaczania nastaw. Jedynie realnie zaobserwowany inny aktywny wykonawca może stanowić konflikt.
 
+### Backend wykonawczy current-first i istniejący TOU
+
+Projektowy kanał bieżących korekt to natywne usługi HA do encji limitu prądu baterii; szczegóły [CONTROL_STRATEGY.md](CONTROL_STRATEGY.md). To **górny limit**, nie polecenie dokładnej mocy. Aktywne TOU pozostaje w stanie zastanym; jego aktualny okres i SOC ograniczają realną wykonalność intencji. Osobna operacja ładowania z sieci wymaga warunków globalnego Grid Charge, limitu ogólnego, limitu sieci i zgody Grid Charge w TOU. Zmiana wyłącznie limitu w A **nie** jest gwarancją ładowania.
+
+Urządzenie utrzymuje ostatnio zapisane nastawy po utracie HA. Nie uruchamiać operacji wymagających przyszłej komendy `OFF` jako jedynej bariery bezpieczeństwa; zwłaszcza nieplanowanego długotrwałego grid charge lub eksportu baterii. **Bezpieczny fizycznie limit prądu** i **ekonomicznie optymalna nastawa na dany kwadrans** to różne właściwości. Po restarcie konieczny nowy odczyt i plan, a nie odtworzenie dawnego polecenia.
+
+Dynamiczne programowanie sześciu okien TOU stanowi **osobną, domyślnie nieaktywną zdolność**, dopiero po testach atomowości pozornej, granicy 00:00, powtarzalności dobowej i wycofania niekompletnej aktualizacji. Samo istnienie encji TOU nie nadaje prawa do ich zapisu.
+
 ## 4. Sekwencja pojedynczej akcji
 
 1. **Snapshot i lock:** jedyny wykonawca operacji uzyskuje blokadę, zapisuje `plan_id`, `action_id`, slot UTC, wersję mapowania, bieżące pomiary i stan urządzenia.
