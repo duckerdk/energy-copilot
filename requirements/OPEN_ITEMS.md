@@ -1,29 +1,26 @@
-# Nierozstrzygnięte kwestie implementacyjne
+# Otwarte kwestie techniczne
 
-**Stan 20.10.2026.** To nie jest lista pytań do użytkownika. Potwierdzone decyzje są wyłącznie w [REQUIREMENTS.md](REQUIREMENTS.md). Wszystkie pozycje poniżej realizuje **Codex w odpowiednim etapie**; nie pytać ponownie o znaki mocy, limit 0 A, minimum SOC, TOU, degradację, awarię HA czy cel optymalizacji. P0 blokuje wyłącznie odpowiednie fizyczne działanie, nie M1–M5.
+**Stan: v0.1.6, 20.10.2026.** Tylko sprawy nadal wymagające implementacji lub potwierdzenia; nie powtarzać zamkniętych decyzji użytkownika. Ich źródłem jest [REQUIREMENTS.md](REQUIREMENTS.md). Właściciel implementacji: Codex, chyba że wskazano inaczej. Testy offline i pojedynczy eksport HA nie zastępują walidacji pracy ciągłej.
 
-## P0 — przed danym zapisem na urządzeniu
-- [ ] **HA pomiary:** zweryfikować mapowanie DC/AC, napięcie×prąd baterii wobec mocy, spójność i świeżość próbek; kierunki znaków są już ustalone. **M2/M6, Codex**.
-- [ ] **Akcje i TOU:** implementacyjnie potwierdzić kroki encji, odczyt po zapisie, interakcję trzech limitów z Grid Charge/TOU/SOC/BMS, częściową aktualizację sześciu okien, ich powtarzalność i recovery. Użytkownik potwierdził ogólną skuteczność nastaw. **M6, Codex + osobny zatwierdzony test fizyczny**.
-- [ ] **PV / bateria:** sprawdzić, że Solar Sell przy dozwolonych zmianach TOU nie uruchamia niezamierzonego eksportu baterii. **M6, Codex + zatwierdzony test**.
-- [ ] **Trwałość i bezpieczeństwo:** ograniczenia BMS/sprzętu, min SOC 20%, restart/utrata HA, poprawne odczytanie ostatnich nastaw. **Ekonomiczne ryzyko braku korekty po awarii jest zaakceptowane**; brak potrzeby dodatkowego sprzętu tylko z tego powodu. **M6, Codex**.
-- [ ] **Eksport baterii (odrębna opcjonalna zdolność):** fizyczna separacja, pomiar baterii→sieci, indywidualna zgoda/limit kWh i mechanizm niezależnego zakończenia przy awarii HA. Bez tego tylko `proposal_only`. **M6, Codex + zatwierdzenie każdej operacji przez użytkownika**.
+## P0 — przed fizycznym sterowaniem (M6)
 
-## P1 — jakość planu i ekonomii
-- [ ] Cena przy progu PV 0,40: walidator i testy offline `PRICE_THRESHOLD_AMBIGUOUS`, UTC/DST 23/25 h są zaimplementowane; pozostaje potwierdzenie rzeczywistych danych encji i zachowania po restarcie prywatnej instalacji. **M2, Codex; observed: testy, unverified: instalacja**.
-- [ ] Forecast.Solar: natywna usługa Core 2026.10.2 została przetestowana z kontrolowanym estymatem (config entry, `wh_period[t]` w Wh za przedział KOŃCZĄCY się w t, UTC). Retencja jest ograniczona wiekiem, liczbą i rozmiarem, zachowuje pierwotne wartości i czas pierwszego odczytu oraz umożliwia odtworzenie obserwacji dostępnej w chwili decyzji; czas generacji u dostawcy nie jest dostępny w usłudze HA. Stare znormalizowane wersje nie odzyskują utraconych surowych danych. Podejrzenie curtailment jest diagnostyką, nie pomiarem utraconej produkcji. Kontrakt końca przedziału i brakujące godziny potwierdzono na HA 0.1.2; pozostaje walidacja rozpoznawania nocy oraz polityki braków w wersji 0.1.3. **M2, Codex; observed: test kontraktu, unverified: instalacja**.
-- [ ] Recorder: adapter i odrzucanie zamaskowanych zer/nieweryfikowalnych okresów mają testy z rzeczywistym Recorder SQLite w pamięci. Dłuższe zakresy można czytać na żądanie porcjami do 24 h (maksymalnie 366 dni), bez kopii bazy ani automatycznego wielomiesięcznego odczytu; diagnostyka rozróżnia retencję ustawioną od pokrycia. Niezmienne stany w tym samym przebiegu Recorder są rekonstruowane bez traktowania `last_updated` jako heartbeat. Pozostaje potwierdzenie fizycznej jakości pochodnej domu oraz wpływu wykluczanych kwadransów na przyszły model. **M2, Codex; observed: testy, unverified: instalacja**.
-- [ ] Sprawność torów AC/DC, wiarygodność SOC i moc rzeczywiście dostępna przy BMS; parametry 0,9487/0,97 są tylko założeniami. **M3/M5, Codex**.
-- [ ] Model wykonalnych akcji i dynamicznego TOU, wartość końcowego SOC, backtest walk-forward na prawdziwych migawkach prognoz, bez future leakage. **M3/M5, Codex**.
+- [ ] **Bilans i ograniczenia sprzętu:** zweryfikować stronę DC/AC pomiarów, relację P≈V×I baterii, wiarygodność SOC i rzeczywiste limity BMS. Potwierdzone znaki i encje pozostają bez zmian.
+- [ ] **Zapis nastaw:** sprawdzić zakresy i odczyt po zapisie limitów prądu, Grid Charge oraz wszystkich 6 okresów TOU; przetestować przerwanie zapisu, ponowienie, restart i odtwarzanie aktualnego stanu. Test fizyczny wymaga osobnej zgody.
+- [ ] **Bezpieczeństwo eksportu:** potwierdzić, że Solar Sell i zmiany TOU nie powodują niezamierzonego eksportu baterii. Dla opcjonalnego eksportu baterii wymagane są fizyczne potwierdzenie kierunku przepływu, limit energii, niezależny stop i osobna zgoda na **każdą** operację.
+- [ ] **Awaria HA:** sprawdzić bezpieczne limity i zachowanie falownika po utracie/restartcie HA, bez cofania zaakceptowanego przez użytkownika ryzyka ekonomicznego pozostawienia ostatnich nastaw.
 
-## P2 — przed dystrybucją
-- [ ] Trwały rejestr decyzji, bezpieczna retencja, UX STOP, zgody i dashboard. **M4/M5, Codex**.
-- [ ] Test kompatybilności HA, dokument instalacji, ewentualna dystrybucja HACS. **M5/M6, Codex**.
+## P1 — jakość danych przed M3/M5
 
-## P1 — pozostałe po diagnostyce HA 0.1.2 (Issue #5)
+- [ ] **Dzień i noc na prawdziwym HA:** zebrać minimum 30 minut ciągłej diagnostyki w obu warunkach dla **v0.1.6**. Sprawdzić `pv_available`, `home_available`, przyjęcia/odrzucenia w `live_measurement_window` oraz epizody `unknown/unavailable` i recovery. Pojedynczy eksport v0.1.6 potwierdził `input_state=valid`, ale nie zamyka testu ciągłego.
+- [ ] **Forecast.Solar:** rozwiązać politykę brakujących przedziałów prognozy o zmierzchu i pozostałej części już rozpoczętego okresu. `forecast_state=incomplete` i `unresolved_forecast_seconds>0` pozostają jawnymi ograniczeniami; nie dopisywać fikcyjnych Wh. Kontrakt `wh_period[end]` jest już potwierdzony — nie implementować go ponownie.
+- [ ] **Recorder i profil domu:** ocenić rzeczywiste pokrycie kwadransów po normalizacji `max(0, home)`, wpływ luk oraz błąd fizycznego bilansu domu (w tym dodatnich anomalii). Diagnostyka v0.1.6 pokazała 88/96 kompletnych kwadransów, ale nie stanowi walidacji dokładności ani pełnej historii pauz Recorder.
+- [ ] **Ceny i DST:** przetestować na rzeczywistym HA precyzję `raw_*` kontra `current_price` przy progu 0,40 DKK/kWh, zachowanie po restarcie i zmianę czasu. Testy offline `PRICE_THRESHOLD_AMBIGUOUS` i 23/25 h istnieją.
+- [ ] **Sprawności i BMS:** oszacować osobno sprawności PV→bateria, sieć→bateria, bateria→AC, PV→AC; historyczne współczynniki 0,9487/0,97 są założeniami, nie zmierzonymi wynikami.
+- [ ] **Planner i backtest:** zbudować wykonalny model sześciu TOU, limitów prądu, SOC i wartości końcowej energii oraz walk-forward na prognozach i cenach dostępnych w chwili decyzji, bez future leakage.
 
-- [ ] **Dokładność skorygowanego profilu domu:** decyzja normalizacji `max(0, home)` przy ważnych źródłach jest już w REQUIREMENTS i w kodzie 0.1.3; nie wymaga wyjaśnienia fizycznej przyczyny każdego ujemnego piku ani zmian sprzętu. Pozostaje ocena błędu/wrażliwości przed M3/M5, także dodatnich rozbieżności przy asynchronii i modelu DC/AC. Statystyki korekt są oddzielone od surowej całki; fizyczna wiarygodność pozostaje `unverified`. Domyślna diagnostyka zawiera wyłącznie agregaty audytu. **M3/M5, Codex; observed: decyzja i regresje, unverified: dokładność profilu gospodarstwa**.
-- [ ] **Kompletność profilu Recorder po nowej polityce:** raport 0.1.2 miał **84/96 poprawnych, 12 odrzuconych = 9 ujemnych + 3 rozłączne kwadranse z lukami**. Zanonimizowana regresja z syntetycznymi mocami zachowuje 9 kwadransów po korekcie, nadal odrzucając 3 rzeczywiste braki; nie jest to wynik instalacji po aktualizacji. Pozostaje pomiar nowych agregatów korekt i faktycznego pokrycia na HA. Przerwy procesów 10,578395 s, 8,398994 s i 8,145750 s (łącznie 27,123139 s) nie wyjaśniają całego czasu niedostępności po uruchomieniu. Nieznane dawne pauzy/filtry i aktualność sprzętu pozostają odrębnymi ograniczeniami. Zachowano pełne/obserwowane częściowe całki bez interpolowania braków. **M2/M3/M5, Codex**.
-- [ ] **Nocny horyzont PV:** surowa prognoza kończy się 21.10.2026 18:06:30 CEST, ceny sięgają 22.10 00:00 CEST. Wersja 0.1.3 rozpoznaje dzień/zmierzch/noc cywilną na podstawie lokalizacji wybranej instalacji Forecast.Solar i Astral; bez wiarygodnej lokalizacji pozostawia `unknown`. Nie dopisuje Wh i nie zwiększa surowego pokrycia. Potrzebne potwierdzenie klasyfikacji na prywatnej HA oraz w przyszłym modelu jawna polityka nocnej energii i pozostałej części rozpoczętego okresu. Dane decyzyjne odrzucają obserwacje późniejsze niż decyzja i całe Wh rozpoczętych okresów. Kontrakt `values[end]`, aktualność backendowego `last_reported`, ceny i identyfikacja wydania 0.1.2 są już potwierdzone; nie implementować ich ponownie. **M2/M3/M5, Codex**.
+## P2 — przed automatyzacją i szerszą dystrybucją
 
-- [ ] **Issue #9 — weryfikacja instalacji po v0.1.4:** Integracja używa wyłącznie `sensor.pv_sum`, bez PV1/PV2. Zbadać minimum 30 min diagnostyki dnia i nocy: dostępność PV i domu, ostrzeżenia `pv_template_time_unverified`, `measurement_time_skew`, awarie źródeł oraz `live_measurement_window`. Osobno zweryfikować niepewność fizycznego bilansu. Wyniki offline nie zastępują instalacji.
+- [ ] **M4/M5:** dziennik decyzji, retencja, dashboard, STOP oraz interfejs indywidualnej zgody na eksport baterii.
+- [ ] **M5/M6:** testy zgodności kolejnych wersji HA i odbiór działań fizycznych. Publikowanie do HACS działa; nie jest otwartym zadaniem.
+
+Kryteria odbioru i regresje: [VALIDATION.md](VALIDATION.md). Polityka wykonania: [EXECUTION.md](EXECUTION.md).
