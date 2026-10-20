@@ -2,7 +2,11 @@ name: Publish Energy Co-Pilot v0.1.6 to HACS
 on:
   push:
     branches: [main]
-    paths: ['.github/workflows/publish-016.yml']
+    paths:
+      - '.github/workflows/publish-016.yml'
+      - 'custom_components/**'
+      - 'tests/**'
+      - 'requirements/**'
 permissions:
   contents: write
 jobs:
