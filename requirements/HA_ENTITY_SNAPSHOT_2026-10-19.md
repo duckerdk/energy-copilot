@@ -9,7 +9,7 @@
 | PV rzeczywiste | `sensor.pv_sum` | 3034 | W → **3,034 kW** | Nazwa i jednostka potwierdzone; punkt DC/AC i curtailment nieustalone |
 | PV MPPT1 | `sensor.sun12k_pv1_power` | 2387 | W | Zaobserwowane |
 | PV MPPT2 | `sensor.sun12k_pv2_power` | 647 | W | Zaobserwowane |
-| Dom | `sensor.home_energy_consumption` | 583 | W → **0,583 kW** | Zaobserwowane; definicja względem wyjścia LOAD do wyjaśnienia |
+| Dom — sensor wyliczany | `sensor.home_energy_consumption` | 583 | W → **0,583 kW** | **Wzór później potwierdzony przez użytkownika:** suma `pv_sum + total_grid_power + battery_output_power` |
 | Alternatywny LOAD | `sensor.sun12k_load_totalpower` | 532 | W | Inna wartość niż dom; nie utożsamiać bez sprawdzenia topologii |
 | Sieć — net (import/eksport ze znakiem) | `sensor.sun12k_total_grid_power` | −2470 | W → **−2,470 kW** | **Kandydat:** wartość ujemna odpowiada eksportowi w tym zrzucie; drugi znak/import do sprawdzenia |
 | Alternatywna moc sieci | `sensor.sun12k_out_of_grid_total_power_2` | −2483 | W | Podobny odczyt co `total_grid_power`; nie sumować dwóch kanałów |
@@ -35,7 +35,7 @@
 ## 2. Kontrola spójności jednego odczytu
 
 - Dwa pomiary PV: **2387 W + 647 W = 3034 W** — dokładnie tyle co `sensor.pv_sum`. Dobre potwierdzenie agregacji odczytów obu MPPT w chwili zrzutu.
-- Równanie przykładowego bilansu **3034 W PV + 19 W baterii = 583 W domu + 2470 W eksportu = 3053 W** zamyka się **numerycznie**. **Uwaga metodologiczna:** trzeba sprawdzić, czy `home_energy_consumption` nie jest *wyliczony* z pozostałych sensorów; wówczas równanie byłoby tautologią. Nie dowodzi niezależności pomiarów, poprawności torów AC/DC ani znaków podczas importu i ładowania. Kontrakt: [MEASUREMENT_CONTRACT.md](MEASUREMENT_CONTRACT.md).
+- Równanie przykładowego bilansu **3034 W PV + 19 W baterii = 583 W domu + 2470 W eksportu = 3053 W** zamyka się **numerycznie**. **Aktualizacja po wyjaśnieniu użytkownika:** `home_energy_consumption` **jest** wyliczany z dokładnie tych trzech sensorów; zgodność wynika z definicji, a nie z niezależnego pomiaru. Nie dowodzi niezależności pomiarów ani sprawności torów AC/DC; nie wymaga to tworzenia nowej infrastruktury pomiarowej. Kontrakt: [MEASUREMENT_CONTRACT.md](MEASUREMENT_CONTRACT.md).
 - Odczyty pochodzą z różnych chwil (PV/dom około 13:24:14 UTC, eksport około 13:24:11 UTC, bateria około 13:24:09 UTC). W kontrolerze należy wymagać synchronizacji/tolerancji czasu, nie wymuszać idealnego bilansu z asynchronicznych próbek.
 - Prognoza PV „dziś” = 15,865 kWh, a zarejestrowana produkcja = 23,5 kWh. **Odchylenie jest naturalną możliwością prognozowania, nie automatycznym błędem systemu**. Do oceny jakości potrzeba odpowiadających sobie czasów/profili, migawek prognoz i informacji o curtailment, nie wymagać 100% zgodności.
 - `last_updated` to czas zmiany stanu/atrybutów HA, **nie musi być** czasem ostatniej telemetrii z urządzenia. Starsza data SOC lub sterowania nie dowodzi samodzielnie, że czujnik przestał działać; potrzebny `last_reported` lub równoważny sygnał nowej próbki, jeśli dostępny.
