@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from .const import HISTORY_ROLES, MAX_AGE, MAX_FUTURE_OFFSET, MAX_SKEW, POWER_ROLES
+from .const import HISTORY_ROLES, MAX_AGE, MAX_FUTURE_OFFSET, POWER_ROLES
 from .models import (
     ForecastPeriod,
     ForecastSnapshot,
@@ -48,7 +48,11 @@ def measurement(role, state, now, *, historical=False, allow_old_report=False):
         at = utc(state.last_updated if historical else state.last_reported)
     except ValueError, TypeError, OverflowError:
         raise ValueError("invalid_input") from None
-    if at > now + MAX_FUTURE_OFFSET or (\n        not allow_old_report\n        and now - at > MAX_AGE\n        and not (role == "pv" and value == 0)\n    ):
+    if at > now + MAX_FUTURE_OFFSET or (
+        not allow_old_report
+        and now - at > MAX_AGE
+        and not (role == "pv" and value == 0)
+    ):
         raise ValueError("stale_input")
     unit = state.attributes.get("unit_of_measurement")
     expected = (
@@ -132,18 +136,14 @@ def _derived_measurements(states, values, issues, now, templates, recovery):
     is checked, not a private HA dependency graph or a physical AC/DC model.
     An observed outage still requires a subsequent actual template report.
     """
-    # pv_sum is the only configured PV source; no PV1/PV2 corroboration.\n    # An unchanged zero is a valid HA state, not a missing heartbeat.\n    # After a witnessed outage, the actual PV entity must report again.\n    if "pv" in values and "pv" in recovery and (\n        recovery["pv"] is None or values["pv"].at < recovery["pv"]\n    ):\n        values.pop("pv")\n        issues.append(Issue("derived_predates_source_recovery", "pv"))
-    if "pv" in templates and "pv" not in values:
-        try:
-            original = measurement("pv", states.get("pv"), now, allow_old_report=True)
-        except ValueError:
-            pass
-        else:
-            recovered = recovery.get("pv", original.at)
-            if recovered is not None and original.at >= recovered:
-                values["pv"] = original
-                issues.remove(Issue("stale_input", "pv"))
-                issues.append(Issue("pv_template_time_unverified", "pv"))
+    # pv_sum is the only configured PV source; no PV1/PV2 corroboration.
+    # An unchanged zero is a valid HA state, not a missing heartbeat.
+    # After a witnessed outage, the actual PV entity must report again.
+    if "pv" in values and "pv" in recovery and (
+        recovery["pv"] is None or values["pv"].at < recovery["pv"]
+    ):
+        values.pop("pv")
+        issues.append(Issue("derived_predates_source_recovery", "pv"))
     for role, required in DERIVED_SOURCES.items():
         if role not in templates:
             continue
@@ -199,7 +199,10 @@ def _derived_measurements(states, values, issues, now, templates, recovery):
             continue
         context_at = min(values[r].context_at or values[r].at for r in required)
         pv_time_unknown = Issue("pv_template_time_unverified", "pv") in issues
-        stable_zero_pv = "pv" in configured and values["pv"].value == 0\n        if now - context_at > MAX_AGE and not (\n            pv_time_unknown or stable_zero_pv\n        ):
+        stable_zero_pv = "pv" in configured and values["pv"].value == 0
+        if now - context_at > MAX_AGE and not (
+            pv_time_unknown or stable_zero_pv
+        ):
             issues.append(Issue("derived_freshness_unverifiable", role))
             continue
         values[role] = Sample(original.value, original.at, context_at=context_at)
@@ -251,13 +254,6 @@ def measurements(
         values.pop("home", None)
         issues.append(Issue("home_predates_source_recovery", "home"))
     else:
-        timing = live_timing(states, values)
-        for key, code in (
-            ("source_context_skew_seconds", "measurement_time_skew"),
-            ("home_context_lag_seconds", "home_context_lag"),
-        ):
-            if timing[key] is not None and timing[key] > MAX_SKEW.total_seconds():
-                issues.append(Issue(code, "home"))
         if (home := values["home"]).value < 0:
             # User policy applies after availability, units, freshness and recovery.
             # As-of timing uncertainty remains visible alongside normalization.
