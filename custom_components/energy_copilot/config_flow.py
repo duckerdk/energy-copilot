@@ -108,7 +108,7 @@ def validate(hass, data):
 
 def normalize(data):
     """Persist explicit removals so old entry.data cannot restore optional mappings."""
-    result = dict(data)
+    result = {key: value for key, value in data.items() if key not in {"pv1", "pv2"}}
     for name in OPTIONAL_SETTINGS:
         result[name] = data.get(name) or None
     for name, (default, _) in RETENTION_SETTINGS.items():

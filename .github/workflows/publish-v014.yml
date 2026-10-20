@@ -1,0 +1,47 @@
+name: Publish v0.1.4 once
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+      - run: pip install -r requirements-test.txt
+      - run: ruff check custom_components tests scripts/build_release.py
+      - run: ruff format --check custom_components tests scripts/build_release.py
+      - run: pytest --cov=custom_components.energy_copilot --cov-report=term-missing
+      - run: python scripts/check_docs.py
+      - name: Create immutable version tag and publish HACS package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(python -c 'import json;print(json.load(open("custom_components/energy_copilot/manifest.json"))["version"])')" = "0.1.4"
+          if gh release view v0.1.4 >/dev/null 2>&1; then
+            echo "v0.1.4 already published; not replacing it."
+            exit 0
+          fi
+          if git ls-remote --exit-code origin refs/tags/v0.1.4 >/dev/null 2>&1; then
+            echo "v0.1.4 already tagged without release; stopping to avoid ambiguity."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag v0.1.4 "$RELEASE_COMMIT"
+          git push origin refs/tags/v0.1.4
+          python scripts/build_release.py --tag v0.1.4 --commit "$RELEASE_COMMIT" --output /tmp/energy-copilot-release
+          printf '%s\n' 'Energy Co-Pilot v0.1.4 — source of PV power: sensor.pv_sum only.' 'No PV1/PV2 input mapping or blocking. Read-only M2.' 'Asynchronous home and stable native PV templates expose uncertainty without inventing fresh timestamps.' 'Night/day real HA diagnostics are still required to verify field operation.' > /tmp/energy-copilot-notes.md
+          gh release create v0.1.4 /tmp/energy-copilot-release/energy_copilot.zip /tmp/energy-copilot-release/SHA256SUMS /tmp/energy-copilot-release/BUILD_INFO.json --verify-tag --title "Energy Co-Pilot v0.1.4" --notes-file /tmp/energy-copilot-notes.md

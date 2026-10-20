@@ -19,18 +19,18 @@
 | PVE-02 | Solar Sell ON, HA znika, cena następnej godziny niższa | Ostatnia nastawa trwa; zaakceptowane ryzyko ekonomiczne, po powrocie reconcilation |
 | MTR-01 | grid +1200/-2470 W, bateria +1000/-1000 W | Poprawny import/eksport i rozładowanie/ładowanie |
 | MTR-02 | `home_energy_consumption` ma liczbę z `float(0)` dla niedostępnego źródła | `invalid_input` także historycznie |
-| MTR-03 | PV1 2387W + PV2 647W | PV DC=3034W, bez dodania ponownie PV→bateria |
+| MTR-03 | `sensor.pv_sum=3034 W` | PV DC=3034 W; brak zależności od PV1/PV2 |
 | MTR-04 | 15–40s rozrzutu świeżych raportów Modbus, skoki wejść, opóźniony dom | Dom as-of zachowany z `measurement_time_skew` / `home_context_lag`, `uncertain`; brak dowodu atomowego/fizycznego bilansu |
-| MTR-05 | Prawdziwe szablony HA: >300s PV=0 i stały dom, aktywne składowe; osobno martwe/brakujące/błędne składowe, niepełne mapowania PV1/PV2 | Stary zgodny szablon zachowany z osobnym świeżym kontekstem i `uncertainty`, oryginalny czas bez zmian; brak dowodów to `stale_input`/`derived_freshness_unverifiable`, rzeczywiste braki blokują dom; bez sztucznego heartbeat |
-| MTR-06 | Awaria i powrót źródła pomiędzy pollami, liczbowy stary szablon, reload/unload | `home_predates_source_recovery` do nowego raportu domu; listener (także PV1/PV2) usunięty, nowe okno po setup; po awarii składowej stary szablon PV wymaga rzeczywistego raportu po odzyskaniu |
+| MTR-05 | Stały natywny `pv_sum=0` i dom >300 s | Zachowane z `uncertainty`; jawne braki blokują |
+| MTR-06 | Awaria i powrót PV/grid/battery, reload/unload | Stary dom blokowany, listener bez wycieku |
 | MTR-07 | Syntetyczne 30min odczytów i limity okna | Liczniki przyjęć/odrzuceń i percentyle poprawne, bez surowych W; weryfikacja rzeczywistego okna HA osobno w OPEN_ITEMS |
 | PVF-01 | brak/nieznana odpowiedź Forecast.Solar | Diagnostyka, bez wymyślonej prognozy |
 | PVF-02 | pełny SOC, Solar Sell OFF, słoneczna pogoda | Brak nauki błędu prognozy z ograniczonej produkcji PV |
 | LOAD-01 | historia Recorder z zamaskowanym zerem składowej | Odrzucenie slota z uczenia i backtestu |
 | LOAD-02 | ważne liczbowe ujemne home, pozostałe źródła poprawne | `max(0, home)` w bieżących danych i całce odcinkowej; kwadrans zachowany, jawne agregaty czasu/liczby/kWh korekt |
-| MTR-08 | Świeże natywne PV/home: zgodna suma, różnica ±1 W i >1 W, czasy w obrębie 1 s, przejściowy skok z kontrolowanym opóźnieniem publikacji natywnego szablonu | Tylko rozbieżność >1 W daje `derived_sum_time_uncertain`, dane zachowane; po zgodnej aktualizacji alert znika. Osobny próg 100 W PV nie ukrywa niepewności domu. |
-| MTR-09 | PV1 nieskonfigurowany vs skonfigurowany stale/unknown/missing, własny raport PV ~35,7 s i pozostałe core ~2–5 s | Niepełne mapowanie: własny świeży PV zachowany z uncertainty; skonfigurowany niewiarygodny leaf: jawna blokada PV/domu. Diagnostyka rozdziela `self_report_valid` i `accepted`, liczy odrzucenia i zachowuje bramkę odbioru HA. |
-| MTR-10 | Krótki zanik PV1 lub PV2 i powrót do tego samego 0, osiem późniejszych godzinnych obserwacji świeżych leaf | Stary szablon nadal odrzucony do rzeczywistego nowego raportu; udokumentowane ryzyko blokady przez noc, bez sztucznego heartbeat. |
+| MTR-08 | Świeży dom zgodny / rozbieżny z sumą PV/grid/battery | Alert `derived_sum_time_uncertain` przy rozbieżności |
+| MTR-09 | Niezmieniony natywny szablon `pv_sum` starszy niż 300 s | Użyty z jawnym `pv_template_time_unverified` |
+| MTR-10 | `pv_sum` unknown/unavailable i recovery | Nie odzyskiwać danych z zamaskowanego zera |
 | QUALITY-01 | wyłącznie historyczne/informacyjne ograniczenia M2 | `Input quality=valid` dla wymaganych bieżących wejść, wszystkie ostrzeżenia zachowane, brak deklaracji gotowości planera |
 | DIAG-01 | szczegółowy audyt lokalny zawiera próbki gospodarstwa | domyślny eksport recent/backfill tylko z agregatami, bez `events`, `home_w`, `source_w`; lokalny audyt bez zmian |
 | ECON-01 | rozładowanie 2 kWh DC | Degradacja 0,80 DKK, dokładnie raz |

@@ -78,8 +78,6 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         def source_changed(event):
             templates = derived_templates(self.hass, self.entities)
             for role in WATCHED_ROLES:
-                if role in {"pv1", "pv2"} and "pv" not in templates:
-                    continue
                 if self.entities[role] == event.data["entity_id"]:
                     self.live_context.observe(
                         role,
@@ -110,7 +108,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         }
         templates = derived_templates(self.hass, self.entities)
         self.measurement_source_timing = {}
-        timing_roles = (*HISTORY_ROLES, *templates.get("pv", ()))
+        timing_roles = HISTORY_ROLES
         for role in timing_roles:
             state = states[role]
             reported = getattr(state, "last_reported", None)
@@ -131,9 +129,6 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                 and state.state not in {"unknown", "unavailable"},
             }
         for role in WATCHED_ROLES:
-            if role in {"pv1", "pv2"} and "pv" not in templates:
-                self.live_context.recovery_at.pop(role, None)
-                continue
             if self.entities[role]:
                 self.live_context.observe(
                     role, states[role], now, derived=role in templates

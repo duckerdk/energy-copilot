@@ -10,7 +10,7 @@ from homeassistant.helpers.entity_component import DATA_INSTANCES
 from .validation import DERIVED_SOURCES, live_timing, measurement, utc
 
 SOURCE_ROLES = ("pv", "grid", "battery")
-WATCHED_ROLES = (*SOURCE_ROLES, "pv1", "pv2")
+WATCHED_ROLES = SOURCE_ROLES
 WINDOW = timedelta(minutes=30)
 MAX_POLLS = 120
 UNCERTAINTY_CODES = {
@@ -19,6 +19,8 @@ UNCERTAINTY_CODES = {
     "derived_value_from_fresh_sources",
     "derived_sum_time_uncertain",
     "derived_source_confirmation_unavailable",
+    "pv_template_time_unverified",
+    "derived_home_with_unverified_pv_time",
 }
 
 
@@ -31,11 +33,14 @@ def derived_templates(hass, entities):
     component = hass.data.get(DATA_INSTANCES, {}).get("sensor")
     if component is None:
         return {}
-    return {
+    templates = {
         role: tuple(r for r in required if entities.get(r))
         for role, required in DERIVED_SOURCES.items()
         if isinstance(component.get_entity(entities[role]), StateSensorEntity)
     }
+    if isinstance(component.get_entity(entities["pv"]), StateSensorEntity):
+        templates["pv"] = ()
+    return templates
 
 
 class LiveSourceContext:
@@ -119,12 +124,6 @@ class LiveMeasurementWindow:
                 source_changed = True
         uncertain = any(i.code in UNCERTAINTY_CODES for i in issues)
         rejected = "home" not in values
-        leaf_rejection_evidence = any(
-            i.source == "pv"
-            and i.code
-            in {"derived_source_invalid", "derived_source_freshness_unverifiable"}
-            for i in issues
-        )
         reasons = {
             f"{i.source}:{i.code}"
             for i in issues
@@ -137,7 +136,6 @@ class LiveMeasurementWindow:
                     for j in issues
                 )
             )
-            and not (i.source in {"pv1", "pv2"} and not leaf_rejection_evidence)
         }
         if len(self._polls) >= MAX_POLLS:
             self._polls.popleft()
@@ -152,9 +150,7 @@ class LiveMeasurementWindow:
                 "reasons": reasons if rejected else set(),
                 "pv_rejected": "pv" not in values,
                 "pv_reasons": {
-                    reason
-                    for reason in reasons
-                    if reason.split(":", 1)[0] in {"pv", "pv1", "pv2"}
+                    reason for reason in reasons if reason.split(":", 1)[0] == "pv"
                 }
                 if "pv" not in values
                 else set(),

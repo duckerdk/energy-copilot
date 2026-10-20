@@ -5,8 +5,7 @@ Wymagania ekonomiczne i uprawnienia: [REQUIREMENTS.md](REQUIREMENTS.md). Fizyczn
 ## Czujniki
 | Rola | Encja | Interpretacja |
 |---|---|---|
-| Produkcja PV DC | `sensor.pv_sum` | **PV1 + PV2 na wejściach DC falownika**, niezależnie od podziału energii |
-| PV1 / PV2 | `sensor.sun12k_pv1_power`, `sensor.sun12k_pv2_power` | Składowe PV; nie dodawać drugi raz do `pv_sum` |
+| Produkcja PV | `sensor.pv_sum` | Wyłączne źródło mocy PV w Energy Co-Pilot |
 | Sieć | `sensor.sun12k_total_grid_power` | **Dodatnie = import, ujemne = eksport** |
 | Bateria | `sensor.sun12k_battery_output_power` | **Dodatnie = rozładowanie, ujemne = ładowanie** |
 | Napięcie/prąd baterii | `sensor.sun12k_battery_voltage`, `sensor.sun12k_battery_output_current` | Weryfikować relację P≈V·I i stronę DC z danymi HA |
@@ -17,24 +16,19 @@ Wymagania ekonomiczne i uprawnienia: [REQUIREMENTS.md](REQUIREMENTS.md). Fizyczn
 
 Normalizacja mocy: `grid_import=max(0,P_grid)`, `grid_export=max(0,-P_grid)`, `battery_discharge=max(0,P_bat)`, `battery_charge=max(0,-P_bat)`. Wszystkie wartości wejściowe początkowo [W], następnie konwersja na kW. Kierunki potwierdził użytkownik; nie zadawać mu znów tych pytań. `sensor.pv_sum` pokazuje **moc faktycznie przyjętą na wejściach falownika**, a nie potencjał produkcji ograniczonej (curtailment). Nie doliczać PV→bateria jako dodatkowej produkcji.
 
-**Dom jest szablonem, nie niezależnym licznikiem.** Używa `float(0)`, co maskuje `unavailable` i tworzy możliwe fałszywe odczyty także w historii. Dla każdego slotu uczenia, backtestu i decyzji sprawdź dostępność i aktualność wszystkich źródłowych PV/grid/battery, ich synchronizację i jednostki. Brakujące/niepoprawne źródła oznacz `invalid_input`, a nieweryfikowalną historię `historical_quality_unverifiable`, zamiast zakładać zero. Bieżący dom jest wartością as-of, nie atomową ramką: świeże źródła o rozrzucie raportów ponad cel 10 s zachowaj z `measurement_time_skew` (`uncertainty`); opóźnienie domu względem ostatniej zmiany wejść ponad 10 s oznacz `home_context_lag`. Raporty źródeł bazowych nadal mają limit 300 s; przyszły czas toleruje maks. 10 s. Stary natywny szablon aktualizowany po zmianie stanu może zachować wartość wyłącznie przy poprawnych, świeżych przypisanych składowych i zgodności z udokumentowaną sumą w granicach 1 W. Dla PV potrzebne są oba opcjonalne mapowania PV1/PV2; dla domu PV/grid/battery (PV może mieć własny zweryfikowany kontekst składowych). Oryginalne `at`/`last_reported` pozostają bez zmian, osobne `context_at`/`context_oldest_report_utc` i `derived_value_from_fresh_sources` ujawniają podstawę walidacji oraz niepewność. To weryfikacja zadeklarowanej sumy, nie odczyt grafu Jinja ani potwierdzenie heartbeat urządzenia. Bez dowodów pozostają `stale_input` i `derived_freshness_unverifiable`; brakujące lub błędne przypisane składowe nie mogą być zastępowane zerem. Wykrycie natywnego szablonu opiera się na załadowanej encji HA, bez zgadywania po nazwie. Po zaobserwowanym braku źródła wymagaj raportu domu po jego odzyskaniu. Sam niezmienny nocny odczyt nie dowodzi aktualnego raportowania urządzenia. Zerowa reszta z równania szablonu nie dowodzi fizycznej sprawności. Strony AC/DC i straty wymaga model [OPTIMIZATION.md](OPTIMIZATION.md).
+**Jedyny pomiar PV:** `sensor.pv_sum`. Energy Co-Pilot nie odczytuje ani nie waliduje PV1/PV2. Dla natywnego szablonu HA, który nie raportuje ponownie niezmienionej wartości, zachowujemy liczbę z oryginalnym czasem i `pv_template_time_unverified` (`uncertainty`); nie tworzymy heartbeat ani domniemanych danych. `unknown`, `unavailable`, błędne jednostki i wartości nadal blokują PV. Dla pomiaru niebędącego rozpoznanym natywnym szablonem obowiązuje limit wieku 300 s.
 
-**Potwierdzona polityka normalizacji domu (20.10.2026):** krótkie ujemne odczyty bilansu `home` mogą powstawać przy przełączeniach PV/baterii, skokach obciążenia i opóźnieniach Modbus. Dla **ważnego liczbowego pomiaru** przy poprawnie dostępnych PV/grid/battery stosuj w Energy Co-Pilot `P_home_effective=max(0,P_home_raw)`. W historii całkuj moc skorygowaną odcinek po odcinku, bez odrzucania całego kwadransa tylko za ujemny pik. Zachowaj w audycie liczność/czas i wpływ korekty, nie publikuj surowych zdarzeń w standardowej diagnostyce. `unknown`, `unavailable`, błędne jednostki, brak danych składowych, problem po awarii źródła lub luka Recorder pozostają **brakiem danych**, nigdy zerem. Czujnika HA nie zmieniać. To świadoma reguła obliczeniowa, nie weryfikacja fizycznego modelu AC/DC. [Decyzja nadrzędna](REQUIREMENTS.md).
+**Dom jest szablonem:** `pv_sum + grid + battery`, nie niezależnym licznikiem. To jedyne trzy źródła kontrolowane w bieżącym bilansie. Przy niezgodnej świeżej sumie zgłaszamy `derived_sum_time_uncertain`, a przy starym zgodnym szablonie zachowujemy as-of z niepewnością. Wykryty zanik i powrót jednego z tych źródeł oznacza potrzebę ponownego raportowania domu. Ujemne ważne `home` normalizujemy zgodnie z wymaganiem do `max(0,home)`. Braki nie są zamieniane na zero. Nie twierdzimy, że bilans AC/DC jest fizycznie potwierdzony.
 
 ## Bieżące szablony — statusy walidacji M2
-
-| Stan | Wynik i znaczenie |
-| --- | --- |
-| Świeży natywny szablon, poprawne składowe, reszta sumy ≤1 W | Zachowany; brak alertu o reszcie. Inne ostrzeżenia/blokery nadal obowiązują. |
-| Świeży natywny szablon, poprawne składowe, reszta sumy >1 W | Zachowany z `derived_sum_time_uncertain` (`uncertainty`), także przy znacznikach w obrębie 1 s. Nie potwierdza awarii fizycznej. `pv_sum_inconsistent` >100 W pozostaje widoczny, przy tej świeżej natywnej niepewności także jako `uncertainty`; inne przypadki tej dotychczasowej kontroli pozostają blokujące. |
-| Świeży PV, niepełne opcjonalne mapowania PV1/PV2 | Własny raport zachowany z `derived_source_confirmation_unavailable` (`uncertainty`). Nie potwierdza zdrowia nieprzypisanych składowych i nie pozwala podtrzymywać starego PV. |
-| Świeży natywny PV, przypisany PV1/PV2 bez świeżego raportu | PV i zależny dom odrzucone, `derived_source_freshness_unverifiable` (`blocking`), choć własny raport PV może być poprawny i świeży. `pv1:stale_input` pozostaje informacją o leaf, nie jest usuwany. |
-| Przypisana składowa missing/unknown/unavailable, niefinitywna lub z błędną jednostką | Pochodny pomiar odrzucony z `derived_source_invalid`; `float(0)` nie naprawia braku. |
-| Stary szablon >300 s, komplet świeżych składowych, zgodna suma | Zachowany z osobnym kontekstem i `derived_value_from_fresh_sources` (`uncertainty`), bez zmiany własnego czasu HA. |
-| Stary szablon bez pełnych dowodów lub z rozbieżną sumą | Odrzucony, zachowane `stale_input` oraz odpowiednio `derived_freshness_unverifiable` / `derived_value_inconsistent`; nie otrzymuje wyjątku świeżego pomiaru. |
-| Szablon sprzed zaobserwowanej awarii i powrotu składowej | Odrzucony (`derived_predates_source_recovery` / `home_predates_source_recovery`) do rzeczywistego raportu po powrocie. Powrót PV1/PV2 do tego samego zera może blokować PV i dom przez całą noc. Nie wymuszamy raportu ani zmian HA/ESPHome. |
-
-**Bramka odbioru na HA:** powyższe fail-closed może zmniejszyć pokrycie w realnym scenariuszu 0.1.3, gdzie PV1 był `stale_input`, ale PV miał raport o wieku ~35,7 s, a grid/battery/home ~2–5 s. Dostępne znaczniki nie rozstrzygają, czy leaf zamilkł, czy szablon nadal opiera się na poprawnym źródle; nie zgadujemy heartbeat. Diagnostyka rozdziela poprawność własnego raportu od przyjęcia próbki i brakujących dowodów składowych. `live_measurement_acceptance=pending_day_and_night_ha_evidence` pozostaje jawne. Odbiór wymaga minimum 30 min rzeczywistych agregatów w dzień i w nocy, z wiekiem PV1/PV2, przyczynami odrzuceń PV/domu i rozrzutem kontekstu. Natywne testy kontrolowane nie potwierdzają naprawy nocnego PV tej instalacji. Patrz [OPEN_ITEMS](OPEN_ITEMS.md).
+| Sytuacja | Decyzja |
+|---|---|
+| Poprawny `sensor.pv_sum` | Jedyny pomiar PV; brak zależności od PV1/PV2 |
+| Niezmienny natywny szablon PV starszy niż 300 s | Zachowany z ostrzeżeniem `pv_template_time_unverified` |
+| `pv_sum=unknown/unavailable` lub wadliwy | Odrzucony; dom niedostępny |
+| Stary raport domu zgodny z PV/sieć/bateria | Zachowany z jawną niepewnością |
+| Świeża suma domu różni się ponad 1 W | `derived_sum_time_uncertain`, bez twierdzeń o fizycznej awarii |
+| Zanik źródła i powrót | Wymagany nowy raport po odzyskaniu źródła |
 
 ## Ceny
 - `sensor.energi_data_service`: końcowa cena zakupu; `sensor.energi_data_spotpris`: cena sprzedaży. Ceny z HA są danymi końcowymi; **bez dodawania lub odejmowania opłat**.

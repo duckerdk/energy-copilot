@@ -10,8 +10,6 @@ MAX_SKEW = timedelta(seconds=10)
 MAX_FUTURE_OFFSET = timedelta(seconds=10)
 DEFAULT_ENTITIES = {
     "pv": "sensor.pv_sum",
-    "pv1": "sensor.sun12k_pv1_power",
-    "pv2": "sensor.sun12k_pv2_power",
     "grid": "sensor.sun12k_total_grid_power",
     "battery": "sensor.sun12k_battery_output_power",
     "voltage": "sensor.sun12k_battery_voltage",
@@ -25,7 +23,7 @@ DEFAULT_ENTITIES = {
     "buy": "sensor.energi_data_service",
     "sell": "sensor.energi_data_spotpris",
 }
-POWER_ROLES = {"pv", "pv1", "pv2", "grid", "battery", "home", "grid_alternative"}
+POWER_ROLES = {"pv", "grid", "battery", "home", "grid_alternative"}
 HISTORY_ROLES = ("pv", "grid", "battery", "home")
 
 # Core sources needed for measurements, SOC and the published price horizon.

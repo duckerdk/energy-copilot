@@ -43,6 +43,8 @@ def quality_report(issues, forecast_coverage=None):
             "measurement_time_skew",
             "home_context_lag",
             "derived_value_from_fresh_sources",
+            "pv_template_time_unverified",
+            "derived_home_with_unverified_pv_time",
         }:
             category, effect = "uncertainty", "as_of_values_not_atomic_measurement"
         elif code == "negative_home_normalized":
