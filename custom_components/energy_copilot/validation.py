@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from .const import HISTORY_ROLES, MAX_AGE, MAX_FUTURE_OFFSET, POWER_ROLES
+from .const import HISTORY_ROLES, MAX_FUTURE_OFFSET, POWER_ROLES
 from .models import (
     ForecastPeriod,
     ForecastSnapshot,
@@ -39,8 +39,8 @@ def utc(value):
     return result.astimezone(UTC)
 
 
-def measurement(role, state, now, *, historical=False, allow_old_report=False):
-    """Validate a signed sample; home normalization needs the full source context."""
+def measurement(role, state, now, *, historical=False):
+    """Validate the HA state without confusing an unchanged value with failure."""
     if state is None or state.state in ("unknown", "unavailable"):
         raise ValueError("invalid_input")
     try:
@@ -48,11 +48,7 @@ def measurement(role, state, now, *, historical=False, allow_old_report=False):
         at = utc(state.last_updated if historical else state.last_reported)
     except ValueError, TypeError, OverflowError:
         raise ValueError("invalid_input") from None
-    if at > now + MAX_FUTURE_OFFSET or (
-        not allow_old_report
-        and now - at > MAX_AGE
-        and not (role == "pv" and value == 0)
-    ):
+    if at > now + MAX_FUTURE_OFFSET:
         raise ValueError("stale_input")
     unit = state.attributes.get("unit_of_measurement")
     expected = (
@@ -130,15 +126,7 @@ def live_timing(states, samples=None):
 
 
 def _derived_measurements(states, values, issues, now, templates, recovery):
-    """Validate configured sums against fresh leaves, never invent a heartbeat.
-
-    Only native state-based templates qualify. The role's documented arithmetic
-    is checked, not a private HA dependency graph or a physical AC/DC model.
-    An observed outage still requires a subsequent actual template report.
-    """
-    # pv_sum is the only configured PV source; no PV1/PV2 corroboration.
-    # An unchanged zero is a valid HA state, not a missing heartbeat.
-    # After a witnessed outage, the actual PV entity must report again.
+    """Check derived HA values against available sources and observed recoveries."""
     if (
         "pv" in values
         and "pv" in recovery
@@ -150,73 +138,37 @@ def _derived_measurements(states, values, issues, now, templates, recovery):
         if role not in templates:
             continue
         configured = templates[role]
-        invalid_sources = [r for r in configured if r not in values]
-        if invalid_sources:
+        if any(source not in values for source in configured):
             values.pop(role, None)
-            # A fresh template report does not prove that a configured silent
-            # leaf is alive. Keep this reception gate distinct from bad payloads.
-            if any(Issue("stale_input", r) in issues for r in invalid_sources):
-                issues.append(Issue("derived_source_freshness_unverifiable", role))
-            if any(Issue("stale_input", r) not in issues for r in invalid_sources):
-                issues.append(Issue("derived_source_invalid", role))
+            issues.append(Issue("derived_source_invalid", role))
             continue
-        try:
-            original = measurement(role, states.get(role), now, allow_old_report=True)
-        except ValueError:
-            continue  # Payload, units and future timestamps never get an exemption.
+        if role not in values:
+            continue
+        original = values[role]
         if any(
-            r in recovery and (recovery[r] is None or original.at < recovery[r])
-            for r in configured
+            source in recovery
+            and (recovery[source] is None or original.at < recovery[source])
+            for source in configured
         ):
             values.pop(role, None)
             issues.append(Issue("derived_predates_source_recovery", role))
             continue
-        if role in values:
-            if not all(r in configured and r in values for r in required):
-                issues.append(Issue("derived_source_confirmation_unavailable", role))
-            elif (
-                abs(original.value - sum(values[r].value for r in required))
-                > DERIVED_SUM_TOLERANCE_W
-            ):
-                # Close report times do not establish an atomic device frame.
-                # Keep fresh as-of values but expose the unexplained residual.
-                issues.append(Issue("derived_sum_time_uncertain", role))
-            else:
-                values[role] = Sample(
-                    original.value,
-                    original.at,
-                    context_at=min(
-                        values[r].context_at or values[r].at for r in required
-                    ),
-                )
-            continue  # A fresh report continues using the ordinary validation path.
-        if not all(r in configured and r in values for r in required):
-            issues.append(Issue("derived_freshness_unverifiable", role))
-            continue
-        if (
-            abs(original.value - sum(values[r].value for r in required))
+        if not all(source in configured and source in values for source in required):
+            issues.append(Issue("derived_source_confirmation_unavailable", role))
+        elif (
+            abs(original.value - sum(values[source].value for source in required))
             > DERIVED_SUM_TOLERANCE_W
         ):
-            issues.append(Issue("derived_value_inconsistent", role))
-            continue
-        context_at = min(values[r].context_at or values[r].at for r in required)
-        pv_time_unknown = Issue("pv_template_time_unverified", "pv") in issues
-        stable_zero_pv = "pv" in configured and values["pv"].value == 0
-        if now - context_at > MAX_AGE and not (pv_time_unknown or stable_zero_pv):
-            issues.append(Issue("derived_freshness_unverifiable", role))
-            continue
-        values[role] = Sample(original.value, original.at, context_at=context_at)
-        issues.remove(Issue("stale_input", role))
-        if not stable_zero_pv:
-            issues.append(
-                Issue(
-                    "derived_home_with_unverified_pv_time"
-                    if pv_time_unknown
-                    else "derived_value_from_fresh_sources",
-                    role,
-                )
+            issues.append(Issue("derived_sum_time_uncertain", role))
+        else:
+            values[role] = Sample(
+                original.value,
+                original.at,
+                context_at=min(
+                    values[source].context_at or values[source].at
+                    for source in required
+                ),
             )
-
 
 def measurements(
     states, now, *, historical=False, source_recovery_at=None, derived_templates=None
@@ -238,12 +190,6 @@ def measurements(
             derived_templates or {},
             source_recovery_at or {},
         )
-        for role in DERIVED_SOURCES:
-            if (
-                Issue("stale_input", role) in issues
-                and Issue("derived_freshness_unverifiable", role) not in issues
-            ):
-                issues.append(Issue("derived_freshness_unverifiable", role))
     sources = [values[r] for r in HISTORY_ROLES if r in values]
     if len(sources) != len(HISTORY_ROLES):
         values.pop("home", None)
