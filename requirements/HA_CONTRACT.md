@@ -17,15 +17,16 @@
 
 Normalizacja: `grid_import=max(0,P_grid)`, `grid_export=max(0,-P_grid)`, `battery_discharge=max(0,P_bat)`, `battery_charge=max(0,-P_bat)`. Jednostki wejściowe mocy to W. Nie liczyć PV→bateria jako drugiej produkcji. `sensor.pv_sum` nie informuje, jaka produkcja PV byłaby możliwa bez ograniczenia (curtailment). Integracja **nie używa PV1/PV2**.
 
-## Walidacja bieżących odczytów — v0.1.6
+## Walidacja bieżących odczytów
 
-- Prawidłowy dostępny `sensor.pv_sum=0 W` jest ważny niezależnie od wieku `last_reported` — także przez całą noc. Nie wymagamy heartbeat.
-- Dodatnia moc PV i bieżące moce sieci/baterii wymagają aktualnego raportu (limit 300 s). **SOC i liczniki dzienne** są rejestrami wartości, które mogą pozostać niezmienione przez wiele minut lub godzin. Ich poprawną ostatnią wartość przyjmujemy mimo starego znacznika czasu **wyłącznie gdy jednocześnie zarówno sieć, jak i moc baterii są poprawne i mają aktualny raport**. Jeśli ta podstawa znika, stare dane są odrzucane. Samo raportowanie innych rejestrów nie dowodzi fizycznej poprawności SOC. `unknown`, `unavailable`, błędne jednostki, wartości niefinitywne i niedozwolone ujemne wartości blokują pomiar; **nie** są zastępowane zerem.
-- Poprawne czujniki mogą raportować asynchronicznie. Sam rozrzut ich znaczników czasu nie oznacza błędu danych ani utraty domu. Rzeczywista różnica sumy `home` względem PV + sieć + bateria jest raportowana (`derived_sum_time_uncertain`); algebraiczna zgodność nie potwierdza niezależnego fizycznego bilansu AC/DC.
-- Dom jest pochodną trzech źródeł. Po wykrytej awarii źródła i jego powrocie wymagany jest właściwy nowy raport szablonu; stare liczby nie dowodzą odzyskania danych. Nienumeryczne źródła blokują wynik, nawet jeśli szablon HA z `float(0)` dalej pokazuje liczbę.
-- Prawidłowe liczbowe ujemne `home` są normalizowane wewnątrz Co-Pilot do `max(0, home)`, także przy całkowaniu Recorder. Oryginalna encja i jej historia nie są modyfikowane.
+- HA może zachować niezmieniony stan encji przez wiele godzin, niezależnie od tego, czy jest to `0 W`, dodatnia moc PV, SOC, napięcie, prąd, licznik dzienny czy wartość pochodna. **Wiek `last_changed`, `last_updated` lub `last_reported` nie stanowi samodzielnego dowodu awarii** i nie może sam wywołać `Degraded` albo odrzucenia takiej wartości.
+- Dla wszystkich wymaganych i opcjonalnych pomiarów sprawdzać **aktualny stan HA**: istnienie encji, jawne `unknown/unavailable`, poprawność liczby i jednostki, znaku oraz zakresu. Nie tworzyć odczytów ani nie przesuwać ich znaczników czasu. Znacznik w przyszłości ponad tolerancję 10 s nadal jest niepoprawny.
+- Brak niezależnego sygnału heartbeat sprzętu nie pozwala udowodnić fizycznej świeżości — pokazywać prawdziwy czas i `device_freshness_verified=false` w diagnostyce. Jeśli urządzenie przestanie publikować i HA pozostawi ostatnią liczbę, sam ten stan nie dowodzi aktywności urządzenia; do wykrywania takiej awarii potrzebny jest osobny sygnał dostępności/zdrowia urządzenia.
+- Szablon domu `PV + grid + battery` weryfikować przy dostępnych trzech źródłach. Różnica sumy jest ostrzeżeniem o niespójności wartości as-of, **nie dowodem awarii wynikającym z różnych czasów raportowania**. Po jawnej awarii źródła i jego odzyskaniu odrzucać stary raport domu, jeżeli poprzedza moment odzyskania źródła; nie odtwarzać braków przez `float(0)`.
+- Opcjonalna para napięcie×prąd baterii może aktualizować się asynchronicznie względem mocy. Jej niezgodność z mocą to ostrzeżenie diagnostyczne, nie dowód nieprawidłowości głównego pomiaru baterii. Wiarygodność fizycznego bilansu AC/DC pozostaje do potwierdzenia przed sterowaniem.
+- Poprawną liczbową ujemną moc domu normalizować wewnętrznie do `max(0, home)` również przy całkowaniu historii Recorder. Nie zmieniać surowej encji i nie zastępować braków danych zerami.
 
-`last_reported` to czas raportu backendowego Python State; `last_updated` oznacza aktualizację stanu i nie musi być heartbeat urządzenia. Frontendowy eksport HA może nie udostępniać `last_reported`. Nie przypisywać czasowi zmiany historycznej Recorder limitu świeżości bieżących raportów.
+`last_reported` w Python State oznacza czas ostatniego raportu HA, a `last_updated` czas aktualizacji stanu. Żaden z tych znaczników nie jest gwarantowanym heartbeat sprzętu; historyczny `last_updated` Recorder nie podlega limitowi wieku bieżących raportów.
 
 ## Ceny
 
