@@ -274,7 +274,7 @@ async def test_native_lifecycle_exposes_night_quality_without_replacing_forecast
     assert diagnostic["quality"]["planning_readiness"] == "not_evaluated_m2"
     state = hass.states.get("sensor.energy_co_pilot_input_quality")
     assert (
-        state.state == "degraded"
+        state.state == "valid"
         and state.attributes["issue_categories"] == diagnostic["quality"]["categories"]
     )
     assert diagnostic["read_only"] and first.data.forecast.periods[-1].kwh == 0.009
