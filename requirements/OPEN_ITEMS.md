@@ -16,7 +16,7 @@ Dokument zawiera **wyłącznie niepotwierdzone elementy**, nie powtarza ustalony
 
 ## P1 — wymagane do wiarygodnego planowania i kosztów
 
-- [ ] Weryfikacja godzinowej / 15-minutowej serii **cen zakupu z opłatami** i **spot**, dat, DST oraz kompletności taryf; w tym potwierdzenie na fakturze rozliczenia sprzedaży Vindstød (0,0215 DKK/kWh jako znana prowizja).
+- [ ] Sprawdzić godzinową / 15-minutową **strukturę przyszłych cen zakupu i spot**, timestamps, DST i koniec faktycznie opublikowanego okresu. **Zamknięto:** użytkownik potwierdził, że HA zawiera wszystkie opłaty i taryfy w cenie zakupu; Co-Pilot nie nalicza ich drugi raz. Eksport netto liczyć wg przekazanej prowizji Vindstød 0,0215 DKK/kWh.
 - [ ] Godzinowy profil PV z Forecast.Solar, jego jakość i horyzont; nie polegać tylko na łącznych prognozach na dziś/jutro. **Weryfikacja prognozy musi odróżniać rzeczywistą produkcję od potencjalnej produkcji w okresach curtailment**: potrzebne są sygnały ograniczania/MPPT lub wiarygodne przesłanki oznaczające przedziały jako nieodpowiednie do kalibracji. Brak pomiaru potencjału nie pozwala obliczać „utraconych kWh” jako różnicy od prognozy.
 - [ ] Historia zużycia, importu/eksportu i SOC o wystarczającej rozdzielczości; dane wieloletnie mogą być zagregowane.
 - [ ] **Zebrać dane do kalibracji** sprawności torów AC/DC, rzeczywistego kosztu marginalnego degradacji i prognozy zużycia. **Metoda i założenia rozstrzygnięte** w [CALIBRATION_POLICY.md](CALIBRATION_POLICY.md): diagnostyczne sprawności 0,9487/0,9487 są założeniem, nie dowodem; EFC/model ekonomiczny jawnie zależą od danych o trwałości, nie od stałej z sufitu. Zapewnić migawki prognoz do testów `walk-forward` i ocenę reprezentatywności bez curtailment.
