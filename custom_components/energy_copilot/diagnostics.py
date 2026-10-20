@@ -26,12 +26,8 @@ async def async_get_config_entry_diagnostics(hass, entry):
     price_first = data.prices[0].start.isoformat() if data.prices else None
     price_last = data.prices[-1].end.isoformat() if data.prices else None
     forecast_periods = data.forecast.periods if data.forecast else ()
-    forecast_first = (
-        forecast_periods[0].start.isoformat() if forecast_periods else None
-    )
-    forecast_last = (
-        forecast_periods[-1].end.isoformat() if forecast_periods else None
-    )
+    forecast_first = forecast_periods[0].start.isoformat() if forecast_periods else None
+    forecast_last = forecast_periods[-1].end.isoformat() if forecast_periods else None
     return {
         "mode": coordinator.settings.get("mode", "monitor"),
         "read_only": True,
