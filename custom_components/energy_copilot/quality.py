@@ -6,6 +6,9 @@ from .const import REQUIRED_ENTITY_ROLES
 
 
 def quality_report(issues, forecast_coverage=None):
+    temporal_sum_sources = {
+        i.source for i in issues if i.code == "derived_sum_time_uncertain"
+    }
     classified = []
     for issue in issues:
         code, source = issue.code, issue.source
@@ -19,6 +22,22 @@ def quality_report(issues, forecast_coverage=None):
                 "night_energy_policy_required"
                 if night_only
                 else "forecast_horizon_unresolved"
+            )
+        elif code == "derived_source_freshness_unverifiable":
+            category, effect = "blocking", "configured_source_freshness_unverified"
+        elif code == "derived_predates_source_recovery":
+            category, effect = "blocking", "await_actual_template_report_after_recovery"
+        elif code == "derived_sum_time_uncertain" or (
+            code == "pv_sum_inconsistent" and source in temporal_sum_sources
+        ):
+            category, effect = (
+                "uncertainty",
+                "configured_sum_differs_without_atomic_frame",
+            )
+        elif code == "derived_source_confirmation_unavailable":
+            category, effect = (
+                "uncertainty",
+                "fresh_report_without_complete_leaf_evidence",
             )
         elif code in {
             "measurement_time_skew",
@@ -62,6 +81,7 @@ def quality_report(issues, forecast_coverage=None):
         "quality_scope": "required_current_inputs",
         "planning_readiness": "not_evaluated_m2",
         "load_profile_readiness": "physical_validation_required",
+        "live_measurement_acceptance": "pending_day_and_night_ha_evidence",
         "categories": {
             key: counts[key]
             for key in ("blocking", "uncertainty", "historical", "informational")

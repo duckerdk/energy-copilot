@@ -51,7 +51,11 @@ class InputQualitySensor(CoordinatorEntity, SensorEntity):
                 "load_profile_readiness"
             ],
             "planning_readiness": self.coordinator.quality["planning_readiness"],
+            "live_measurement_acceptance": self.coordinator.quality[
+                "live_measurement_acceptance"
+            ],
             "home_available": "home" in data.measurements,
+            "pv_available": "pv" in data.measurements,
             "price_slots": len(data.prices),
             "forecast_periods": len(data.forecast.periods) if data.forecast else 0,
             "history_valid_slots": sum(s.home_kwh is not None for s in data.history),

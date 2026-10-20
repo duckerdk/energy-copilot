@@ -17,6 +17,8 @@ UNCERTAINTY_CODES = {
     "measurement_time_skew",
     "home_context_lag",
     "derived_value_from_fresh_sources",
+    "derived_sum_time_uncertain",
+    "derived_source_confirmation_unavailable",
 }
 
 
@@ -122,6 +124,14 @@ class LiveMeasurementWindow:
             for i in issues
             if i.source in (*WATCHED_ROLES, "home")
             and i.code not in UNCERTAINTY_CODES | {"negative_home_normalized"}
+            and not (
+                i.code == "pv_sum_inconsistent"
+                and any(
+                    j.code == "derived_sum_time_uncertain" and j.source == i.source
+                    for j in issues
+                )
+            )
+            and not (i.source in {"pv1", "pv2"} and "pv" in values)
         }
         if len(self._polls) >= MAX_POLLS:
             self._polls.popleft()
@@ -134,6 +144,14 @@ class LiveMeasurementWindow:
                 "uncertain": uncertain,
                 "changed_with_uncertainty": source_changed and uncertain,
                 "reasons": reasons if rejected else set(),
+                "pv_rejected": "pv" not in values,
+                "pv_reasons": {
+                    reason
+                    for reason in reasons
+                    if reason.split(":", 1)[0] in {"pv", "pv1", "pv2"}
+                }
+                if "pv" not in values
+                else set(),
             }
         )
 
@@ -153,6 +171,11 @@ class LiveMeasurementWindow:
             else None,
             "home_retained": len(self._polls) - rejected,
             "home_rejected": rejected,
+            "pv_retained": sum(not p["pv_rejected"] for p in self._polls),
+            "pv_rejected": sum(p["pv_rejected"] for p in self._polls),
+            "pv_rejection_reasons": dict(
+                Counter(reason for p in self._polls for reason in p["pv_reasons"])
+            ),
             "home_retained_with_uncertainty": sum(
                 p["uncertain"] and not p["rejected"] for p in self._polls
             ),

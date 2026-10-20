@@ -31,7 +31,7 @@ from .live_measurements import (
 from .models import InputSnapshot, Issue
 from .quality import quality_report
 from .solar import solar_evidence
-from .validation import forecast, measurements, prices
+from .validation import forecast, measurement, measurements, prices
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -146,13 +146,39 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         )
         for role, timing in self.measurement_source_timing.items():
             sample = snapshot.measurements.get(role)
+            try:
+                measurement(role, states[role], now)
+            except ValueError:
+                self_report_valid = False
+            else:
+                self_report_valid = True
             timing.update(
                 {
+                    "self_report_valid": self_report_valid,
+                    "accepted": sample is not None,
+                    "issue_codes": sorted(
+                        {i.code for i in snapshot.issues if i.source == role}
+                    ),
                     "native_state_template": role in templates,
                     "context_oldest_report_utc": sample.context_at.isoformat()
                     if sample and sample.context_at
                     else None,
                     "configured_sources": list(templates.get(role, ())),
+                    "configured_source_issues": {
+                        r: sorted({i.code for i in snapshot.issues if i.source == r})
+                        for r in templates.get(role, ())
+                        if r not in snapshot.measurements
+                    },
+                    "recovery_pending_sources": sorted(
+                        r
+                        for r in templates.get(role, ())
+                        if r in self.live_context.recovery_at
+                        and (
+                            sample is None
+                            or self.live_context.recovery_at[r] is None
+                            or sample.at < self.live_context.recovery_at[r]
+                        )
+                    ),
                     "template_dependency_graph_verified": False,
                 }
             )

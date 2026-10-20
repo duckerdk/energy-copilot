@@ -28,6 +28,9 @@
 | PVF-02 | pełny SOC, Solar Sell OFF, słoneczna pogoda | Brak nauki błędu prognozy z ograniczonej produkcji PV |
 | LOAD-01 | historia Recorder z zamaskowanym zerem składowej | Odrzucenie slota z uczenia i backtestu |
 | LOAD-02 | ważne liczbowe ujemne home, pozostałe źródła poprawne | `max(0, home)` w bieżących danych i całce odcinkowej; kwadrans zachowany, jawne agregaty czasu/liczby/kWh korekt |
+| MTR-08 | Świeże natywne PV/home: zgodna suma, różnica ±1 W i >1 W, czasy w obrębie 1 s, przejściowy skok z kontrolowanym opóźnieniem publikacji natywnego szablonu | Tylko rozbieżność >1 W daje `derived_sum_time_uncertain`, dane zachowane; po zgodnej aktualizacji alert znika. Osobny próg 100 W PV nie ukrywa niepewności domu. |
+| MTR-09 | PV1 nieskonfigurowany vs skonfigurowany stale/unknown/missing, własny raport PV ~35,7 s i pozostałe core ~2–5 s | Niepełne mapowanie: własny świeży PV zachowany z uncertainty; skonfigurowany niewiarygodny leaf: jawna blokada PV/domu. Diagnostyka rozdziela `self_report_valid` i `accepted`, liczy odrzucenia i zachowuje bramkę odbioru HA. |
+| MTR-10 | Krótki zanik PV1 lub PV2 i powrót do tego samego 0, osiem późniejszych godzinnych obserwacji świeżych leaf | Stary szablon nadal odrzucony do rzeczywistego nowego raportu; udokumentowane ryzyko blokady przez noc, bez sztucznego heartbeat. |
 | QUALITY-01 | wyłącznie historyczne/informacyjne ograniczenia M2 | `Input quality=valid` dla wymaganych bieżących wejść, wszystkie ostrzeżenia zachowane, brak deklaracji gotowości planera |
 | DIAG-01 | szczegółowy audyt lokalny zawiera próbki gospodarstwa | domyślny eksport recent/backfill tylko z agregatami, bez `events`, `home_w`, `source_w`; lokalny audyt bez zmian |
 | ECON-01 | rozładowanie 2 kWh DC | Degradacja 0,80 DKK, dokładnie raz |

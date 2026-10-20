@@ -136,9 +136,15 @@ def _derived_measurements(states, values, issues, now, templates, recovery):
         if role not in templates:
             continue
         configured = templates[role]
-        if any(r not in values for r in configured):
+        invalid_sources = [r for r in configured if r not in values]
+        if invalid_sources:
             values.pop(role, None)
-            issues.append(Issue("derived_source_invalid", role))
+            # A fresh template report does not prove that a configured silent
+            # leaf is alive. Keep this reception gate distinct from bad payloads.
+            if any(Issue("stale_input", r) in issues for r in invalid_sources):
+                issues.append(Issue("derived_source_freshness_unverifiable", role))
+            if any(Issue("stale_input", r) not in issues for r in invalid_sources):
+                issues.append(Issue("derived_source_invalid", role))
             continue
         try:
             original = measurement(role, states.get(role), now, allow_old_report=True)
@@ -152,11 +158,16 @@ def _derived_measurements(states, values, issues, now, templates, recovery):
             issues.append(Issue("derived_predates_source_recovery", role))
             continue
         if role in values:
-            if (
-                all(r in configured and r in values for r in required)
-                and abs(original.value - sum(values[r].value for r in required))
-                <= DERIVED_SUM_TOLERANCE_W
+            if not all(r in configured and r in values for r in required):
+                issues.append(Issue("derived_source_confirmation_unavailable", role))
+            elif (
+                abs(original.value - sum(values[r].value for r in required))
+                > DERIVED_SUM_TOLERANCE_W
             ):
+                # Close report times do not establish an atomic device frame.
+                # Keep fresh as-of values but expose the unexplained residual.
+                issues.append(Issue("derived_sum_time_uncertain", role))
+            else:
                 values[role] = Sample(
                     original.value,
                     original.at,

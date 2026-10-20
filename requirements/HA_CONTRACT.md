@@ -21,6 +21,21 @@ Normalizacja mocy: `grid_import=max(0,P_grid)`, `grid_export=max(0,-P_grid)`, `b
 
 **Potwierdzona polityka normalizacji domu (20.10.2026):** krótkie ujemne odczyty bilansu `home` mogą powstawać przy przełączeniach PV/baterii, skokach obciążenia i opóźnieniach Modbus. Dla **ważnego liczbowego pomiaru** przy poprawnie dostępnych PV/grid/battery stosuj w Energy Co-Pilot `P_home_effective=max(0,P_home_raw)`. W historii całkuj moc skorygowaną odcinek po odcinku, bez odrzucania całego kwadransa tylko za ujemny pik. Zachowaj w audycie liczność/czas i wpływ korekty, nie publikuj surowych zdarzeń w standardowej diagnostyce. `unknown`, `unavailable`, błędne jednostki, brak danych składowych, problem po awarii źródła lub luka Recorder pozostają **brakiem danych**, nigdy zerem. Czujnika HA nie zmieniać. To świadoma reguła obliczeniowa, nie weryfikacja fizycznego modelu AC/DC. [Decyzja nadrzędna](REQUIREMENTS.md).
 
+## Bieżące szablony — statusy walidacji M2
+
+| Stan | Wynik i znaczenie |
+| --- | --- |
+| Świeży natywny szablon, poprawne składowe, reszta sumy ≤1 W | Zachowany; brak alertu o reszcie. Inne ostrzeżenia/blokery nadal obowiązują. |
+| Świeży natywny szablon, poprawne składowe, reszta sumy >1 W | Zachowany z `derived_sum_time_uncertain` (`uncertainty`), także przy znacznikach w obrębie 1 s. Nie potwierdza awarii fizycznej. `pv_sum_inconsistent` >100 W pozostaje widoczny, przy tej świeżej natywnej niepewności także jako `uncertainty`; inne przypadki tej dotychczasowej kontroli pozostają blokujące. |
+| Świeży PV, niepełne opcjonalne mapowania PV1/PV2 | Własny raport zachowany z `derived_source_confirmation_unavailable` (`uncertainty`). Nie potwierdza zdrowia nieprzypisanych składowych i nie pozwala podtrzymywać starego PV. |
+| Świeży natywny PV, przypisany PV1/PV2 bez świeżego raportu | PV i zależny dom odrzucone, `derived_source_freshness_unverifiable` (`blocking`), choć własny raport PV może być poprawny i świeży. `pv1:stale_input` pozostaje informacją o leaf, nie jest usuwany. |
+| Przypisana składowa missing/unknown/unavailable, niefinitywna lub z błędną jednostką | Pochodny pomiar odrzucony z `derived_source_invalid`; `float(0)` nie naprawia braku. |
+| Stary szablon >300 s, komplet świeżych składowych, zgodna suma | Zachowany z osobnym kontekstem i `derived_value_from_fresh_sources` (`uncertainty`), bez zmiany własnego czasu HA. |
+| Stary szablon bez pełnych dowodów lub z rozbieżną sumą | Odrzucony, zachowane `stale_input` oraz odpowiednio `derived_freshness_unverifiable` / `derived_value_inconsistent`; nie otrzymuje wyjątku świeżego pomiaru. |
+| Szablon sprzed zaobserwowanej awarii i powrotu składowej | Odrzucony (`derived_predates_source_recovery` / `home_predates_source_recovery`) do rzeczywistego raportu po powrocie. Powrót PV1/PV2 do tego samego zera może blokować PV i dom przez całą noc. Nie wymuszamy raportu ani zmian HA/ESPHome. |
+
+**Bramka odbioru na HA:** powyższe fail-closed może zmniejszyć pokrycie w realnym scenariuszu 0.1.3, gdzie PV1 był `stale_input`, ale PV miał raport o wieku ~35,7 s, a grid/battery/home ~2–5 s. Dostępne znaczniki nie rozstrzygają, czy leaf zamilkł, czy szablon nadal opiera się na poprawnym źródle; nie zgadujemy heartbeat. Diagnostyka rozdziela poprawność własnego raportu od przyjęcia próbki i brakujących dowodów składowych. `live_measurement_acceptance=pending_day_and_night_ha_evidence` pozostaje jawne. Odbiór wymaga minimum 30 min rzeczywistych agregatów w dzień i w nocy, z wiekiem PV1/PV2, przyczynami odrzuceń PV/domu i rozrzutem kontekstu. Natywne testy kontrolowane nie potwierdzają naprawy nocnego PV tej instalacji. Patrz [OPEN_ITEMS](OPEN_ITEMS.md).
+
 ## Ceny
 - `sensor.energi_data_service`: końcowa cena zakupu; `sensor.energi_data_spotpris`: cena sprzedaży. Ceny z HA są danymi końcowymi; **bez dodawania lub odejmowania opłat**.
 - Obie encje udostępniają `attributes.raw_today`, `raw_tomorrow`, `tomorrow_valid` oraz rekordy `hour` i `price`. Odczytaj tylko rzeczywiście opublikowane dane, wspólne ważne przedziały kupna i sprzedaży.
