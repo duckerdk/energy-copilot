@@ -1,5 +1,7 @@
 # Scenariusze testowe Energy Co-Pilot
 
+**Dodatkowe testy z potwierdzonych danych HA:** 18 przypadków `PRICE-01..18` w [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md); obejmują atrybuty, flagę jutra, DST, opłaty w cenie i rozbieżną chwilę publikacji. Nie dublować tych testów w scenariuszach MAP/TIME.
+
 **Status:** specyfikacja testów akceptacyjnych, bez implementacji. **Wszystkie ceny, profile i sprawności w przykładach są syntetycznymi danymi testowymi, nie odczytami instalacji użytkownika.**
 Podstawa: [OPTIMIZATION_MODEL.md](OPTIMIZATION_MODEL.md), [GOALS_AND_REQUIREMENTS.md](GOALS_AND_REQUIREMENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [ENTITY_CONTRACT.md](ENTITY_CONTRACT.md).
 
