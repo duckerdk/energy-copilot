@@ -1,0 +1,32 @@
+name: One-time code formatting for PR 11
+
+on:
+  push:
+    branches: [fix/pvsum-only-release-v014]
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/pvsum-only-release-v014
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: pip install ruff==0.17.1
+      - name: Format changed Python sources
+        run: |
+          set -e
+          ruff check --fix --select I tests/test_template_freshness.py custom_components/energy_copilot/validation.py custom_components/energy_copilot/live_measurements.py
+          ruff format tests/test_template_freshness.py custom_components/energy_copilot/validation.py custom_components/energy_copilot/live_measurements.py
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add tests/test_template_freshness.py custom_components/energy_copilot/validation.py custom_components/energy_copilot/live_measurements.py
+            git commit -m "style: apply Ruff formatting to PV-only correction"
+            git push
+          fi
