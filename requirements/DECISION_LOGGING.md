@@ -9,7 +9,7 @@ Każda istotna decyzja optymalizatora ma być **wyjaśnialna i możliwa do prze�
 Szczególnie podczas rozruchu użytkownik musi widzieć **podstawy każdej decyzji** bez wyszukiwania ich w kodzie lub uruchamiania debuggera.
 
 Rejestrować także:
-- plan: `charge_from_grid`, `charge_from_pv`, `discharge_to_home`, `propose_battery_export`, `export_pv`, `curtail_pv` i `idle`;
+- plan: `charge_from_grid`, `charge_from_pv`, `discharge_to_home`, `propose_battery_export`, `export_pv`, `curtail_pv` i `idle`; każda decyzja ON/OFF eksportu PV podaje **cenę sprzedaży wprost z HA, próg 0,40 DKK/kWh, decyzję switch i jej powód**;
 - wynik `blocked`, błędy i odstąpienie od komendy;
 - każdą aktualizację planu po cenach około 13:00 lub istotnej zmianie danych;
 - powody zmiany/odrzucenia propozycji eksportu baterii;
@@ -21,7 +21,7 @@ Rejestrować także:
 **Widok bieżący — poziom INFO, włączony od pierwszego uruchomienia:**
 - godzina decyzji, aktywny `plan_id`, okres slotu i ważność;
 - działanie: co i z jaką zamierzoną mocą, skąd/dokąd energia, docelowy SOC;
-- cena kupna **pełna** i sprzedaży **netto**; prognoza PV i poboru dla rozpatrywanych okresów;
+- ceny kupna i sprzedaży **dokładnie z odpowiednich encji HA** (bez przeliczeń), próg zezwolenia eksportu PV 0,40 DKK/kWh; prognoza PV i poboru dla rozpatrywanych okresów;
 - przewidywany koszt wybranego planu, przewidywany wynik względem **porównywalnej alternatywy**; wartość degradacji i ryzyka osobno;
 - krótkie konkretne uzasadnienie oraz status wykonawczy `planned`, `blocked`, `applied`, `confirmed` albo `uncertain`.
 
@@ -68,7 +68,7 @@ Każde pole liczbowe z jednostką. Znaczniki czasu jednoznaczne UTC. W zapisie n
 
 ## 5. Typowe kody przyczyn
 
-`GRID_CHEAPER_AFTER_LOSSES`, `PV_STORAGE_MORE_VALUABLE`, `PV_EXPORT_MORE_VALUABLE`, `NEGATIVE_EXPORT_PRICE`, `TARGET_SOC_FROM_DEMAND`, `TERMINAL_ENERGY_VALUE`, `FORECAST_UNCERTAINTY`, `CURTAILMENT_SUSPECTED`, `PRICE_NOT_PUBLISHED`, `SOC_LIMIT`, `POWER_LIMIT`, `BATTERY_EXPORT_NOT_APPROVED`, `CAPABILITY_NOT_VALIDATED`, `STALE_DATA`, `NO_POSITIVE_NET_BENEFIT`, `NO_ACTION_BEST`, `PLAN_SUPERSEDED`, `ACTUATION_NOT_CONFIRMED`, `BASELINE_UNAVAILABLE`.
+`GRID_CHEAPER_AFTER_LOSSES`, `PV_STORAGE_MORE_VALUABLE`, `PV_EXPORT_MORE_VALUABLE`, `PV_EXPORT_BELOW_MIN_PRICE`, `PV_EXPORT_ALLOWED`, `NEGATIVE_EXPORT_PRICE`, `TARGET_SOC_FROM_DEMAND`, `TERMINAL_ENERGY_VALUE`, `FORECAST_UNCERTAINTY`, `CURTAILMENT_SUSPECTED`, `PRICE_NOT_PUBLISHED`, `SOC_LIMIT`, `POWER_LIMIT`, `BATTERY_EXPORT_NOT_APPROVED`, `CAPABILITY_NOT_VALIDATED`, `STALE_DATA`, `NO_POSITIVE_NET_BENEFIT`, `NO_ACTION_BEST`, `PLAN_SUPERSEDED`, `ACTUATION_NOT_CONFIRMED`, `BASELINE_UNAVAILABLE`.
 
 Kody mogą się łączyć: np. ładowanie PV wybrane dzięki cenom **i** dostępnej mocy baterii. Nie wpisywać „100% pewności prognozy” ani „odzyskaliśmy 25 kWh” na podstawie różnicy prognoza/produkcja podczas curtailment.
 
