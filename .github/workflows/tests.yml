@@ -15,7 +15,7 @@ jobs:
           python-version: "3.14"
           cache: pip
       - run: pip install -r requirements-test.txt
-      - run: ruff check custom_components tests
-      - run: ruff format --check custom_components tests
+      - run: ruff check custom_components tests scripts/build_release.py
+      - run: ruff format --check custom_components tests scripts/build_release.py
       - run: pytest --cov=custom_components.energy_copilot --cov-report=term-missing
       - run: python scripts/check_docs.py

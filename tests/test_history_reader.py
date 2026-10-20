@@ -14,6 +14,7 @@ from custom_components.energy_copilot.history import (
     HistoryReadError,
     RecorderHistoryReader,
 )
+from custom_components.energy_copilot.recorder_reconstruction import RecordingRun
 
 from .conftest import NOW, make_state
 
@@ -35,7 +36,17 @@ def fake_recorder(hass, freezer):
             "homeassistant.components.recorder.history.get_significant_states",
             return_value={},
         ) as query,
+        patch(
+            "custom_components.energy_copilot.history.RecorderHistoryReader._read_recording_context",
+            autospec=True,
+            side_effect=lambda reader, rows, start, end: (
+                rows,
+                (RecordingRun(start, end),),
+                (),
+            ),
+        ) as context,
     ):
+        instance.recording_context = context
         yield query, instance
 
 
@@ -70,7 +81,7 @@ async def test_lazy_multi_day_reads_in_bounded_chunks(hass, fake_recorder):
         assert call.args[2] - call.args[1] <= timedelta(days=1)
         assert call.kwargs == {
             "entity_ids": [DEFAULT_ENTITIES[r] for r in HISTORY_ROLES],
-            "include_start_time_state": True,
+            "include_start_time_state": False,
             "significant_changes_only": False,
             "minimal_response": False,
             "no_attributes": False,
@@ -87,7 +98,7 @@ async def test_lazy_multi_day_reads_in_bounded_chunks(hass, fake_recorder):
 
 
 async def test_missing_retention_and_quality_are_not_zero(hass, fake_recorder):
-    query, _ = fake_recorder
+    query, instance = fake_recorder
     start = NOW - timedelta(minutes=30)
     rows = valid_rows(start)
     # One source vanishes and the home's template continues reporting a number.
@@ -95,6 +106,11 @@ async def test_missing_retention_and_quality_are_not_zero(hass, fake_recorder):
         "grid", "unavailable", at=start + timedelta(minutes=5)
     )
     query.return_value = rows
+    instance.recording_context.side_effect = lambda reader, rows, start, end: (
+        rows,
+        (RecordingRun(start, start + timedelta(minutes=15)),),
+        (),
+    )
     reader = RecorderHistoryReader(hass, DEFAULT_ENTITIES)
     slots = await reader.async_read_window(start, NOW)
     assert len(slots) == 2
@@ -113,7 +129,7 @@ async def test_missing_retention_and_quality_are_not_zero(hass, fake_recorder):
 
 
 async def test_partial_coverage_and_no_future_sample_leak(hass, fake_recorder):
-    query, _ = fake_recorder
+    query, instance = fake_recorder
     start = NOW - timedelta(minutes=30)
     rows = valid_rows(start, minutes=16)
     # Later data is never backfilled into an earlier missing interval.
@@ -122,6 +138,11 @@ async def test_partial_coverage_and_no_future_sample_leak(hass, fake_recorder):
             make_state(role, at=NOW + timedelta(minutes=1))
         )
     query.return_value = rows
+    instance.recording_context.side_effect = lambda reader, rows, start, end: (
+        rows,
+        (RecordingRun(start, start + timedelta(minutes=15)),),
+        (),
+    )
     reader = RecorderHistoryReader(hass, DEFAULT_ENTITIES)
     slots = await reader.async_read_window(start, NOW)
     assert slots[0].home_kwh == pytest.approx(5.234 / 4)
@@ -330,3 +351,32 @@ async def test_close_during_read_discards_results(hass, fake_recorder):
     with pytest.raises(HistoryReadError, match="history_reader_closed"):
         await task
     assert reader.last_read_summary["returned_slots"] == 0
+
+
+async def test_disabled_recorder_is_explicit_and_never_queried(hass, fake_recorder):
+    query, instance = fake_recorder
+    instance.enabled = False
+    reader = RecorderHistoryReader(hass, DEFAULT_ENTITIES)
+    with pytest.raises(HistoryReadError, match="recorder_disabled"):
+        await reader.async_read_window(NOW - timedelta(minutes=15), NOW)
+    assert not query.called
+    assert reader.last_read_summary["error"] == "recorder_disabled"
+    assert reader.last_read_summary["recording_pause_history_verified"] is False
+    assert reader.last_read_summary["historical_filter_changes_verified"] is False
+
+
+async def test_disabling_while_job_waits_does_not_read_historical_rows(
+    hass, fake_recorder
+):
+    query, instance = fake_recorder
+    instance.enabled = True
+
+    async def executor(job):
+        instance.enabled = False
+        return job()
+
+    instance.async_add_executor_job.side_effect = executor
+    reader = RecorderHistoryReader(hass, DEFAULT_ENTITIES)
+    with pytest.raises(HistoryReadError, match="recorder_disabled"):
+        await reader.async_read_window(NOW - timedelta(minutes=15), NOW)
+    assert not query.called

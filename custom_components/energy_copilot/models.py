@@ -36,6 +36,10 @@ class ForecastSnapshot:
     captured_at: datetime
     version: str
     periods: tuple[ForecastPeriod, ...]
+    source_start: datetime | None = None
+    source_end: datetime | None = None
+    unbounded_energy_at: tuple[datetime, ...] = ()
+    missing_energy_at: tuple[datetime, ...] = ()
 
 
 @dataclass(frozen=True)
