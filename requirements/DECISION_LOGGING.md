@@ -56,6 +56,8 @@ Każde pole liczbowe z jednostką. Znaczniki czasu jednoznaczne UTC. W zapisie n
 
 **To nie jest obowiązek logowania całej historii 15-minutowych encji przy każdym przeliczeniu.** Wystarczy deterministyczny zestaw użytych wartości i odwołanie do lokalnej migawki, jeśli istnieje; szczegóły DEBUG powinny umożliwiać odtworzenie rozstrzygnięcia.
 
+**Wymóg rozdzielenia planu i skutku przy sterowaniu prądem:** dziennik decyzji rejestruje `backend = current_first | dynamic_tou_candidate | none`, `active_tou_period` (jeśli znany), `intended_energy_flow_kw`, `proposed_charge_current_limit_a`, `proposed_grid_charge_current_limit_a`, `proposed_discharge_current_limit_a`, `ha_entity_id`, `persistent_after_ha_loss = true`, `expected_effect`, `observed_battery_power_kw`, `observed_grid_power_kw` i `unfulfilled_intent_reason`. Zamiana kW na A bazuje na **aktualnym napięciu** i oznaczonej niepewności, nie na stałej wartości. Nie raportować „ładowanie 2 kW wykonane” wyłącznie dlatego, że encja przyjęła nowy limit A. Przy opcji dynamicznego TOU zapisać porównanie z `current_first` i powód, dlaczego sześć okien jest potrzebne. Metodologia: [CONTROL_STRATEGY.md](CONTROL_STRATEGY.md).
+
 ## 4. Rzetelne porównanie alternatyw
 
 - Porównywać **ten sam horyzont**, prognozy, start SOC, parametry sprawności i **porównywalną wartość energii końcowej**; inaczej różnica zysków jest myląca.
