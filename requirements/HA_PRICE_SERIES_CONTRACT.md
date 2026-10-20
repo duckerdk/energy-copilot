@@ -58,6 +58,15 @@ Wejście: **dwa** bieżące stany HA oraz ich atrybuty. Parser jest deterministy
 
 `next_data_update` jest **czasem bez daty**, dlatego nie interpretować go jako dowodu publikacji ani jako znacznika czasu każdej ceny. Śledzić nową zawartość encji i flagi. Przy zmianie czasu i lokalnym dniu 23/25 h obliczenia i deduplikacja odbywają się **wyłącznie w UTC**, prezentacja w `Europe/Copenhagen`.
 
+### Granica progu 0,40 przy różnych precyzjach
+
+W zaobserwowanych danych `raw_today[*].price` jest zaokrąglone do trzech miejsc po przecinku, a `current_price` może mieć większą precyzję. Nie wolno **zakładać**, że porównanie `raw_*.price >= 0.400` odpowiada porównaniu niezaokrąglonej ceny przy granicy 0,40. W planowaniu pozostaje jednolite źródło `raw_*`. W bieżącym sterowaniu eksportem PV:
+- jeśli `current_price` jest aktualny, zgodny z aktywnym slotem i jego porównanie z 0,40 **różni się** od wyniku `raw_*.price`, oznacz `PRICE_THRESHOLD_AMBIGUOUS`, **nie wydawaj komendy ON** i nie raportuj pewnego spełnienia progu;
+- jeśli nie można ustalić precyzji/świeżości obu pól, status porównania oznacz jako niezweryfikowany; nie maskuj zaokrąglenia arbitralną tolerancją;
+- wartość 0,400 dokładnie w źródle **bez konfliktu** nadal oznacza próg włączny, zgodnie z polityką użytkownika.
+
+**Regresja PRICE-19:** `raw_today.price=0.400`, `current_price=0.3996` dla tej samej bieżącej godziny → brak automatycznej komendy ON, `PRICE_THRESHOLD_AMBIGUOUS`. Dla `0.400` i `0.4000` → próg włączny.
+
 ## 4. Reguła ekonomiczna
 
 `C_buy[t] = buy_raw_price[t]` (wszystkie opłaty już zawarte).
