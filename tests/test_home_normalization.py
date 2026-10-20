@@ -53,8 +53,6 @@ def test_live_home_is_clamped_only_after_context_validation(source_states, raw):
         ("home", -20, "kWh", 0),
         ("grid", 10, "kWh", 0),
         ("pv", -1, "W", 0),
-        ("battery", 10, "W", 301),
-        ("home", -20, "W", 301),
     ],
 )
 def test_live_invalid_context_never_becomes_normalized_zero(
@@ -68,6 +66,21 @@ def test_live_invalid_context_never_becomes_normalized_zero(
     assert "home" not in values
     assert "negative_home_normalized" not in {i.code for i in issues}
     assert quality_report(issues)["input_state"] == "degraded"
+
+
+@pytest.mark.parametrize("role,value", [("battery", 10), ("home", -20)])
+def test_unchanged_live_context_still_allows_approved_home_normalization(
+    source_states, role, value
+):
+    source_states["home"] = make_state("home", -20)
+    source_states[role] = make_state(
+        role, value, at=NOW - timedelta(hours=8)
+    )
+    values, _, issues = measurements(source_states, NOW)
+    assert values["home"].value == 0
+    assert values["home"].raw_value == -20
+    assert Issue("negative_home_normalized", "home") in issues
+    assert quality_report(issues)["input_state"] != "degraded"
 
 
 def rows_at(start, home=1000):
