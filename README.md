@@ -19,7 +19,8 @@
 - [Kalibracja i degradacja](requirements/CALIBRATION_POLICY.md) — jawne założenia sprawności, metoda pomiarów i marginalny koszt cyklu; brak udawania pomiarów.
 - [Jednorazowy odczyt HA](requirements/HA_READONLY_CAPTURE.md) — wyłącznie odczytowy raport bieżących encji i jednostek, nie test sterowania.
 - [Wynik odczytu HA z 19.10.2026](requirements/HA_ENTITY_SNAPSHOT_2026-10-19.md) — potwierdzone obecne ID, bilans PV/bateria/dom/sieć, kandydaci sterowań i ryzyka.
-- [Struktura przyszłych cen i prognoz](requirements/HA_TIMESERIES_CAPTURE.md) — następny wąski odczyt atrybutów sześciu źródeł HA.
+- [Potwierdzony kontrakt cen HA](requirements/HA_PRICE_SERIES_CONTRACT.md) — `raw_today/raw_tomorrow`, `tomorrow_valid`, DST, taryfy, parser i 18 testów PRICE.
+- [Odczyt prognoz PV z HA](requirements/HA_TIMESERIES_CAPTURE.md) — opcjonalne narzędzie pozyskania godzinowej serii PV; struktura cen jest już ustalona.
 - [Walidacja historyczna](requirements/BACKTEST_VALIDATION.md) — test walk-forward bez wiedzy o przyszłości oraz uczciwa metoda liczenia korzyści.
 - [Przekazanie programiście](requirements/DEVELOPER_HANDOFF.md) — kolejność dokumentów, etapy M1–M6 i warunki odbioru.
 - [Blokery wdrożenia](requirements/OPEN_ITEMS.md) — co wymaga sprawdzenia przed rzeczywistym sterowaniem.
