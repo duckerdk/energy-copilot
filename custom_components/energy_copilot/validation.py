@@ -17,7 +17,7 @@ from .models import (
 )
 
 COPENHAGEN = ZoneInfo("Europe/Copenhagen")
-DERIVED_SOURCES = {"pv": ("pv1", "pv2"), "home": ("pv", "grid", "battery")}
+DERIVED_SOURCES = {"home": ("pv", "grid", "battery")}
 DERIVED_SUM_TOLERANCE_W = 1
 
 
@@ -132,6 +132,18 @@ def _derived_measurements(states, values, issues, now, templates, recovery):
     is checked, not a private HA dependency graph or a physical AC/DC model.
     An observed outage still requires a subsequent actual template report.
     """
+    # pv_sum is the only configured PV source; no PV1/PV2 corroboration.
+    if "pv" in templates and "pv" not in values:
+        try:
+            original = measurement("pv", states.get("pv"), now, allow_old_report=True)
+        except ValueError:
+            pass
+        else:
+            recovered = recovery.get("pv", original.at)
+            if recovered is not None and original.at >= recovered:
+                values["pv"] = original
+                issues.remove(Issue("stale_input", "pv"))
+                issues.append(Issue("pv_template_time_unverified", "pv"))
     for role, required in DERIVED_SOURCES.items():
         if role not in templates:
             continue
@@ -186,12 +198,16 @@ def _derived_measurements(states, values, issues, now, templates, recovery):
             issues.append(Issue("derived_value_inconsistent", role))
             continue
         context_at = min(values[r].context_at or values[r].at for r in required)
-        if now - context_at > MAX_AGE:
+        pv_time_unknown = Issue("pv_template_time_unverified", "pv") in issues
+        if now - context_at > MAX_AGE and not pv_time_unknown:
             issues.append(Issue("derived_freshness_unverifiable", role))
             continue
         values[role] = Sample(original.value, original.at, context_at=context_at)
         issues.remove(Issue("stale_input", role))
-        issues.append(Issue("derived_value_from_fresh_sources", role))
+        issues.append(Issue(
+            "derived_home_with_unverified_pv_time"
+            if pv_time_unknown else "derived_value_from_fresh_sources", role
+        ))
 
 
 def measurements(
@@ -259,9 +275,6 @@ def measurements(
         expected = values["voltage"].value * values["current"].value
         if abs(expected - values["battery"].value) > max(100, abs(expected) * 0.1):
             issues.append(Issue("battery_power_inconsistent", "battery"))
-    if all(r in values for r in ("pv", "pv1", "pv2")):
-        if abs(values["pv"].value - values["pv1"].value - values["pv2"].value) > 100:
-            issues.append(Issue("pv_sum_inconsistent", "pv"))
     if "soc" in values and values["soc"].value < 20:
         issues.append(Issue("below_policy_minimum", "soc"))
     # No physical efficiency is inferred from the template's algebraic residual.

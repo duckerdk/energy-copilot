@@ -7,8 +7,6 @@
         "description": "M1/M2 only reads data. PV, grid, battery, SOC, home and purchase/sale prices are required. Other sources are optional diagnostics; missing or unavailable data is reported without sending inverter commands.",
         "data": {
           "pv": "Pv",
-          "pv1": "Pv1 (optional)",
-          "pv2": "Pv2 (optional)",
           "grid": "Grid",
           "battery": "Battery",
           "voltage": "Voltage (optional)",
