@@ -58,13 +58,13 @@ Jeżeli dokumenty zawierają sprzeczność, nie rozwiązywać jej przez arbitral
 
 Nie są to wzory, których ma dostarczyć użytkownik. Programista i projekt muszą je **pozyskać / zweryfikować** w sposób zgodny z warunkami dostępu:
 
-1. **Mapowanie rzeczywistych encji i atrybutów HA** — zwłaszcza końcowej ceny zakupu, profili spot i PV, importu/eksportu oraz mocy baterii po AC/DC. Znamy historycznie 11 identyfikatorów, nie zakładać pełności listy.
+1. **Mapowanie pozostałych rzeczywistych encji HA** — ceny zakupu i spot zostały jednoznacznie zmapowane z timestampami w [HA_PRICE_SERIES_CONTRACT.md](HA_PRICE_SERIES_CONTRACT.md); do uzupełnienia pozostają **godzinowy profil PV**, pomiar importu/eksportu i dopasowanie torów AC/DC. Aktualne identyfikatory nie ograniczają się do wcześniejszych 11 historycznych.
 2. **Dokładność punktów pomiarowych** — uwzględnienie ładowania DC i rozpoznawanie ograniczania produkcji.
 3. **Krzywe sprawności i koszt degradacji** — kalibracja na danych z instalacji, bez wymyślania uniwersalnych parametrów.
 4. **Statystyczny model niepewności PV i zużycia** — aktualizacja po zgromadzeniu archiwum dawnych prognoz, bez nadpisywania migawek.
 5. **Wartość energii na końcu horyzontu cenowego** — model musi chronić przed sztucznym opróżnianiem baterii, ale nie wymyślać nieopublikowanych cen.
 6. **Karty zweryfikowanych sterowań** — oddzielna kontrola ładowania, eksportu PV, eksportu baterii, SOC oraz sposobu zatrzymania/odzyskiwania po utracie HA.
-7. **Rozliczenie rzeczywiste** — potwierdzenie kompletności ceny kupna/sprzedaży na rachunku, zgodnie z [OPEN_ITEMS.md](OPEN_ITEMS.md).
+7. **Rozliczenie rzeczywiste** — stosować potwierdzoną przez użytkownika końcową cenę zakupu HA bez naliczania taryf ponownie i cenę sprzedaży spot − 0,0215 DKK/kWh; nie blokować parsera cen oczekiwaniem na ponowne wyjaśnienia.
 
 Punkty 1–5 i 7 wpływają na jakość planu; punkt 6 i sprzętowy fail-safe **blokują rzeczywiste sterowanie**. Nie traktować braku tych danych jako zaproszenia do zgadywania.
 
@@ -90,7 +90,7 @@ Nie rozpoczynać kodowania na podstawie samej decyzji o kompletności dokumentac
 
 **Audyt dokumentów (aktualizacja 2026-10-20):**
 - Sprawdzenie odwołań względnych między plikami Markdown: **brak zerwanych odwołań do plików**.
-- Testy opisane w dokumentacji: **40** scenariuszy PHY/ECO/SOC/TIME/PVQ/SAFE/MAP + **16** CTRL + **20** CUR + **12** EXE + **11** UI + **10** LOG + **10** UNC + **12** BKT + **7** CAL = **138** przypadków specyfikacyjnych.
+- Testy opisane w dokumentacji: **40** scenariuszy PHY/ECO/SOC/TIME/PVQ/SAFE/MAP + **18** PRICE + **16** CTRL + **20** CUR + **12** EXE + **11** UI + **10** LOG + **10** UNC + **12** BKT + **7** CAL = **156** przypadków specyfikacyjnych.
 - Nowe testy **ECO-08 i ECO-09** weryfikują rachunek marginalny i porównanie opłacalności bez dobierania celu 65% z góry; ECO-08 przewiduje wynik **+0,4152 DKK** przy jawnie określonych stratach i degradacji. To wzorzec analityczny, nie wynik pracy kodu.
-- Nadal **nieweryfikowane** są: rzeczywista semantyka sterowania i torów AC/DC, struktura przyszłych przedziałów cen w HA (pełne taryfy zakupu potwierdzone przez użytkownika), realne krzywe sprawności, koszt degradacji, historyczne migawki prognoz, funkcja terminalnej wartości energii i niezależny fail-safe. Zapisanie wzorów **nie zamyka** tych kwestii.
+- Nadal **nieweryfikowane** są: zachowanie sterowania i torów AC/DC, godzinowy profil prognozy PV, realne krzywe sprawności, koszt degradacji, historyczne migawki prognoz, funkcja terminalnej wartości energii i niezależny fail-safe. **Strukturę cen HA oraz pełne taryfy zakupu już ustalono** na podstawie atrybutów z 20.10.2026.
 - Testy zapisano jako przypadki do zaimplementowania; dopóki nie powstanie kod, nie należy ich nazywać „wykonanymi”.
