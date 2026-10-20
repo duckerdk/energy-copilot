@@ -40,6 +40,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
         "observed": {
             "at": data.at.isoformat(),
             "measurement_roles": sorted(data.measurements),
+            "measurement_source_timing": coordinator.measurement_source_timing,
             "price_slots": len(data.prices),
             "price_first_start_utc": price_first,
             "price_last_end_utc": price_last,

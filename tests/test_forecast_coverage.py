@@ -28,7 +28,7 @@ def test_reported_evening_horizon_is_not_extended_with_fake_night_zeros():
     times = [NOW + timedelta(hours=2), NOW + timedelta(hours=6, minutes=6, seconds=30)]
     source = {
         "watts": {t.isoformat(): 100 for t in times},
-        "wh_period": {times[0].isoformat(): 500, times[1].isoformat(): 0},
+        "wh_period": {times[0].isoformat(): 0, times[1].isoformat(): 500},
     }
     snapshot = forecast(source, NOW)
     prices = tuple(
@@ -53,7 +53,7 @@ def test_reported_evening_horizon_is_not_extended_with_fake_night_zeros():
     assert len(snapshot.periods) == 1
 
 
-def test_internal_missing_energy_and_final_unbounded_energy_remain_visible():
+def test_missing_end_energy_and_bounded_final_energy_remain_visible():
     source = forecast_response()
     source["watts"][(NOW + timedelta(hours=3)).isoformat()] = 0
     del source["wh_period"][(NOW + timedelta(hours=1)).isoformat()]
@@ -66,9 +66,9 @@ def test_internal_missing_energy_and_final_unbounded_energy_remain_visible():
     assert result["missing_energy_timestamps_utc"] == [
         (NOW + timedelta(hours=1)).isoformat()
     ]
-    assert result["unbounded_energy_timestamps_utc"] == [
-        (NOW + timedelta(hours=3)).isoformat()
-    ]
+    assert result["unbounded_energy_timestamps_utc"] == []
+    assert snapshot.periods[-1].end == NOW + timedelta(hours=3)
+    assert snapshot.periods[-1].kwh == 0.1
 
 
 @pytest.mark.parametrize("day,hours", [("2026-03-29", 23), ("2026-10-25", 25)])
@@ -89,7 +89,7 @@ def test_dst_missing_hours_use_actual_utc_durations(day, hours):
 
 def test_missing_energy_at_leading_boundary_is_not_conflated_with_unpublished_hours():
     source = forecast_response()
-    del source["wh_period"][NOW.isoformat()]
+    del source["wh_period"][(NOW + timedelta(hours=1)).isoformat()]
     snapshot = forecast(source, NOW - timedelta(hours=1))
     result = forecast_coverage(
         snapshot,

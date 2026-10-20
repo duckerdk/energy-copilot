@@ -187,14 +187,18 @@ def prices(buy_state, sell_state, now):
 
 
 def forecast(response, captured_at):
-    """Parse HA 2026.10 raw response: Wh for the interval starting at timestamp."""
+    """Parse observed HA raw Wh for the interval ENDING at each timestamp.
+
+    The native service's start-index docstring contradicts the exported data.
+    The contract in HA_CONTRACT is backed by adjacent watts/time integrals.
+    """
     if not isinstance(response, Mapping):
         raise ValueError("invalid_forecast_response")
     periods = response.get("wh_period")
     if not isinstance(periods, Mapping) or not periods:
         raise ValueError("invalid_forecast_response")
-    # wh_period alone cannot establish the final interval's end.
-    # Require the corresponding watts timeline to prove interval boundaries.
+    # The first energy value has no known preceding boundary. Every later
+    # value belongs to the interval bounded by the preceding/current watts keys.
     watts = response.get("watts")
     if not isinstance(watts, Mapping):
         raise ValueError("forecast_boundaries_unverifiable")
@@ -210,8 +214,8 @@ def forecast(response, captured_at):
         raise ValueError("invalid_forecast_response")
     result = []
     for start, end in zip(boundaries, boundaries[1:]):
-        if start in values and end > captured_at:
-            result.append(ForecastPeriod(start, end, values[start] / 1000))
+        if end in values and end > captured_at:
+            result.append(ForecastPeriod(start, end, values[end] / 1000))
     if not result:
         raise ValueError("empty_forecast")
     serial = [(p.start.isoformat(), p.end.isoformat(), p.kwh) for p in result]
@@ -226,10 +230,12 @@ def forecast(response, captured_at):
         tuple(result),
         source_start=boundaries[0],
         source_end=boundaries[-1],
-        unbounded_energy_at=tuple(
-            t for t, value in values.items() if t == boundaries[-1] and value != 0
+        # A nonzero final value is bounded by the previous timestamp. Only
+        # initial energy lacks its PRECEDING boundary; never invent that period.
+        unbounded_prior_energy_at=tuple(
+            t for t, value in values.items() if t == boundaries[0] and value != 0
         ),
-        missing_energy_at=tuple(t for t in boundaries[:-1] if t not in values),
+        missing_energy_at=tuple(t for t in boundaries[1:] if t not in values),
     )
 
 

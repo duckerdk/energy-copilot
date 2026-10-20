@@ -66,6 +66,10 @@ def forecast_coverage(snapshot: ForecastSnapshot, prices: tuple[PriceSlot, ...],
         "unbounded_energy_timestamps_utc": [
             t.isoformat() for t in snapshot.unbounded_energy_at
         ],
+        "unbounded_prior_energy_timestamps_utc": [
+            t.isoformat() for t in snapshot.unbounded_prior_energy_at
+        ],
+        "energy_timestamp_semantics": "interval_end",
         "missing_energy_timestamps_utc": [
             t.isoformat() for t in snapshot.missing_energy_at
         ],

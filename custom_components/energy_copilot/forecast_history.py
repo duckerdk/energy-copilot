@@ -297,7 +297,9 @@ class ForecastHistory:
             return None
         payload = self.payloads[row["version"]]
         if "legacy_periods" in payload:
-            return self._legacy_snapshot(payload, row["captured_at"], row["version"])
+            # These periods were normalized by the incorrect start-index parser.
+            # Without the original end-index Wh map they cannot be repaired safely.
+            return None
         return replace(
             forecast(payload, utc(row["captured_at"])), version=row["version"]
         )
@@ -328,4 +330,6 @@ class ForecastHistory:
             ),
             "evicted_this_runtime": self.evicted,
             "provider_generated_at_available": False,
+            "interval_semantics": "end_timestamp",
+            "legacy_replay_supported": False,
         }

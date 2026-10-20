@@ -13,11 +13,64 @@ from homeassistant.util import dt as dt_util
 from .const import HISTORY_ROLES
 from .models import HistorySlot
 from .recorder_reconstruction import RecordingRun, reconstruct_history
-from .validation import utc
+from .validation import number, utc
 
 CHUNK_DURATION = timedelta(days=1)
 MAX_HISTORY_RANGE = timedelta(days=366)
 QUARTER = timedelta(minutes=15)
+MAX_AUDIT_INTERVALS = 96
+
+
+def rejection_audit(slots, runs=()):
+    """Bounded interval evidence without values or private household time series.
+
+    Reason counts overlap: one quarter can contain both a negative home sample
+    and a run gap. Only the union equals the number of rejected quarters.
+    """
+    rejected = [slot for slot in slots if slot.home_kwh is None]
+    by_reason = Counter(
+        code for slot in rejected for code in {i.code for i in slot.issues}
+    )
+    negative = {
+        slot.start
+        for slot in rejected
+        if any(i.code == "negative_home_power" for i in slot.issues)
+    }
+    gaps = {
+        slot.start
+        for slot in rejected
+        if any(i.code == "recorder_recording_gap" for i in slot.issues)
+    }
+    return {
+        "rejected_slots": len(rejected),
+        "rejected_intervals": [
+            {
+                "start_utc": slot.start.isoformat(),
+                "end_utc": slot.end.isoformat(),
+                "issues": [
+                    {"code": issue.code, "source": issue.source}
+                    for issue in slot.issues
+                ],
+            }
+            for slot in rejected[:MAX_AUDIT_INTERVALS]
+        ],
+        "rejected_intervals_truncated": len(rejected) > MAX_AUDIT_INTERVALS,
+        "rejection_reason_slots": dict(sorted(by_reason.items())),
+        "negative_home_and_recording_gap_slots": len(negative & gaps),
+        "negative_home_or_recording_gap_slots": len(negative | gaps),
+        "recording_runs": [
+            {
+                "start_utc": run.start.isoformat(),
+                "recorded_end_utc": run.recorded_end.isoformat()
+                if run.recorded_end is not None
+                else None,
+                "effective_end_utc": run.end.isoformat(),
+                "closed_incorrect": not run.reliable,
+            }
+            for run in runs[:MAX_AUDIT_INTERVALS]
+        ],
+        "recording_runs_truncated": len(runs) > MAX_AUDIT_INTERVALS,
+    }
 
 
 class HistoryReadError(HomeAssistantError):
@@ -83,6 +136,16 @@ class RecorderHistoryReader:
             "device_freshness_verified": False,
             "recording_pause_history_verified": False,
             "historical_filter_changes_verified": False,
+            "history_source_format": "ha_backend_state",
+            "negative_home_records_in_window": 0,
+            "rejected_slots": 0,
+            "rejected_intervals": [],
+            "rejected_intervals_truncated": False,
+            "rejection_reason_slots": {},
+            "negative_home_and_recording_gap_slots": 0,
+            "negative_home_or_recording_gap_slots": 0,
+            "recording_runs": [],
+            "recording_runs_truncated": False,
         }
 
     @staticmethod
@@ -96,6 +159,28 @@ class RecorderHistoryReader:
         summary["chunks_read"] += 1
         summary["configured_retention_days"] = chunk["configured_retention_days"]
         summary["source_rows_last_chunk"] = chunk["source_rows"]
+        summary["negative_home_records_in_window"] += chunk[
+            "negative_home_records_in_window"
+        ]
+        summary["rejected_slots"] += chunk["rejected_slots"]
+        summary["rejection_reason_slots"] = dict(
+            Counter(summary["rejection_reason_slots"])
+            + Counter(chunk["rejection_reason_slots"])
+        )
+        for key in (
+            "negative_home_and_recording_gap_slots",
+            "negative_home_or_recording_gap_slots",
+        ):
+            summary[key] += chunk[key]
+        # Multi-month backfills retain only the latest chunk's bounded interval audit.
+        summary["rejected_intervals_last_chunk"] = chunk["rejected_intervals"]
+        summary["rejected_intervals_last_chunk_truncated"] = chunk[
+            "rejected_intervals_truncated"
+        ]
+        summary["recording_runs_last_chunk"] = chunk["recording_runs"]
+        summary["recording_runs_last_chunk_truncated"] = chunk[
+            "recording_runs_truncated"
+        ]
         summary["recording_intervals_read"] = (
             summary.get("recording_intervals_read", 0)
             + chunk["recording_intervals_read"]
@@ -165,6 +250,10 @@ class RecorderHistoryReader:
             issue_sources=dict(
                 Counter(f"{i.source}:{i.code}" for slot in slots for i in slot.issues)
             ),
+        )
+        summary.update(rejection_audit(slots, runs))
+        summary["negative_home_records_in_window"] = source_rows.get("home", {}).get(
+            "negative_power_records_in_window", 0
         )
         # A setting is not proof that rows covering that duration actually exist.
         retention = getattr(instance, "keep_days", None)
@@ -254,6 +343,7 @@ class RecorderHistoryReader:
                     process_timestamp(row[0]),
                     min(process_timestamp(row[1]) or end, end),
                     not row[2],
+                    process_timestamp(row[1]),
                 )
                 for row in raw_runs
             )
@@ -285,6 +375,18 @@ class RecorderHistoryReader:
                 "first_change_at": min(changes).isoformat() if changes else None,
                 "last_change_at": max(changes).isoformat() if changes else None,
             }
+            if role == "home":
+                negative = 0
+                for state in rows.get(entity_id, ()):
+                    if not start <= utc(state.last_updated) < end:
+                        continue
+                    if state.attributes.get("unit_of_measurement") != "W":
+                        continue
+                    try:
+                        negative += number(state.state) < 0
+                    except TypeError, ValueError, OverflowError:
+                        pass
+                source_rows[role]["negative_power_records_in_window"] = negative
             if changes:
                 first = min(first, min(changes)) if first is not None else min(changes)
                 last = max(last, max(changes)) if last is not None else max(changes)

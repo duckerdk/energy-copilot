@@ -199,11 +199,11 @@ def forecast_response():
     keys = [(NOW + timedelta(hours=n)).isoformat() for n in range(3)]
     return {
         "watts": dict.fromkeys(keys, 500),
-        "wh_period": {keys[0]: 1000, keys[1]: 500, keys[2]: 0},
+        "wh_period": {keys[0]: 194, keys[1]: 1000, keys[2]: 500},
     }
 
 
-def test_forecast_wh_start_intervals_and_version():
+def test_forecast_wh_end_intervals_and_version():
     snapshot = forecast(forecast_response(), NOW)
     assert snapshot.periods[0].start == NOW
     assert snapshot.periods[0].end == NOW + timedelta(hours=1)

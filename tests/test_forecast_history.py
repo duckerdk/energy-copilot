@@ -139,13 +139,16 @@ async def test_legacy_migration_keeps_known_periods_without_fabricated_originals
     )
     archive = ForecastHistory(hass, "entry")
     await archive.async_load(NOW)
-    assert archive.as_of(NOW).periods[0].kwh == 1
+    assert (
+        archive.as_of(NOW) is None
+    )  # Legacy normalized Wh used the wrong interval index.
     assert archive.original_at(NOW) is None
     assert archive.summary["legacy_versions_without_originals"] == 1
     assert (await store.async_load())["format"] == 2
     restored = ForecastHistory(hass, "entry")
     await restored.async_load(NOW)
-    assert restored.as_of(NOW) == archive.as_of(NOW)
+    assert restored.as_of(NOW) is None
+    assert restored.summary["legacy_versions_without_originals"] == 1
 
 
 @pytest.mark.parametrize(
@@ -228,3 +231,35 @@ async def test_oversized_series_rejected_before_storage(hass, monkeypatch):
 def test_retention_settings_are_also_enforced_at_runtime(hass, kwargs):
     with pytest.raises(ValueError, match="invalid_forecast_retention"):
         ForecastHistory(hass, "entry", **kwargs)
+
+
+async def test_original_format2_replays_corrected_end_energy_without_future_revision(
+    hass,
+):
+    start = NOW + timedelta(hours=8)
+    end = start + timedelta(minutes=6, seconds=30)
+    response = {
+        "watts": {start.isoformat(): 162, end.isoformat(): 0},
+        "wh_period": {start.isoformat(): 400, end.isoformat(): 9},
+    }
+    first_capture = start + timedelta(minutes=1)
+    archive = ForecastHistory(hass, "entry")
+    first = await archive.async_record(response, first_capture, "solar")
+    assert first.periods[0].kwh == 0.009
+    assert first.periods[0].start == start and first.periods[0].end == end
+    assert first.unbounded_energy_at == ()
+    assert first.unbounded_prior_energy_at == (start,)
+    restored = ForecastHistory(hass, "entry")
+    await restored.async_load(start + timedelta(minutes=2))
+    assert restored.original_at(first_capture) == response
+    assert restored.as_of(first_capture).periods[0].kwh == 0.009
+    assert restored.as_of(first_capture - timedelta(microseconds=1)) is None
+    revised = deepcopy(response)
+    revised["wh_period"][end.isoformat()] = 18
+    changed_at = start + timedelta(minutes=3)
+    await restored.async_record(revised, changed_at, "solar")
+    assert (
+        restored.as_of(changed_at - timedelta(microseconds=1)).periods[0].kwh == 0.009
+    )
+    assert restored.as_of(changed_at).periods[0].kwh == 0.018
+    assert restored.original_at(first_capture) == response

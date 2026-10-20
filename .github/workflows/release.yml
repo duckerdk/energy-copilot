@@ -68,6 +68,11 @@ jobs:
 
           M2 fixes: reconstruct Recorder state changes using real carry-in timestamps and process boundaries; retain explicit unavailable/unit errors and unknown recording pauses. Preserve already-started forecast intervals without prorating Wh, and report unpublished/internal forecast gaps without inventing nighttime zeros. Expose installed version, commit and payload integrity for HACS releases. Read-only; no inverter commands.
           EOF_CHANGES
+          elif [ "$RELEASE_TAG" = "v0.1.2" ]; then
+            cat >> /tmp/energy-copilot-release-notes.md <<'EOF_ISSUE5'
+
+          Fix #5 Forecast.Solar interval semantics: Wh belongs to the interval ending at its timestamp, including the final short sunset period. Preserve the original energy of a partially elapsed interval and do not invent nighttime zeros. Add per-quarter Recorder rejection reasons, negative-home auditing, RecorderRuns context and Python report/change timestamps. Preserve but quarantine old normalized forecast history whose original end-indexed Wh is unavailable. Full synthetic/anonymized regression suite; no private household history, no price changes and no inverter commands.
+          EOF_ISSUE5
           fi
           gh release create "$RELEASE_TAG" \
             /tmp/energy-copilot-release/energy_copilot.zip \

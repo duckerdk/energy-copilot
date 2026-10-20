@@ -38,7 +38,10 @@ class ForecastSnapshot:
     periods: tuple[ForecastPeriod, ...]
     source_start: datetime | None = None
     source_end: datetime | None = None
+    # Kept for persisted/public snapshot compatibility; end-indexed raw values
+    # never imply unbounded future energy at the last timestamp.
     unbounded_energy_at: tuple[datetime, ...] = ()
+    unbounded_prior_energy_at: tuple[datetime, ...] = ()
     missing_energy_at: tuple[datetime, ...] = ()
 
 

@@ -16,6 +16,7 @@ class RecordingRun:
     start: datetime
     end: datetime
     reliable: bool = True
+    recorded_end: datetime | None = None
 
 
 def _value(role, state):
@@ -27,7 +28,9 @@ def _value(role, state):
         raise ValueError("invalid_input") from None
     if state.attributes.get("unit_of_measurement") != "W":
         raise ValueError("invalid_unit")
-    if role in {"pv", "home"} and value < 0:
+    if role == "home" and value < 0:
+        raise ValueError("negative_home_power")
+    if role == "pv" and value < 0:
         raise ValueError("invalid_input")
     return value
 

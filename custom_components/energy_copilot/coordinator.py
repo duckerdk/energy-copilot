@@ -14,6 +14,7 @@ from .const import (
     DEFAULT_FORECAST_MAX_VERSIONS,
     DEFAULT_FORECAST_RETENTION_DAYS,
     DOMAIN,
+    HISTORY_ROLES,
     OPTIONAL_ENTITY_ROLES,
     UPDATE_INTERVAL,
 )
@@ -57,6 +58,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self._external_issues = []
         self._last_external = None
         self.forecast_coverage = None
+        self.measurement_source_timing = {}
 
     async def _async_setup(self):
         try:
@@ -72,6 +74,26 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             role: self.hass.states.get(entity_id) if entity_id else None
             for role, entity_id in self.entities.items()
         }
+        self.measurement_source_timing = {}
+        for role in HISTORY_ROLES:
+            state = states[role]
+            reported = getattr(state, "last_reported", None)
+            updated = getattr(state, "last_updated", None)
+            self.measurement_source_timing[role] = {
+                "backend": "python_state",
+                "freshness_time_basis": "last_reported",
+                "last_reported_utc": reported.isoformat()
+                if reported is not None
+                else None,
+                "last_updated_utc": updated.isoformat()
+                if updated is not None
+                else None,
+                "report_age_seconds": (now - reported).total_seconds()
+                if reported is not None
+                else None,
+                "available": state is not None
+                and state.state not in {"unknown", "unavailable"},
+            }
         snapshot.measurements, snapshot.flows_kw, snapshot.issues = measurements(
             states, now
         )
