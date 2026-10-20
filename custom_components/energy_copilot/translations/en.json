@@ -44,8 +44,6 @@
         "title": "Read-only sources",
         "data": {
           "pv": "Pv",
-          "pv1": "Pv1 (optional)",
-          "pv2": "Pv2 (optional)",
           "grid": "Grid",
           "battery": "Battery",
           "voltage": "Voltage (optional)",
