@@ -49,21 +49,17 @@ async def test_partial_optional_mapping_keeps_manual_entity_ids(
 ):
     data = {
         **minimal_settings(settings),
-        "pv1": "sensor.custom_pv1",
         "voltage": "sensor.voltage_not_loaded",
         "solar_sell": "switch.optional_not_loaded",
     }
-    hass.states.async_set("sensor.custom_pv1", "unavailable")
     with patch("custom_components.energy_copilot.async_setup_entry", return_value=True):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": "user"}
         )
         result = await hass.config_entries.flow.async_configure(result["flow_id"], data)
         assert result["type"] is FlowResultType.CREATE_ENTRY
-        assert result["data"]["pv1"] == "sensor.custom_pv1"
         assert result["data"]["voltage"] == "sensor.voltage_not_loaded"
         assert result["data"]["solar_sell"] == "switch.optional_not_loaded"
-        assert result["data"]["pv2"] is None
         await hass.async_block_till_done()
 
 
@@ -88,7 +84,6 @@ def test_optional_suggestions_do_not_restore_cleared_values(settings):
     merged = {**settings, **normalized}
     assert all(merged[role] is None for role in OPTIONAL_ENTITY_ROLES)
     assert merged["solar_sell"] is None
-    assert "pv1" not in schema(merged)(data)
 
 
 def test_duplicate_validation_ignores_unconfigured_optional_sources(
@@ -96,14 +91,13 @@ def test_duplicate_validation_ignores_unconfigured_optional_sources(
 ):
     data = normalize(minimal_settings(settings))
     assert validate(hass, data) == {}
-    data["pv1"] = data["pv"]
+    data["voltage"] = data["pv"]
     assert validate(hass, data) == {"base": "duplicate_entity"}
 
 
 @pytest.mark.parametrize(
     "role,entity",
     [
-        ("pv1", "switch.pv1"),
         ("voltage", "not_an_entity"),
         ("solar_sell", "sensor.solar_sell"),
     ],
@@ -174,3 +168,10 @@ async def test_options_remove_old_optional_mappings(
         assert entry.options["solar_sell"] is None
         assert entry.options["forecast_entry"] is None
         reload_entry.assert_awaited_once()
+
+
+def test_legacy_pv_mapping_fields_are_dropped(settings):
+    old = {**settings, "pv1": "sensor.legacy_one", "pv2": "sensor.legacy_two"}
+    cleaned = normalize(old)
+    assert "pv1" not in cleaned and "pv2" not in cleaned
+    assert "pv1" not in DEFAULT_ENTITIES and "pv2" not in DEFAULT_ENTITIES
