@@ -90,7 +90,7 @@ Nie rozpoczynać kodowania na podstawie samej decyzji o kompletności dokumentac
 
 **Audyt dokumentów (aktualizacja 2026-10-20):**
 - Sprawdzenie odwołań względnych między plikami Markdown: **brak zerwanych odwołań do plików**.
-- Testy opisane w dokumentacji: **40** scenariuszy PHY/ECO/SOC/TIME/PVQ/SAFE/MAP + **16** CTRL + **12** EXE + **11** UI + **10** LOG + **10** UNC + **12** BKT + **7** CAL = **118** przypadków specyfikacyjnych.
+- Testy opisane w dokumentacji: **40** scenariuszy PHY/ECO/SOC/TIME/PVQ/SAFE/MAP + **16** CTRL + **20** CUR + **12** EXE + **11** UI + **10** LOG + **10** UNC + **12** BKT + **7** CAL = **138** przypadków specyfikacyjnych.
 - Nowe testy **ECO-08 i ECO-09** weryfikują rachunek marginalny i porównanie opłacalności bez dobierania celu 65% z góry; ECO-08 przewiduje wynik **+0,4152 DKK** przy jawnie określonych stratach i degradacji. To wzorzec analityczny, nie wynik pracy kodu.
 - Nadal **nieweryfikowane** są: rzeczywista semantyka sterowania i torów AC/DC, struktura przyszłych przedziałów cen w HA (pełne taryfy zakupu potwierdzone przez użytkownika), realne krzywe sprawności, koszt degradacji, historyczne migawki prognoz, funkcja terminalnej wartości energii i niezależny fail-safe. Zapisanie wzorów **nie zamyka** tych kwestii.
 - Testy zapisano jako przypadki do zaimplementowania; dopóki nie powstanie kod, nie należy ich nazywać „wykonanymi”.
