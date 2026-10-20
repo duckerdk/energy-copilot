@@ -11,6 +11,7 @@
 - [Model optymalizacji](requirements/OPTIMIZATION_MODEL.md) — bilans PV/sieć/dom/bateria, koszty, dynamiczny SOC, zmienny horyzont znanych cen, walidacja prognozy przy curtailment.
 - [Scenariusze testowe](requirements/TEST_SCENARIOS.md) — 40 przypadków z danymi i kryteriami akceptacji: bilans, koszty, dynamiczny SOC, ceny, curtailment, bezpieczeństwo i mapowanie encji HA.
 - [Strategia sterowania prąd/TOU](requirements/CONTROL_STRATEGY.md) — preferowany current-first, trwałość nastaw, ograniczenia sześciu okien TOU i 16 testów porównania.
+- [Algorytm regulatora prądu](requirements/CURRENT_CONTROLLER_MODEL.md) — dokładne przeliczenia A↔kW, sterowanie 15-minutowe, ograniczenia TOU/SOC, 20 testów CUR.
 - [Wykonawca HA](requirements/EXECUTION_CONTRACT.md) — kontrakt poleceń, weryfikacja skutków, zgody, stany i awarie; 12 dodatkowych testów EXE.
 - [Panel Home Assistant](requirements/HA_DASHBOARD.md) — widok pomiarów, planu, kosztów, SOC, zgód i diagnostyki; 10 testów UI.
 - [Rejestr decyzji](requirements/DECISION_LOGGING.md) — wymagane od pierwszego rozruchu ceny, prognozy, koszty, porównanie alternatyw i historia w HA.
