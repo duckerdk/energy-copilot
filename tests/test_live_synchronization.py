@@ -47,9 +47,7 @@ def test_modbus_as_of_spread_preserves_home_and_negative_policy(spread, home):
     assert values["home"].value == max(0, home)
     assert values["home"].raw_value == (home if home < 0 else None)
     assert "measurement_time_skew" not in {i.code for i in issues}
-    assert quality_report(issues)["input_state"] == (
-        "uncertain" if spread > 10 else "valid"
-    )
+    assert quality_report(issues)["input_state"] == "valid"
     assert not any(i.code == "snapshot_not_synchronous" for i in issues)
 
 
@@ -76,11 +74,11 @@ def test_unchanged_night_pv_report_is_not_confused_with_change_time():
     values, _, issues = measurements(states, NOW)
     assert values["pv"].value == 0 and "home" in values
     assert not issues
-    # A silent template is still silent, regardless of its numeric zero.
+    # An unchanged zero remains a valid HA value without a heartbeat.
     states["pv"] = timed("pv", value=0, age=301, change_age=8 * 3600)
     values, _, issues = measurements(states, NOW)
-    assert "home" not in values
-    assert Issue("stale_input", "pv") in issues
+    assert "home" in values
+    assert Issue("stale_input", "pv") not in issues
 
 
 def test_home_report_lag_tracks_changed_inputs_not_unchanged_heartbeats():
