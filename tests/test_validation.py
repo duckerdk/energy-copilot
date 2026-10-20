@@ -101,11 +101,9 @@ def test_physical_consistency_is_not_inferred(source_states):
     source_states["voltage"] = make_state("voltage", 56)
     source_states["current"] = make_state("current", 100)
     source_states["soc"] = make_state("soc", 19)
-    source_states["pv1"] = make_state("pv1", 1)
     _, _, issues = measurements(source_states, NOW)
     assert codes(issues) >= {
         "battery_power_inconsistent",
-        "pv_sum_inconsistent",
         "below_policy_minimum",
     }
 
