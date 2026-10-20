@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from .const import HISTORY_ROLES, MAX_AGE, MAX_SKEW, POWER_ROLES
+from .const import HISTORY_ROLES, MAX_AGE, MAX_FUTURE_OFFSET, MAX_SKEW, POWER_ROLES
 from .models import (
     ForecastPeriod,
     ForecastSnapshot,
@@ -46,7 +46,7 @@ def measurement(role, state, now, *, historical=False):
         at = utc(state.last_updated if historical else state.last_reported)
     except ValueError, TypeError, OverflowError:
         raise ValueError("invalid_input") from None
-    if at > now + MAX_SKEW or now - at > MAX_AGE:
+    if at > now + MAX_FUTURE_OFFSET or now - at > MAX_AGE:
         raise ValueError("stale_input")
     unit = state.attributes.get("unit_of_measurement")
     expected = (
@@ -82,7 +82,42 @@ def measurement(role, state, now, *, historical=False):
     return Sample(value, at)
 
 
-def measurements(states, now, *, historical=False):
+def live_timing(states):
+    """Compare reports separately from changes in the derived home's inputs.
+
+    A fresh unchanged report is not a new value requiring template evaluation.
+    These are HA timestamps, not proof of an atomic Modbus device frame.
+    """
+    reported, changed = {}, {}
+    for role in HISTORY_ROLES:
+        state = states.get(role)
+        try:
+            reported[role] = utc(state.last_reported)
+            changed[role] = utc(state.last_updated)
+        except AttributeError, TypeError, ValueError, OverflowError:
+            continue
+    sources = ("pv", "grid", "battery")
+
+    def skew(roles):
+        times = [reported[r] for r in roles if r in reported]
+        return (
+            (max(times) - min(times)).total_seconds()
+            if len(times) == len(roles)
+            else None
+        )
+
+    return {
+        "source_report_skew_seconds": skew(sources),
+        "all_report_skew_seconds": skew(HISTORY_ROLES),
+        "home_context_lag_seconds": max(
+            0, (max(changed[r] for r in sources) - reported["home"]).total_seconds()
+        )
+        if "home" in reported and all(r in changed for r in sources)
+        else None,
+    }
+
+
+def measurements(states, now, *, historical=False, source_recovery_at=None):
     values, issues = {}, []
     for role, state in states.items():
         if role in {"buy", "sell"}:
@@ -95,14 +130,25 @@ def measurements(states, now, *, historical=False):
     if len(sources) != len(HISTORY_ROLES):
         values.pop("home", None)
         issues.append(Issue("invalid_input", "home"))
-    elif max(s.at for s in sources) - min(s.at for s in sources) > MAX_SKEW:
+    elif any(
+        recovered is None or values["home"].at < recovered
+        for recovered in (source_recovery_at or {}).values()
+    ):
         values.pop("home", None)
-        issues.append(Issue("snapshot_not_synchronous", "home"))
-    elif (home := values["home"]).value < 0:
-        # User policy applies only after validating all four sources and times.
-        # Preserve the signed input locally without modifying the HA entity.
-        values["home"] = Sample(0, home.at, raw_value=home.value)
-        issues.append(Issue("negative_home_normalized", "home"))
+        issues.append(Issue("home_predates_source_recovery", "home"))
+    else:
+        timing = live_timing(states)
+        for key, code in (
+            ("source_report_skew_seconds", "measurement_time_skew"),
+            ("home_context_lag_seconds", "home_context_lag"),
+        ):
+            if timing[key] is not None and timing[key] > MAX_SKEW.total_seconds():
+                issues.append(Issue(code, "home"))
+        if (home := values["home"]).value < 0:
+            # User policy applies after availability, units, freshness and recovery.
+            # As-of timing uncertainty remains visible alongside normalization.
+            values["home"] = Sample(0, home.at, raw_value=home.value)
+            issues.append(Issue("negative_home_normalized", "home"))
     flows = {}
     for role, positive, negative in (
         ("grid", "grid_import", "grid_export"),

@@ -82,7 +82,8 @@
         "name": "Input quality",
         "state": {
           "valid": "Valid",
-          "degraded": "Degraded"
+          "degraded": "Degraded",
+          "uncertain": "Uncertain"
         }
       }
     }

@@ -201,7 +201,12 @@ def test_quality_separates_required_inputs_history_and_information():
         Issue("new_unknown_failure", "new_source"),
     ]
     report = quality_report(issues)
-    assert report["categories"] == {"blocking": 2, "historical": 2, "informational": 2}
+    assert report["categories"] == {
+        "blocking": 2,
+        "uncertainty": 0,
+        "historical": 2,
+        "informational": 2,
+    }
     assert len(report["issues"]) == len(issues)
     assert report["night_classification_supplies_forecast_energy"] is False
 

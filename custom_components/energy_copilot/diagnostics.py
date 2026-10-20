@@ -3,6 +3,8 @@
 from collections import Counter
 from copy import deepcopy
 
+from homeassistant.util import dt as dt_util
+
 from .const import OPTIONAL_ENTITY_ROLES
 
 
@@ -64,6 +66,9 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "home_sample_normalized": "home" in data.measurements
             and data.measurements["home"].raw_value is not None,
             "measurement_source_timing": coordinator.measurement_source_timing,
+            "live_measurement_window": coordinator.live_window.summary(
+                dt_util.utcnow()
+            ),
             "price_slots": len(data.prices),
             "price_first_start_utc": price_first,
             "price_last_end_utc": price_last,
@@ -104,7 +109,8 @@ async def async_get_config_entry_diagnostics(hass, entry):
         },
         "assumed": {
             "live_freshness_seconds": 300,
-            "live_maximum_skew_seconds": 10,
+            "live_as_of_skew_warning_seconds": 10,
+            "live_future_timestamp_tolerance_seconds": 10,
             "recent_history_lookback_hours": 24,
             "history_on_demand_max_days": 366,
             "history_chunk_hours": 24,

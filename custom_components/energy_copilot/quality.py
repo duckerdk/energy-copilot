@@ -20,6 +20,8 @@ def quality_report(issues, forecast_coverage=None):
                 if night_only
                 else "forecast_horizon_unresolved"
             )
+        elif code in {"measurement_time_skew", "home_context_lag"}:
+            category, effect = "uncertainty", "as_of_values_not_atomic_measurement"
         elif code == "negative_home_normalized":
             category, effect = "informational", "user_approved_home_normalization"
         elif source == "recorder" or code in {
@@ -48,12 +50,17 @@ def quality_report(issues, forecast_coverage=None):
         )
     counts = Counter(i["category"] for i in classified)
     return {
-        "input_state": "degraded" if counts["blocking"] else "valid",
+        "input_state": "degraded"
+        if counts["blocking"]
+        else "uncertain"
+        if counts["uncertainty"]
+        else "valid",
         "quality_scope": "required_current_inputs",
         "planning_readiness": "not_evaluated_m2",
         "load_profile_readiness": "physical_validation_required",
         "categories": {
-            key: counts[key] for key in ("blocking", "historical", "informational")
+            key: counts[key]
+            for key in ("blocking", "uncertainty", "historical", "informational")
         },
         "issues": classified,
         "history_slot_policy": "complete_observed_quarter_required",

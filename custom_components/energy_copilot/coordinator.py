@@ -4,8 +4,9 @@ import asyncio
 import logging
 from datetime import timedelta
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
@@ -21,6 +22,7 @@ from .const import (
 from .forecast_history import ForecastHistory
 from .forecast_quality import forecast_coverage
 from .history import HistoryReadError, RecorderHistoryReader
+from .live_measurements import SOURCE_ROLES, LiveMeasurementWindow, LiveSourceContext
 from .models import InputSnapshot, Issue
 from .quality import quality_report
 from .solar import solar_evidence
@@ -62,8 +64,26 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self.forecast_coverage = None
         self.measurement_source_timing = {}
         self.quality = None
+        self.live_context = LiveSourceContext()
+        self.live_window = LiveMeasurementWindow()
 
     async def _async_setup(self):
+        # State-change events preserve short outages between the 30-second polls.
+        @callback
+        def source_changed(event):
+            for role in SOURCE_ROLES:
+                if self.entities[role] == event.data["entity_id"]:
+                    self.live_context.observe(
+                        role, event.data["new_state"], dt_util.utcnow()
+                    )
+
+        self.config_entry.async_on_unload(
+            async_track_state_change_event(
+                self.hass,
+                [self.entities[role] for role in SOURCE_ROLES if self.entities[role]],
+                source_changed,
+            )
+        )
         try:
             await self.forecast_history.async_load(dt_util.utcnow())
         except HomeAssistantError:
@@ -97,9 +117,13 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                 "available": state is not None
                 and state.state not in {"unknown", "unavailable"},
             }
+        for role in SOURCE_ROLES:
+            self.live_context.observe(role, states[role], now)
         snapshot.measurements, snapshot.flows_kw, snapshot.issues = measurements(
-            states, now
+            states, now, source_recovery_at=self.live_context.recovery_at
         )
+        self.live_context.accept_home(snapshot.measurements.get("home"))
+        self.live_window.record(states, now, snapshot.measurements, snapshot.issues)
         for role in OPTIONAL_ENTITY_ROLES:
             if not self.entities[role]:
                 snapshot.issues.append(Issue("optional_entity_unconfigured", role))

@@ -1,7 +1,7 @@
 name: Read-only integration
 on:
   push:
-    branches: [main, fix/issue-5-forecast-contract]
+    branches: [main, fix/issue-5-forecast-contract, fix/issue-9-live-synchronization]
   pull_request:
 permissions:
   contents: read

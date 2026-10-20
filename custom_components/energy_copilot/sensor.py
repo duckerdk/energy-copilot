@@ -16,7 +16,7 @@ class InputQualitySensor(CoordinatorEntity, SensorEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "input_quality"
     _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options = ["valid", "degraded"]
+    _attr_options = ["valid", "uncertain", "degraded"]
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, entry):
@@ -51,6 +51,7 @@ class InputQualitySensor(CoordinatorEntity, SensorEntity):
                 "load_profile_readiness"
             ],
             "planning_readiness": self.coordinator.quality["planning_readiness"],
+            "home_available": "home" in data.measurements,
             "price_slots": len(data.prices),
             "forecast_periods": len(data.forecast.periods) if data.forecast else 0,
             "history_valid_slots": sum(s.home_kwh is not None for s in data.history),

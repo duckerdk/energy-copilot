@@ -20,7 +20,10 @@
 | MTR-01 | grid +1200/-2470 W, bateria +1000/-1000 W | Poprawny import/eksport i rozładowanie/ładowanie |
 | MTR-02 | `home_energy_consumption` ma liczbę z `float(0)` dla niedostępnego źródła | `invalid_input` także historycznie |
 | MTR-03 | PV1 2387W + PV2 647W | PV DC=3034W, bez dodania ponownie PV→bateria |
-| MTR-04 | 20s różnicy próbek sieci i PV przy szybkim skoku | `snapshot_not_synchronous`, bez uznania residual za dowód |
+| MTR-04 | 15–40s rozrzutu świeżych raportów Modbus, skoki wejść, opóźniony dom | Dom as-of zachowany z `measurement_time_skew` / `home_context_lag`, `uncertain`; brak dowodu atomowego/fizycznego bilansu |
+| MTR-05 | Nocne PV=0, raport vs zmiana; brak, zły format/jednostka, raport >300s lub przyszły >10s | Niezmienny świeży raport ważny, rzeczywiste braki nadal blokują dom; bez sztucznego heartbeat |
+| MTR-06 | Awaria i powrót źródła pomiędzy pollami, liczbowy stary szablon, reload/unload | `home_predates_source_recovery` do nowego raportu domu; listener usunięty, nowe okno po setup |
+| MTR-07 | Syntetyczne 30min odczytów i limity okna | Liczniki przyjęć/odrzuceń i percentyle poprawne, bez surowych W; weryfikacja rzeczywistego okna HA osobno w OPEN_ITEMS |
 | PVF-01 | brak/nieznana odpowiedź Forecast.Solar | Diagnostyka, bez wymyślonej prognozy |
 | PVF-02 | pełny SOC, Solar Sell OFF, słoneczna pogoda | Brak nauki błędu prognozy z ograniczonej produkcji PV |
 | LOAD-01 | historia Recorder z zamaskowanym zerem składowej | Odrzucenie slota z uczenia i backtestu |
