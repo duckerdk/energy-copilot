@@ -15,7 +15,7 @@ Powiązania: [CONTROL_STRATEGY.md](CONTROL_STRATEGY.md), [ENTITY_CONTRACT.md](EN
 - Sterowanie bezpośrednio przez HA trwa tylko, gdy HA jest dostępny. **Wszystkie nastawy pozostają w falowniku po utracie HA**; TOU powtarza swój 6-okienkowy profil każdego dnia.
 - SOC okresu TOU **nie** ogranicza ładowania z PV: ogranicza głównie rozładowanie, a przy Grid Charge jest także celem ładowania z sieci.
 - Eksport baterii obecnie wyłączony; brak ważnej zgody na konkretny plan = brak celowego eksportu baterii.
-- Użytkownik potwierdził, że cena zakupu z HA zawiera **wszystkie taryfy i opłaty**; nie dodawać ich ponownie. Sprzedaż: spot − 0,0215 DKK/kWh.
+- Co-Pilot używa ceny zakupu **wprost** z `sensor.energi_data_service` oraz ceny sprzedaży **wprost** z `sensor.energi_data_spotpris`, bez liczenia prowizji i taryf. Eksport PV przy cenie z HA co najmniej 0,40 DKK/kWh; [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md).
 
 ## 2. Co planujemy, a co rzeczywiście ustawiamy
 
@@ -141,7 +141,7 @@ Każda decyzja powinna zawierać: `decision_id`, slot UTC, ceny końcowe kupna i
 - `CUR-12`: user policy 0–50 / 0–100 / 0–50 A i nielegalne 51 A, 101 A → odpowiednie prośby odrzucone, bez cichego przycięcia.
 - `CUR-13`: niedostępne napięcie baterii albo nieznany krok nastawy → brak pozornie dokładnej konwersji kW na A.
 - `CUR-14`: sam sukces `number.set_value` nie jest pomiarem rzeczywistego prądu; jeśli ładowanie fizycznie możliwe, a odczyt nadal wykazuje poprzednią nastawę lub przekroczenie limitu → diagnostyka, nie podwójny zapis w ciemno.
-- `CUR-15`: w taryfie HA cena zakupu zawiera wszystkie opłaty → nie doliczać drugi raz; sprzedaż PV liczyć spot − 0,0215 DKK/kWh.
+- `CUR-15`: zakup i sprzedaż pobierane z odpowiednich encji HA bez jakichkolwiek korekt; żadnych prowizji ani taryf w Co-Pilot; próg PV export 0,40 DKK/kWh według [PV_EXPORT_POLICY.md](PV_EXPORT_POLICY.md).
 - `CUR-16`: wariant z wyższą ceną sprzedaży rano, ale niepewną jutrzejszą PV i dynamicznym celem SOC → algorytm optymalizuje cały horyzont, nie sztywną regułę „rano 5 A, w południe 50 A”.
 - `CUR-17`: eksport PV wyłączony, bateria pełna → zmniejszenie prądu ładowania nie tworzy przychodu, a może skutkować ograniczeniem PV.
 - `CUR-18`: przy awarii HA plan `grid_charge` wymagający przyszłego wyłączenia jest zablokowany bez niezależnego sposobu zakończenia, mimo dodatniego zysku prognozy.
