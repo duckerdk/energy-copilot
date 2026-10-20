@@ -78,7 +78,7 @@ Podana migawka numerycznie pasuje. Dodatkowe sprawdzenia:
 | Cena zakupu dzisiaj (licznik pomocniczy) | `sensor.sun12k_daily_energy_bought_cost` | 0 DKK przy 4,3 kWh importu | **Podejrzane**; nie przyjmować jako rzeczywistej ceny/kosztu |
 | Wynagrodzenie za sprzedaż (pomocnicze) | `sensor.sun12k_daily_energy_sold_compensation` | 7,136... DKK | Tylko porównanie kontrolne; stawki mogą mieć inny czas, reset i model opłat |
 
-**Rachunek netto:** osobno wyliczać koszt **faktycznego importu** według `sensor.energi_data_service.raw_today/raw_tomorrow` i przychód **faktycznego eksportu** według `sensor.energi_data_spotpris.raw_today/raw_tomorrow − 0,0215`. Do przyszłych decyzji pracować na prognozowanym eksporcie/importie, nie na liczniku dziennym jako pomiarze mocy.
+**Rachunek netto:** osobno wyliczać koszt **faktycznego importu** według `sensor.energi_data_service.raw_today/raw_tomorrow` i przychód **faktycznego eksportu** według `sensor.energi_data_spotpris.raw_today/raw_tomorrow` — **bez jakichkolwiek korekt cen**. Do przyszłych decyzji pracować na prognozowanym eksporcie/importie, nie na liczniku dziennym jako pomiarze mocy.
 
 **Dwa tryby obliczania rzeczywistych kWh:** (a) przyrost **zweryfikowanego**, nierestartowanego licznika `kWh`, lub (b) całka z mocy z rzeczywistymi odstępami próbek. **Nie sumować** wyników obu metod jako dwóch energii. Porównywać je jako **kontrolę** po dopasowaniu tych samych przedziałów. Liczniki dobowe mają reset — różnica po północy nie jest ujemnym importem/eksportem.
 
