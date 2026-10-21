@@ -114,13 +114,14 @@ def test_previous_day_projection_rejects_partial_missing_and_future_history():
     assert error.value.code == "load:coverage_or_resolution_gap"
 
 
-
 def test_opt_in_short_load_gap_models_prediction_not_recorder_records():
     slots = history_quarters()
     slots = (
         replace(slots[0], home_kwh=0.2),
         replace(
-            slots[1], home_kwh=None, observed_seconds=875,
+            slots[1],
+            home_kwh=None,
+            observed_seconds=875,
             unobserved_seconds=25,
         ),
         replace(slots[2], home_kwh=0.6),
@@ -152,7 +153,9 @@ def test_bracketed_three_quarter_recorder_gap_models_only_future_load():
         now=HOUR,
         prices=(
             PriceSlot(HOUR, HOUR + timedelta(hours=1), 0.4, 0.4),
-            PriceSlot(HOUR + timedelta(hours=1), HOUR + 2 * timedelta(hours=1), 0.5, 0.4),
+            PriceSlot(
+                HOUR + timedelta(hours=1), HOUR + 2 * timedelta(hours=1), 0.5, 0.4
+            ),
         ),
         periods=forecast_quarters(count=8),
         history=slots,
@@ -181,13 +184,13 @@ def test_long_load_gap_or_unbracketed_gap_is_never_modeled():
     )
     assert prediction.modeled_quarters == 0
     projected_starts = {period.start for period in prediction.periods}
-    assert all(
-        HOUR + index * QUARTER not in projected_starts for index in (2, 3, 4, 5)
-    )
+    assert all(HOUR + index * QUARTER not in projected_starts for index in (2, 3, 4, 5))
     unbracketed = snapshot(
         now=HOUR,
         history=(
-            replace(slots[0], home_kwh=None, observed_seconds=0, unobserved_seconds=900),
+            replace(
+                slots[0], home_kwh=None, observed_seconds=0, unobserved_seconds=900
+            ),
             *slots[1:],
         ),
     )
