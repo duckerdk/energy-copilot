@@ -71,5 +71,5 @@ async def test_native_diagnostics_identifies_installed_manifest_without_git_head
         hass.states.get("sensor.energy_co_pilot_input_quality").attributes[
             "installed_version"
         ]
-        == "0.1.8"
+        == "0.1.9"
     )
