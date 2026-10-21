@@ -39,6 +39,8 @@ class PlanningInput:
     pv_forecast_version: str
     pv_forecast_to_dc_multiplier: float
     load_method: str
+    pv_temporal_model: str = "exact_source_periods"
+    pv_temporal_modeled_quarters: int = 0
     # Incomplete physical calibration and Deye's six TOUs forbid execution.
     actionable: bool = False
     coverage_status: str = "complete"
@@ -121,6 +123,43 @@ def _exact_quarter_energy(
     return total
 
 
+
+def _modeled_quarter_pv_energy(
+    periods: tuple[ForecastPeriod, ...], start: datetime, end: datetime
+) -> tuple[float, bool]:
+    """Integrate published PV energy with a declared constant-power model.
+
+    The source period's kWh is preserved, not copied to every quarter.
+    Partial intersections are estimates, never verified intraperiod forecasts.
+    A missing interval or overlapping source periods still fail closed.
+    """
+    cursor = start
+    total = 0.0
+    modeled = False
+    for period in periods:
+        left = _utc(period.start, "pv")
+        right = _utc(period.end, "pv")
+        if right <= start:
+            continue
+        if left >= end:
+            break
+        if right <= left:
+            raise PlanningInputError("pv:invalid_period", start)
+        overlap_start = max(left, start)
+        overlap_end = min(right, end)
+        if overlap_start != cursor or overlap_end <= overlap_start:
+            raise PlanningInputError("pv:coverage_or_resolution_gap", start)
+        total += _amount(period.kwh, "pv") * (
+            (overlap_end - overlap_start).total_seconds()
+            / (right - left).total_seconds()
+        )
+        modeled |= overlap_start != left or overlap_end != right
+        cursor = overlap_end
+    if cursor != end:
+        raise PlanningInputError("pv:coverage_or_resolution_gap", start)
+    return total, modeled
+
+
 def build_planning_input(
     snapshot: InputSnapshot,
     *,
@@ -128,6 +167,7 @@ def build_planning_input(
     load_projection: LoadProjection | None = None,
     pv_export_enabled: bool = False,
     allow_prefix: bool = False,
+    pv_temporal_model: str | None = None,
 ) -> PlanningInput:
     """Prepare all complete future 15-minute quarters up to published price end.
 
@@ -136,6 +176,8 @@ def build_planning_input(
     conversion efficiency or zero-filled forecast is introduced.
     """
     now = _utc(snapshot.at, "decision")
+    if pv_temporal_model not in (None, "uniform_power_unverified"):
+        raise PlanningInputError("pv:invalid_temporal_model")
     multiplier = _amount(pv_forecast_to_dc_multiplier, "pv_conversion")
     if multiplier <= 0:
         raise PlanningInputError("pv_conversion:zero")
@@ -180,6 +222,7 @@ def build_planning_input(
         sorted(projection.periods, key=lambda period: _utc(period.start, "load"))
     )
     quarters = []
+    modeled_pv_quarters = 0
     first_gap = None
     price_index = 0
     cursor = start
@@ -198,13 +241,20 @@ def build_planning_input(
             raise PlanningInputError("price:coverage_gap", cursor)
         price = prices[price_index]
         try:
-            pv_energy = _exact_quarter_energy(pv_periods, cursor, right, "pv")
+            if pv_temporal_model == "uniform_power_unverified":
+                pv_energy, modeled_pv = _modeled_quarter_pv_energy(
+                    pv_periods, cursor, right
+                )
+            else:
+                pv_energy = _exact_quarter_energy(pv_periods, cursor, right, "pv")
+                modeled_pv = False
             load_energy = _exact_quarter_energy(load_periods, cursor, right, "load")
         except PlanningInputError as error:
             if not allow_prefix or not quarters:
                 raise
             first_gap = error
             break
+        modeled_pv_quarters += int(modeled_pv)
         quarters.append(
             Quarter(
                 cursor,
@@ -225,6 +275,10 @@ def build_planning_input(
         snapshot.forecast.version,
         multiplier,
         projection.method,
+        pv_temporal_model=(
+            "uniform_power_unverified" if modeled_pv_quarters else "exact_source_periods"
+        ),
+        pv_temporal_modeled_quarters=modeled_pv_quarters,
         coverage_status="partial" if first_gap is not None else "complete",
         first_missing_code=first_gap.code if first_gap is not None else None,
         first_missing_at=first_gap.at if first_gap is not None else None,
