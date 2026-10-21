@@ -38,6 +38,8 @@
 | SOC-01 | plan chce 15% SOC | `not_executable`, minimum 20% |
 | CUR-01 | napięcie 56V, limit 5A/50A | Górne granice 0,28/2,8 kW DC, bez gwarancji przepływu |
 | CUR-02 | próba 51 A ładowania/101 A rozładowania | Odrzucić, nie przycinać |
+| CUR-03 | wymagana energia 0,64 kWh DC, 51,2 V; dostępne 15/30/60 minut | 50/25/12,5 A odpowiednio, bez przekroczenia ograniczeń SOC i prądu |
+| CUR-04 | ta sama cena w dostępnych slotach, wariant 50 A i 25 A | Wybrać niższy prąd przy równym koszcie i tej samej dostarczonej energii; droższy wariant nie wygrywa tylko za łagodniejsze ładowanie |
 | TOU-01 | potrzeba 7 niezależnych okien, falownik ma 6 | Nie raportować idealnego sterowania 7 oknami |
 | TOU-02 | przerwanie zapisu po trzecim polu/00:00 | Nie oznaczać sukcesu, procedura recovery |
 | CTRL-01 | ręczna zmiana przy włączonym Co-Pilot | Możliwość nadpisania przy następnym planie, bez pętli |
