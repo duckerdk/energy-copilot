@@ -43,9 +43,7 @@ def dispatch(**kwargs):
 
 
 def run(q=None, d=None, plant=PLANT):
-    return simulate_candidate(
-        plant, (q or quarter(),), (d or dispatch(),)
-    )
+    return simulate_candidate(plant, (q or quarter(),), (d or dispatch(),))
 
 
 def test_no_dispatch_import_and_terminal_value_are_accounted_once():
@@ -96,7 +94,9 @@ def test_pv_export_blocked_below_040(price):
     with pytest.raises(InfeasibleCandidate, match="pv_export:policy"):
         run(
             q=quarter(
-                pv_dc_kwh=1, home_ac_kwh=0, pv_export_enabled=True,
+                pv_dc_kwh=1,
+                home_ac_kwh=0,
+                pv_export_enabled=True,
                 sell_dkk_per_kwh=price,
             ),
             d=dispatch(pv_to_export_dc_kwh=1),
@@ -111,14 +111,17 @@ def test_pv_export_not_implicitly_authorized_by_price():
         )
 
 
-@pytest.mark.parametrize("field,value,reason", [
-    ("charge_limit_a", 51, "charge_limit_a:policy_limit"),
-    ("discharge_limit_a", 101, "discharge_limit_a:policy_limit"),
-    ("grid_charge_limit_a", 51, "grid_charge_limit_a:policy_limit"),
-    ("initial_soc_pct", 19.99, "initial_soc:policy_limit"),
-    ("eta_battery_to_ac", 1.01, "eta_battery_to_ac:outside_0_to_1"),
-    ("battery_capacity_dc_kwh", 0, "capacity:zero"),
-])
+@pytest.mark.parametrize(
+    "field,value,reason",
+    [
+        ("charge_limit_a", 51, "charge_limit_a:policy_limit"),
+        ("discharge_limit_a", 101, "discharge_limit_a:policy_limit"),
+        ("grid_charge_limit_a", 51, "grid_charge_limit_a:policy_limit"),
+        ("initial_soc_pct", 19.99, "initial_soc:policy_limit"),
+        ("eta_battery_to_ac", 1.01, "eta_battery_to_ac:outside_0_to_1"),
+        ("battery_capacity_dc_kwh", 0, "capacity:zero"),
+    ],
+)
 def test_equipment_and_policy_parameters_are_not_silently_clipped(field, value, reason):
     with pytest.raises(InfeasibleCandidate, match=reason):
         run(plant=replace(PLANT, **{field: value}))
@@ -225,7 +228,9 @@ def test_consecutive_quarters_preserve_energy_and_soc():
     assert r.final_soc_pct == pytest.approx(100 * (5.12 + 0.18) / 10.24)
     assert r.quarters[1].soc_start_pct == pytest.approx(r.quarters[0].soc_end_pct)
     with pytest.raises(InfeasibleCandidate, match="time:nonconsecutive"):
-        simulate_candidate(PLANT, (q1, replace(q2, start=START)), (dispatch(), dispatch()))
+        simulate_candidate(
+            PLANT, (q1, replace(q2, start=START)), (dispatch(), dispatch())
+        )
 
 
 def test_missing_forecasts_are_not_treated_as_zero():
