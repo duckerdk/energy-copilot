@@ -15,7 +15,11 @@ from .planner import (
     lowest_cost_candidate,
     spread_grid_charge_evenly,
 )
-from .planning_inputs import PlanningInputError, build_planning_input
+from .planning_inputs import (
+    PlanningInputError,
+    build_planning_input,
+    project_previous_utc_day_load,
+)
 
 NOMINAL_BATTERY_CAPACITY_KWH = 10.24
 NOMINAL_BATTERY_VOLTAGE_V = 51.2
@@ -38,6 +42,7 @@ class Preview:
     quarters: int = 0
     pv_version: str | None = None
     source_load_method: str | None = None
+    load_modeled_quarters: int = 0
     pv_temporal_model: str | None = None
     pv_temporal_modeled_quarters: int = 0
     reference_cost_dkk: float | None = None
@@ -102,6 +107,9 @@ def evaluate_preview(
             pv_export_enabled=pv_export_enabled,
             allow_prefix=True,
             pv_temporal_model="uniform_power_unverified",
+            load_projection=project_previous_utc_day_load(
+                snapshot, short_gap_model="linear_bracketed_unverified"
+            ),
         )
         quarters = inputs.quarters
         base = tuple(_reference_dispatch(plant, q) for q in quarters)
@@ -185,6 +193,7 @@ def evaluate_preview(
         quarters=len(quarters),
         pv_version=inputs.pv_forecast_version,
         source_load_method=inputs.load_method,
+        load_modeled_quarters=inputs.load_modeled_quarters,
         pv_temporal_model=inputs.pv_temporal_model,
         pv_temporal_modeled_quarters=inputs.pv_temporal_modeled_quarters,
         reference_cost_dkk=reference.objective_dkk,
