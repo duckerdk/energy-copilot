@@ -193,6 +193,7 @@ async def test_ha_diagnostics_labels_unverified_pv_resolution_and_no_commands(
     from custom_components.energy_copilot.diagnostics import (
         async_get_config_entry_diagnostics,
     )
+
     from .conftest import NOW
 
     freezer.move_to(NOW)
