@@ -250,3 +250,47 @@ def simulate_candidate(
         energy_cost + degradation_cost - terminal_value,
         energy / capacity * 100,
     )
+
+
+def reference_no_battery(plant: Plant, quarters: tuple[Quarter, ...]) -> CandidateResult:
+    """Zero battery cycling benchmark, NOT the existing Deye TOU baseline."""
+    _plant(plant)
+    dispatches = []
+    for q in quarters:
+        pv = _nonnegative(q.pv_dc_kwh, "pv")
+        home = _nonnegative(q.home_ac_kwh, "home")
+        sell = _finite(q.sell_dkk_per_kwh, "sell_price")
+        pv_to_home = min(pv, home / plant.eta_pv_to_ac)
+        excess = max(0.0, pv - pv_to_home)
+        can_export = q.pv_export_enabled and sell >= PV_EXPORT_MIN_DKK_PER_KWH
+        pv_to_export = excess if can_export else 0.0
+        dispatches.append(
+            Dispatch(
+                pv_to_home,
+                0.0,
+                pv_to_export,
+                excess - pv_to_export,
+                0.0,
+                0.0,
+            )
+        )
+    return simulate_candidate(plant, quarters, tuple(dispatches))
+
+
+def lowest_cost_candidate(
+    plant: Plant,
+    quarters: tuple[Quarter, ...],
+    candidate_dispatches: tuple[tuple[Dispatch, ...], ...],
+) -> tuple[int, CandidateResult]:
+    """Rank validated candidates by full-horizon cost, including terminal SOC.
+
+    This selects only among supplied dispatches. It does NOT claim global
+    optimality, existing Deye policy emulation, or six-TOU executability.
+    """
+    if not candidate_dispatches:
+        raise InfeasibleCandidate("candidates:missing")
+    scored = tuple(
+        (index, simulate_candidate(plant, quarters, candidate))
+        for index, candidate in enumerate(candidate_dispatches)
+    )
+    return min(scored, key=lambda item: (item[1].objective_dkk, item[0]))
