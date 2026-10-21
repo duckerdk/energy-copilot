@@ -170,6 +170,64 @@ def test_missing_recent_history_cannot_be_replaced_with_arbitrary_load():
     assert result.reason == "load:coverage_or_resolution_gap"
 
 
+
+def test_dry_run_recovers_full_price_horizon_across_short_recorder_gaps():
+    s = snapshot(hours=12)
+    missing = {3, 6, 7, 11, 18, 32, 33, 34, 39, 43}
+    s.history = tuple(
+        replace(h, home_kwh=None, observed_seconds=875, unobserved_seconds=25)
+        if index in missing
+        else h
+        for index, h in enumerate(s.history)
+    )
+    result = evaluate_preview(s, mode="dry_run")
+    assert result.status == "preview"
+    assert result.coverage == "complete"
+    assert result.reason is None
+    assert result.quarters == 48
+    assert result.end == BASE + timedelta(hours=12)
+    assert result.load_modeled_quarters == len(missing)
+    assert (
+        result.source_load_method
+        == "previous_24h_utc_linear_bracketed_gap_model_unverified"
+    )
+    assert result.modeled_saving_dkk > 0
+    assert result.executable is False
+    assert all(s.history[index].home_kwh is None for index in missing)
+
+
+def test_dry_run_long_recorder_outage_remains_explicit_partial():
+    s = snapshot(hours=12)
+    s.history = tuple(
+        replace(h, home_kwh=None, observed_seconds=0, unobserved_seconds=900)
+        if 20 <= index < 26
+        else h
+        for index, h in enumerate(s.history)
+    )
+    result = evaluate_preview(s, mode="dry_run")
+    assert result.status == "preview"
+    assert result.coverage == "partial"
+    assert result.quarters == 20
+    assert result.reason == "load:coverage_or_resolution_gap"
+    assert result.first_uncovered_at == BASE + 20 * STEP
+    assert result.load_modeled_quarters == 0
+    assert result.executable is False
+
+
+def test_dry_run_without_both_bracketing_load_samples_stays_blocked():
+    s = snapshot()
+    s.history = tuple(
+        replace(h, home_kwh=None, observed_seconds=0, unobserved_seconds=900)
+        if index == 0
+        else h
+        for index, h in enumerate(s.history)
+    )
+    result = evaluate_preview(s, mode="dry_run")
+    assert result.status == "blocked"
+    assert result.reason == "load:coverage_or_resolution_gap"
+    assert result.modeled_saving_dkk is None
+
+
 def test_absent_optional_battery_voltage_is_labeled_nominal_not_measured():
     s = snapshot()
     del s.measurements["voltage"]
@@ -209,8 +267,9 @@ async def test_ha_diagnostics_labels_unverified_pv_resolution_and_no_commands(
         HistorySlot(
             NOW + i * STEP - DAY,
             NOW + (i + 1) * STEP - DAY,
-            0.5,
-            observed_seconds=900,
+            None if i == 3 else 0.5,
+            observed_seconds=875 if i == 3 else 900,
+            unobserved_seconds=25 if i == 3 else 0,
         )
         for i in range(8)
     )
@@ -225,10 +284,12 @@ async def test_ha_diagnostics_labels_unverified_pv_resolution_and_no_commands(
     assert state.state == "preview"
     assert state.attributes["pv_temporal_model"] == "uniform_power_unverified"
     assert state.attributes["pv_temporal_modeled_quarters"] > 0
+    assert state.attributes["load_modeled_quarters"] == 1
     assert state.attributes["executable"] is False
     diag = await async_get_config_entry_diagnostics(hass, entry)
     assert diag["planning_preview"]["pv_temporal_model"] == "uniform_power_unverified"
     assert diag["planning_preview"]["pv_temporal_modeled_quarters"] > 0
+    assert diag["planning_preview"]["load_modeled_quarters"] == 1
     assert diag["read_only"] is True
 
 
