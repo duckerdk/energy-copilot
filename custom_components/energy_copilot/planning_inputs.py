@@ -123,7 +123,6 @@ def _exact_quarter_energy(
     return total
 
 
-
 def _modeled_quarter_pv_energy(
     periods: tuple[ForecastPeriod, ...], start: datetime, end: datetime
 ) -> tuple[float, bool]:
@@ -276,7 +275,9 @@ def build_planning_input(
         multiplier,
         projection.method,
         pv_temporal_model=(
-            "uniform_power_unverified" if modeled_pv_quarters else "exact_source_periods"
+            "uniform_power_unverified"
+            if modeled_pv_quarters
+            else "exact_source_periods"
         ),
         pv_temporal_modeled_quarters=modeled_pv_quarters,
         coverage_status="partial" if first_gap is not None else "complete",
