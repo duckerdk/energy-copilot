@@ -129,7 +129,6 @@ def test_hourly_forecast_energy_is_not_spread_without_intraperiod_model():
     assert error.value.code == "pv:coverage_or_resolution_gap"
 
 
-
 def test_uniform_pv_model_preserves_hourly_energy_and_marks_unverified():
     data = snapshot(
         now=HOUR,
@@ -166,9 +165,7 @@ def test_misaligned_pv_periods_conserve_energy_across_quarter_boundary():
         ),
     )
     result = prepare(data, factor=1, pv_temporal_model="uniform_power_unverified")
-    assert [q.pv_dc_kwh for q in result.quarters] == pytest.approx(
-        [0.3, 0.3, 0.3, 0.3]
-    )
+    assert [q.pv_dc_kwh for q in result.quarters] == pytest.approx([0.3, 0.3, 0.3, 0.3])
     assert sum(q.pv_dc_kwh for q in result.quarters) == pytest.approx(1.2)
 
 
