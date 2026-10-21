@@ -226,8 +226,7 @@ async def test_ha_dry_run_with_real_coordinator_snapshot_renders_model_result(
     await hass.async_block_till_done()
     coordinator = entry.runtime_data.coordinator
     forecast = tuple(
-        ForecastPeriod(NOW + i * STEP, NOW + (i + 1) * STEP, 0)
-        for i in range(8)
+        ForecastPeriod(NOW + i * STEP, NOW + (i + 1) * STEP, 0) for i in range(8)
     )
     coordinator._forecast = ForecastSnapshot(
         NOW - timedelta(minutes=1),
@@ -235,9 +234,7 @@ async def test_ha_dry_run_with_real_coordinator_snapshot_renders_model_result(
         forecast,
     )
     coordinator._history = tuple(
-        HistorySlot(
-            q.start - DAY, q.end - DAY, 0.5, observed_seconds=900
-        )
+        HistorySlot(q.start - DAY, q.end - DAY, 0.5, observed_seconds=900)
         for q in forecast
     )
     coordinator._last_external = NOW
@@ -273,7 +270,4 @@ async def test_preview_exception_does_not_turn_m2_input_quality_unavailable(
     assert coordinator.planning_preview.status == "blocked"
     assert coordinator.planning_preview.reason == "planner:internal_error"
     assert hass.states.get("sensor.energy_co_pilot_input_quality").state == "valid"
-    assert (
-        hass.states.get("sensor.energy_co_pilot_planning_status").state
-        == "blocked"
-    )
+    assert hass.states.get("sensor.energy_co_pilot_planning_status").state == "blocked"
