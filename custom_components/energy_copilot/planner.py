@@ -311,7 +311,9 @@ def lowest_cost_candidate(
     equally_cheap = (
         (index, result)
         for index, result in scored
-        if isclose(result.objective_dkk, minimum_cost, rel_tol=0, abs_tol=COST_TIE_ABS_TOL_DKK)
+        if isclose(
+            result.objective_dkk, minimum_cost, rel_tol=0, abs_tol=COST_TIE_ABS_TOL_DKK
+        )
     )
     return min(
         equally_cheap,
@@ -362,9 +364,7 @@ def spread_grid_charge_evenly(
         pv_to_home = min(pv, home / plant.eta_pv_to_ac)
         excess = max(0.0, pv - pv_to_home)
         export = (
-            excess
-            if q.pv_export_enabled and sell >= PV_EXPORT_MIN_DKK_PER_KWH
-            else 0.0
+            excess if q.pv_export_enabled and sell >= PV_EXPORT_MIN_DKK_PER_KWH else 0.0
         )
         dispatches.append(
             Dispatch(
