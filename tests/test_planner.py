@@ -231,7 +231,7 @@ def test_consecutive_quarters_preserve_energy_and_soc():
     assert r.quarters[1].soc_start_pct == pytest.approx(r.quarters[0].soc_end_pct)
     with pytest.raises(InfeasibleCandidate, match="time:nonconsecutive"):
         simulate_candidate(
-            PLANT, (q1, replace(q2, start=START)), (dispatch(), dispatch())
+            PLANT, (q1, q1), (dispatch(), dispatch())
         )
 
 
