@@ -180,10 +180,10 @@ def test_long_load_gap_or_unbracketed_gap_is_never_modeled():
         data, short_gap_model="linear_bracketed_unverified"
     )
     assert prediction.modeled_quarters == 0
+    projected_starts = {period.start for period in prediction.periods}
     assert all(
-        period.start != HOUR + index * QUARTER for period in prediction.periods
-        for index in ()
-    )  # Empty source gaps remain absent, never synthesized as zeros
+        HOUR + index * QUARTER not in projected_starts for index in (2, 3, 4, 5)
+    )
     unbracketed = snapshot(
         now=HOUR,
         history=(
