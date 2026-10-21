@@ -1,7 +1,7 @@
 """M3 read-only adapter: published prices, PV intervals and auditable load proxy.
 
-No interpolation, assumed-zero data, device writes or TOU executability claims.
-A previous-UTC-day load projection is an unverified model, not a measurement.
+No historical samples are changed or zero-filled; no device writes.
+The optional short-gap interpolation affects future load predictions only.
 """
 
 from dataclasses import dataclass
@@ -13,6 +13,7 @@ from .planner import QUARTER, Quarter
 
 DAY = timedelta(days=1)
 SECONDS_PER_QUARTER = QUARTER.total_seconds()
+MAX_MODELED_LOAD_GAP_QUARTERS = 3
 
 
 class PlanningInputError(ValueError):
@@ -30,6 +31,7 @@ class LoadProjection:
     periods: tuple[ForecastPeriod, ...]
     method: str
     physical_accuracy_verified: bool = False
+    modeled_quarters: int = 0
 
 
 @dataclass(frozen=True)
@@ -41,6 +43,7 @@ class PlanningInput:
     load_method: str
     pv_temporal_model: str = "exact_source_periods"
     pv_temporal_modeled_quarters: int = 0
+    load_modeled_quarters: int = 0
     # Incomplete physical calibration and Deye's six TOUs forbid execution.
     actionable: bool = False
     coverage_status: str = "complete"
@@ -65,20 +68,29 @@ def _amount(value: float, label: str) -> float:
     return number
 
 
-def project_previous_utc_day_load(snapshot: InputSnapshot) -> LoadProjection:
-    """Project complete, validated Recorder quarters exactly 24h forward.
+def project_previous_utc_day_load(
+    snapshot: InputSnapshot, *, short_gap_model: str | None = None
+) -> LoadProjection:
+    """Repeat the previous UTC day's verified load as an unverified forecast.
 
-    UTC repeat deliberately does not claim local-time DST or weather correction.
-    Gaps remain gaps, and this fallback is not approved for device control.
+    In opt-in dry-run mode, short runs of missing Recorder quarters may be
+    linearly modeled in the *future projection* using both adjacent fully
+    observed quarters. Original Recorder records remain missing. Long gaps,
+    absent boundaries and source uncertainty never become assumed zero.
     """
+    if short_gap_model not in (None, "linear_bracketed_unverified"):
+        raise PlanningInputError("load:invalid_short_gap_model")
     now = _utc(snapshot.at, "decision")
-    periods = []
-    seen = set()
+    available_starts: set[datetime] = set()
+    recorded: dict[datetime, float] = {}
     for slot in snapshot.history:
         start = _utc(slot.start, "history")
         end = _utc(slot.end, "history")
         if end > now or end - start != QUARTER:
             continue
+        if start in available_starts:
+            raise PlanningInputError("load:duplicate_history", start)
+        available_starts.add(start)
         if slot.home_kwh is None:
             continue
         if (
@@ -86,15 +98,46 @@ def project_previous_utc_day_load(snapshot: InputSnapshot) -> LoadProjection:
             or slot.unobserved_seconds > 1e-6
         ):
             continue
-        if start in seen:
-            raise PlanningInputError("load:duplicate_history", start)
-        energy = _amount(slot.home_kwh, "load")
-        periods.append(ForecastPeriod(start + DAY, end + DAY, energy))
-        seen.add(start)
+        recorded[start] = _amount(slot.home_kwh, "load")
+
+    modeled: dict[datetime, float] = {}
+    if short_gap_model == "linear_bracketed_unverified":
+        processed: set[datetime] = set()
+        for start in sorted(available_starts):
+            if start in recorded or start in processed:
+                continue
+            missing = []
+            cursor = start
+            while cursor in available_starts and cursor not in recorded:
+                missing.append(cursor)
+                processed.add(cursor)
+                cursor += QUARTER
+            left = start - QUARTER
+            if (
+                len(missing) > MAX_MODELED_LOAD_GAP_QUARTERS
+                or left not in recorded
+                or cursor not in recorded
+            ):
+                continue
+            before, after = recorded[left], recorded[cursor]
+            for index, target in enumerate(missing, start=1):
+                modeled[target] = before + (after - before) * (
+                    index / (len(missing) + 1)
+                )
+    forecast = {**recorded, **modeled}
+    periods = tuple(
+        ForecastPeriod(start + DAY, start + DAY + QUARTER, energy)
+        for start, energy in sorted(forecast.items())
+    )
     return LoadProjection(
         now,
-        tuple(sorted(periods, key=lambda period: period.start)),
-        method="previous_24h_utc_unverified",
+        periods,
+        method=(
+            "previous_24h_utc_linear_bracketed_gap_model_unverified"
+            if modeled
+            else "previous_24h_utc_unverified"
+        ),
+        modeled_quarters=len(modeled),
     )
 
 
@@ -280,6 +323,7 @@ def build_planning_input(
             else "exact_source_periods"
         ),
         pv_temporal_modeled_quarters=modeled_pv_quarters,
+        load_modeled_quarters=projection.modeled_quarters,
         coverage_status="partial" if first_gap is not None else "complete",
         first_missing_code=first_gap.code if first_gap is not None else None,
         first_missing_at=first_gap.at if first_gap is not None else None,
