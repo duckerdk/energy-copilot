@@ -123,9 +123,7 @@ def test_missing_pv_at_night_is_not_invented_as_zero():
 
 
 def test_hourly_forecast_energy_is_not_spread_without_intraperiod_model():
-    data = snapshot(
-        periods=(ForecastPeriod(HOUR, HOUR + timedelta(hours=1), 0.8),)
-    )
+    data = snapshot(periods=(ForecastPeriod(HOUR, HOUR + timedelta(hours=1), 0.8),))
     with pytest.raises(PlanningInputError) as error:
         prepare(data)
     assert error.value.code == "pv:coverage_or_resolution_gap"
@@ -136,7 +134,9 @@ def test_two_five_and_one_five_minute_periods_can_sum_to_quarter():
     periods = (
         ForecastPeriod(HOUR, HOUR + QUARTER, 0.1),
         ForecastPeriod(start, start + timedelta(minutes=5), 0.1),
-        ForecastPeriod(start + timedelta(minutes=5), start + timedelta(minutes=10), 0.1),
+        ForecastPeriod(
+            start + timedelta(minutes=5), start + timedelta(minutes=10), 0.1
+        ),
         ForecastPeriod(start + timedelta(minutes=10), start + QUARTER, 0.1),
         *forecast_quarters(start=start + QUARTER, count=2, kwh=0.2),
     )
@@ -229,9 +229,7 @@ def test_export_not_enabled_implicitly_and_price_ambiguity_blocks_activation():
 
 def test_dst_hour_boundary_is_utc_and_has_no_fake_hour():
     autumn = datetime(2026, 10, 25, 0, tzinfo=UTC)
-    prices = (
-        PriceSlot(autumn, autumn + timedelta(hours=1), 0.3, 0.41),
-    )
+    prices = (PriceSlot(autumn, autumn + timedelta(hours=1), 0.3, 0.41),)
     forecast = tuple(
         ForecastPeriod(
             autumn + i * QUARTER,
