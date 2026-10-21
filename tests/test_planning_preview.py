@@ -1,6 +1,7 @@
 """M3 Home Assistant dry-run preview acceptance and read-only behavior."""
 
 from dataclasses import replace
+from unittest.mock import patch
 from datetime import UTC, datetime, timedelta
 
 from custom_components.energy_copilot.models import (
@@ -190,3 +191,89 @@ async def test_ha_dry_run_without_forecast_shows_specific_blocker_in_diagnostics
     assert diag["planning_preview"]["reason"] == "pv:forecast_missing"
     assert diag["planning_preview"]["executable"] is False
     assert diag["read_only"] is True
+
+
+async def test_ha_dry_run_with_real_coordinator_snapshot_renders_model_result(
+    hass, populated_hass, entry, freezer
+):
+    from .conftest import NOW
+
+    freezer.move_to(NOW)
+    for role, prices in (
+        ("buy", [0.1, 1.4]),
+        ("sell", [0.0, 0.0]),
+    ):
+        entity_id = entry.data[role]
+        hass.states.async_set(
+            entity_id,
+            "0.1",
+            {
+                "unit_of_measurement": "DKK/kWh",
+                "raw_today": [
+                    {
+                        "hour": (NOW + timedelta(hours=i)).isoformat(),
+                        "price": value,
+                    }
+                    for i, value in enumerate(prices)
+                ],
+                "raw_tomorrow": [],
+                "tomorrow_valid": False,
+                "current_price": prices[0],
+            },
+        )
+    hass.config_entries.async_update_entry(entry, options={"mode": "dry_run"})
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = entry.runtime_data.coordinator
+    forecast = tuple(
+        ForecastPeriod(NOW + i * STEP, NOW + (i + 1) * STEP, 0)
+        for i in range(8)
+    )
+    coordinator._forecast = ForecastSnapshot(
+        NOW - timedelta(minutes=1),
+        "test-service-forecast",
+        forecast,
+    )
+    coordinator._history = tuple(
+        HistorySlot(
+            q.start - DAY, q.end - DAY, 0.5, observed_seconds=900
+        )
+        for q in forecast
+    )
+    coordinator._last_external = NOW
+
+    with patch(
+        "homeassistant.core.ServiceRegistry.async_call",
+        side_effect=AssertionError("no HA service permitted during preview"),
+    ):
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+    state = hass.states.get("sensor.energy_co_pilot_planning_status")
+    assert state.state == "preview"
+    assert state.attributes["coverage"] == "complete"
+    assert state.attributes["modeled_saving_dkk"] > 0
+    assert state.attributes["executable"] is False
+    modeled = hass.states.get("sensor.energy_co_pilot_modeled_saving")
+    assert float(modeled.state) > 0
+
+
+async def test_preview_exception_does_not_turn_m2_input_quality_unavailable(
+    hass, populated_hass, entry
+):
+    hass.config_entries.async_update_entry(entry, options={"mode": "dry_run"})
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = entry.runtime_data.coordinator
+    with patch(
+        "custom_components.energy_copilot.coordinator.evaluate_preview",
+        side_effect=RuntimeError("broken experimental optimizer"),
+    ):
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+    assert coordinator.planning_preview.status == "blocked"
+    assert coordinator.planning_preview.reason == "planner:internal_error"
+    assert hass.states.get("sensor.energy_co_pilot_input_quality").state == "valid"
+    assert (
+        hass.states.get("sensor.energy_co_pilot_planning_status").state
+        == "blocked"
+    )
