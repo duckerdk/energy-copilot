@@ -70,3 +70,11 @@ Każde `decision_id`, `plan_id`, start i ważność, dane wejściowe oraz ich we
 - W `monitor`: status M3 `monitor`, bez modelowanej oszczędności i bez zapisu komend. W `dry_run` z brakiem prognozy: `blocked` i kod `pv:forecast_missing` w encji oraz diagnostyce, bez wpływu na `Input quality`.
 - Ze znanym, kompletnym zestawem 15-minutowych prognoz i cen, przedziałem rekordów Recorder oraz poprawnym SOC: `preview`, rzeczywisty wynik kosztowy podglądu i `executable=false`. Brak rozpoczętego/pustego okresu nigdy nie jest zastępowany zerem.
 - Niepełne Forecast.Solar: co najwyżej jawnie oznaczony `partial` bez interpolacji, bez twierdzenia o optymalnym planie pełnego horyzontu. Awaria samego preview nie może zatrzymać M1/M2 ani zmienić statusu `Input quality`.
+
+## Odbiór M3 dry_run v0.1.9 — dane Forecast.Solar o grubej rozdzielczości
+- Opublikowany okres 60 minut z energią 0,8 kWh rozdzielony przez **jawny** niezweryfikowany model stałej średniej mocy daje 4 × 0,2 kWh; dokładna suma zachowana, bez duplikowania energii.
+- Okres rozpoczęty przed pierwszym przyszłym kwadransem: uwzględnić tylko przecięcie przyszłe, bez przypisania całej energii okresu do reszty.
+- Nieregularne odcinki 20 i 40 minut, suma energii zachowana, bez luk; nakładanie okresów lub nieopublikowana minuta nadal blokuje.
+- Oryginalne kwadransowe Forecast.Solar bez alokacji modelowej są opisane `exact_source_periods`.
+- W HA z `dry_run`, pełnymi wymaganymi kwadransami Recorder, SOC i cenami: `planning_status=preview` z `pv_temporal_model=uniform_power_unverified`, liczbą kwadransów i `executable=false`; żadne komendy falownika nie są wywoływane.
+- Nadal blokować niekompletny **pierwszy** przyszły kwadrans obciążenia, nie pomijać luk Recorder; status jakości M1/M2 pozostaje niezależny. Żadna liczba symulacji nie jest oszczędnością rzeczywistą.
