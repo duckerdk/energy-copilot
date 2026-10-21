@@ -44,3 +44,6 @@ Przy niepewnej marginalnej korzyści po degradacji i stratach wybierać brak **d
 
 ## Wynik
 Dla każdego slotu: UTC, ceny i wersja danych, prognoza PV i zużycia, SOC początek/koniec, przepływy PV/dom/bateria/sieć, zamierzony Grid Charge/TOU/prądy/Solar Sell, koszty wariantów, degradacja, niepewność i status wykonalności. Plan jest **intencją**, nie potwierdzonym przepływem. Executor: [EXECUTION.md](EXECUTION.md), testy: [VALIDATION.md](VALIDATION.md).
+
+## Aktualny zakres implementacji M3
+`custom_components/energy_copilot/planner.py` przyjmuje jawny ciąg 15-minutowych wejść, parametry sprawności i proponowane przepływy, weryfikuje bilans i limity oraz porównuje koszt wariantów z degradacją i wyceną końcowego SOC. `reference_no_battery` jest pomocniczym scenariuszem **bez cykli baterii**, nie rzeczywistym `baseline_deye`. Wynik `physical_candidate_only_tou_unverified` nie oznacza planu wykonalnego przez sześć TOU ani optymalności globalnej. Wartości prognostyczne, sprawności i wartość końcowa nie mają domyślnych założeń; wymagają jawnych, udokumentowanych wejść. Pozostaje implementacja adapterów prognoz, predykcji domu, optymalizatora z rzeczywistym mapowaniem sześciu TOU oraz backtestu.
