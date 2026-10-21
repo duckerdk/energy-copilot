@@ -273,7 +273,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         elif self.planning_preview.status == "blocked":
             readiness = "m3_preview_blocked"
         else:
-            readiness = "not_evaluated_monitor"
+            readiness = "not_evaluated_m2"
         self.quality["planning_readiness"] = readiness
         return snapshot
 
