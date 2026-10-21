@@ -4,7 +4,7 @@ The forecast conversion and physical efficiency factors are TEST assumptions.
 Output is never a Deye TOU plan, a confirmed saving or an actuator command.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 from .models import InputSnapshot
@@ -152,8 +152,6 @@ def evaluate_preview(
                                     plant, quarters, energy, flags
                                 )
                             )
-                            from dataclasses import replace
-
                             dispatch[discharge_at] = replace(
                                 dispatch[discharge_at],
                                 battery_to_home_dc_kwh=energy,
