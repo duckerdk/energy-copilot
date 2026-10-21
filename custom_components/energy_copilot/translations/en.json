@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Read-only sources",
-        "description": "M1/M2 only reads data. PV, grid, battery, SOC, home and purchase/sale prices are required. Other sources are optional diagnostics; missing or unavailable data is reported without sending inverter commands.",
+        "description": "M1/M2 reads data. Dry-run M3 additionally evaluates non-executable cost scenarios using explicitly unverified assumptions; neither mode changes inverter settings.",
         "data": {
           "pv": "Pv",
           "grid": "Grid",
@@ -61,7 +61,8 @@
           "solar_sell": "PV export permission switch (optional, read only)",
           "forecast_retention_days": "Forecast retention (days)",
           "forecast_max_versions": "Maximum retained forecast versions"
-        }
+        },
+        "description": "Choose dry_run to inspect experimental M3 planning preview. No inverter commands are sent."
       }
     },
     "error": {
@@ -81,6 +82,17 @@
           "degraded": "Degraded",
           "uncertain": "Uncertain"
         }
+      },
+      "planning_status": {
+        "name": "Planning status (experimental)",
+        "state": {
+          "monitor": "Monitor mode",
+          "blocked": "Blocked",
+          "preview": "Preview available"
+        }
+      },
+      "modeled_saving": {
+        "name": "Modeled saving (experimental)"
       }
     }
   }
