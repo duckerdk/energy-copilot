@@ -236,7 +236,7 @@ def simulate_candidate(
                 discharge_dc,
                 purchase,
                 sales,
-                degradation
+                degradation,
             )
         )
     energy_cost = sum(r.purchase_dkk - r.sales_dkk for r in outcomes)
