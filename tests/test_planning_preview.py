@@ -3,8 +3,6 @@
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
-import pytest
-from homeassistant.components.sensor import SensorDeviceClass
 
 from custom_components.energy_copilot.models import (
     ForecastPeriod,
