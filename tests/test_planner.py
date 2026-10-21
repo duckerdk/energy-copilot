@@ -2,7 +2,6 @@
 
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from math import isnan
 
 import pytest
 
