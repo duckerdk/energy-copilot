@@ -129,6 +129,93 @@ def test_hourly_forecast_energy_is_not_spread_without_intraperiod_model():
     assert error.value.code == "pv:coverage_or_resolution_gap"
 
 
+
+def test_uniform_pv_model_preserves_hourly_energy_and_marks_unverified():
+    data = snapshot(
+        now=HOUR,
+        periods=(ForecastPeriod(HOUR, HOUR + timedelta(hours=1), 0.8),),
+    )
+    result = prepare(data, factor=1, pv_temporal_model="uniform_power_unverified")
+    assert len(result.quarters) == 4
+    assert [q.pv_dc_kwh for q in result.quarters] == pytest.approx([0.2] * 4)
+    assert sum(q.pv_dc_kwh for q in result.quarters) == pytest.approx(0.8)
+    assert result.pv_temporal_model == "uniform_power_unverified"
+    assert result.pv_temporal_modeled_quarters == 4
+    assert result.actionable is False
+
+
+def test_uniform_pv_model_uses_only_remaining_fraction_of_started_hour():
+    data = snapshot(
+        now=NOW,
+        periods=(ForecastPeriod(HOUR, HOUR + timedelta(hours=1), 0.8),),
+    )
+    result = prepare(data, factor=1, pv_temporal_model="uniform_power_unverified")
+    assert len(result.quarters) == 3
+    assert sum(q.pv_dc_kwh for q in result.quarters) == pytest.approx(0.6)
+    assert result.quarters[0].start == HOUR + QUARTER
+
+
+def test_misaligned_pv_periods_conserve_energy_across_quarter_boundary():
+    data = snapshot(
+        now=HOUR,
+        periods=(
+            ForecastPeriod(HOUR, HOUR + timedelta(minutes=20), 0.4),
+            ForecastPeriod(
+                HOUR + timedelta(minutes=20), HOUR + timedelta(hours=1), 0.8
+            ),
+        ),
+    )
+    result = prepare(data, factor=1, pv_temporal_model="uniform_power_unverified")
+    assert [q.pv_dc_kwh for q in result.quarters] == pytest.approx(
+        [0.3, 0.3, 0.3, 0.3]
+    )
+    assert sum(q.pv_dc_kwh for q in result.quarters) == pytest.approx(1.2)
+
+
+def test_uniform_model_does_not_fill_real_pv_gaps_or_overlaps():
+    data = snapshot(
+        now=HOUR,
+        periods=(
+            ForecastPeriod(HOUR, HOUR + timedelta(minutes=20), 0.3),
+            ForecastPeriod(
+                HOUR + timedelta(minutes=21), HOUR + timedelta(hours=1), 0.7
+            ),
+        ),
+    )
+    with pytest.raises(PlanningInputError) as gap:
+        prepare(data, pv_temporal_model="uniform_power_unverified")
+    assert gap.value.code == "pv:coverage_or_resolution_gap"
+    assert gap.value.at == HOUR + QUARTER
+    overlapping = snapshot(
+        now=HOUR,
+        periods=(
+            ForecastPeriod(HOUR, HOUR + timedelta(minutes=20), 0.3),
+            ForecastPeriod(
+                HOUR + timedelta(minutes=19), HOUR + timedelta(hours=1), 0.7
+            ),
+        ),
+    )
+    with pytest.raises(PlanningInputError) as overlap:
+        prepare(overlapping, pv_temporal_model="uniform_power_unverified")
+    assert overlap.value.code == "pv:coverage_or_resolution_gap"
+
+
+def test_invalid_pv_energy_is_not_silently_normalized():
+    data = snapshot(
+        now=HOUR,
+        periods=(ForecastPeriod(HOUR, HOUR + timedelta(hours=1), -0.8),),
+    )
+    with pytest.raises(PlanningInputError) as error:
+        prepare(data, pv_temporal_model="uniform_power_unverified")
+    assert error.value.code == "pv:invalid_number"
+
+
+def test_exact_15min_pv_periods_do_not_claim_temporal_modeling():
+    result = prepare(pv_temporal_model="uniform_power_unverified")
+    assert result.pv_temporal_model == "exact_source_periods"
+    assert result.pv_temporal_modeled_quarters == 0
+
+
 def test_two_five_and_one_five_minute_periods_can_sum_to_quarter():
     start = HOUR + QUARTER
     periods = (
