@@ -114,6 +114,101 @@ def test_previous_day_projection_rejects_partial_missing_and_future_history():
     assert error.value.code == "load:coverage_or_resolution_gap"
 
 
+
+def test_opt_in_short_load_gap_models_prediction_not_recorder_records():
+    slots = history_quarters()
+    slots = (
+        replace(slots[0], home_kwh=0.2),
+        replace(
+            slots[1], home_kwh=None, observed_seconds=875,
+            unobserved_seconds=25,
+        ),
+        replace(slots[2], home_kwh=0.6),
+        slots[3],
+    )
+    data = snapshot(now=HOUR, history=slots)
+    forecast = project_previous_utc_day_load(
+        data, short_gap_model="linear_bracketed_unverified"
+    )
+    assert slots[1].home_kwh is None
+    assert forecast.modeled_quarters == 1
+    assert forecast.method == "previous_24h_utc_linear_bracketed_gap_model_unverified"
+    assert forecast.periods[1].kwh == pytest.approx(0.4)
+    result = prepare(data, load_projection=forecast)
+    assert result.quarters[1].home_ac_kwh == pytest.approx(0.4)
+    assert result.load_modeled_quarters == 1
+    assert result.actionable is False
+
+
+def test_bracketed_three_quarter_recorder_gap_models_only_future_load():
+    slots = history_quarters(count=8)
+    slots = tuple(
+        replace(slot, home_kwh=None, observed_seconds=0, unobserved_seconds=900)
+        if index in (2, 3, 4)
+        else replace(slot, home_kwh=0.2 if index == 1 else 0.6)
+        for index, slot in enumerate(slots)
+    )
+    data = snapshot(
+        now=HOUR,
+        prices=(
+            PriceSlot(HOUR, HOUR + timedelta(hours=1), 0.4, 0.4),
+            PriceSlot(HOUR + timedelta(hours=1), HOUR + 2 * timedelta(hours=1), 0.5, 0.4),
+        ),
+        periods=forecast_quarters(count=8),
+        history=slots,
+    )
+    prediction = project_previous_utc_day_load(
+        data, short_gap_model="linear_bracketed_unverified"
+    )
+    assert prediction.modeled_quarters == 3
+    assert [prediction.periods[i].kwh for i in (2, 3, 4)] == pytest.approx(
+        [0.3, 0.4, 0.5]
+    )
+    assert len(prepare(data, load_projection=prediction).quarters) == 8
+
+
+def test_long_load_gap_or_unbracketed_gap_is_never_modeled():
+    slots = history_quarters(count=8)
+    long_gap = tuple(
+        replace(slot, home_kwh=None, observed_seconds=0, unobserved_seconds=900)
+        if index in (2, 3, 4, 5)
+        else slot
+        for index, slot in enumerate(slots)
+    )
+    data = snapshot(now=HOUR, history=long_gap)
+    prediction = project_previous_utc_day_load(
+        data, short_gap_model="linear_bracketed_unverified"
+    )
+    assert prediction.modeled_quarters == 0
+    assert all(
+        period.start != HOUR + index * QUARTER for period in prediction.periods
+        for index in ()
+    )  # Empty source gaps remain absent, never synthesized as zeros
+    unbracketed = snapshot(
+        now=HOUR,
+        history=(
+            replace(slots[0], home_kwh=None, observed_seconds=0, unobserved_seconds=900),
+            *slots[1:],
+        ),
+    )
+    projection = project_previous_utc_day_load(
+        unbracketed, short_gap_model="linear_bracketed_unverified"
+    )
+    assert projection.modeled_quarters == 0
+    assert projection.periods[0].start == HOUR + QUARTER
+
+
+def test_short_gap_model_rejects_unknown_policy_and_duplicate_recorder_slots():
+    data = snapshot()
+    with pytest.raises(PlanningInputError, match="load:invalid_short_gap_model"):
+        project_previous_utc_day_load(data, short_gap_model="invent_zero")
+    with pytest.raises(PlanningInputError, match="load:duplicate_history"):
+        project_previous_utc_day_load(
+            snapshot(history=(*history_quarters(), history_quarters()[1])),
+            short_gap_model="linear_bracketed_unverified",
+        )
+
+
 def test_missing_pv_at_night_is_not_invented_as_zero():
     data = snapshot(periods=forecast_quarters(count=2))
     with pytest.raises(PlanningInputError) as error:
