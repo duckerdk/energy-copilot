@@ -252,7 +252,9 @@ def simulate_candidate(
     )
 
 
-def reference_no_battery(plant: Plant, quarters: tuple[Quarter, ...]) -> CandidateResult:
+def reference_no_battery(
+    plant: Plant, quarters: tuple[Quarter, ...]
+) -> CandidateResult:
     """Zero battery cycling benchmark, NOT the existing Deye TOU baseline."""
     _plant(plant)
     dispatches = []
