@@ -72,6 +72,8 @@ async def async_get_config_entry_diagnostics(hass, entry):
             ),
             "forecast_version": preview.pv_version,
             "load_method": preview.source_load_method,
+            "pv_temporal_model": preview.pv_temporal_model,
+            "pv_temporal_modeled_quarters": preview.pv_temporal_modeled_quarters,
             "reference_cost_dkk": preview.reference_cost_dkk,
             "scenario_cost_dkk": preview.scenario_cost_dkk,
             "modeled_saving_dkk": preview.modeled_saving_dkk,
