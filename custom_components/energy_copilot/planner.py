@@ -7,7 +7,7 @@ explicitly rather than concealed as defaults.
 """
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from math import isfinite
 
 QUARTER = timedelta(minutes=15)
