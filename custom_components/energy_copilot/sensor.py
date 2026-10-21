@@ -10,7 +10,11 @@ from .const import DOMAIN
 
 async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(
-        [InputQualitySensor(entry), PlanningStatusSensor(entry), ModeledSavingSensor(entry)]
+        [
+            InputQualitySensor(entry),
+            PlanningStatusSensor(entry),
+            ModeledSavingSensor(entry),
+        ]
     )
 
 
@@ -117,9 +121,7 @@ class PlanningStatusSensor(CoordinatorEntity, SensorEntity):
                 preview.charge_start.isoformat() if preview.charge_start else None
             ),
             "discharge_start_utc": (
-                preview.discharge_start.isoformat()
-                if preview.discharge_start
-                else None
+                preview.discharge_start.isoformat() if preview.discharge_start else None
             ),
             "evaluated_scenarios": preview.evaluated_scenarios,
             "voltage_source": preview.voltage_source,
