@@ -180,7 +180,10 @@ def build_planning_input(
     cursor = start
     while cursor < last:
         right = cursor + QUARTER
-        while price_index < len(prices) and _utc(prices[price_index].end, "price") <= cursor:
+        while (
+            price_index < len(prices)
+            and _utc(prices[price_index].end, "price") <= cursor
+        ):
             price_index += 1
         if (
             price_index == len(prices)
