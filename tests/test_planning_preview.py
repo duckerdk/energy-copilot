@@ -170,7 +170,6 @@ def test_missing_recent_history_cannot_be_replaced_with_arbitrary_load():
     assert result.reason == "load:coverage_or_resolution_gap"
 
 
-
 def test_dry_run_recovers_full_price_horizon_across_short_recorder_gaps():
     s = snapshot(hours=12)
     missing = {3, 6, 7, 11, 18, 32, 33, 34, 39, 43}
