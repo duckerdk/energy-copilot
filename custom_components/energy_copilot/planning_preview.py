@@ -52,9 +52,7 @@ class Preview:
 def _reference_dispatch(plant: Plant, q) -> Dispatch:
     pv_home = min(q.pv_dc_kwh, q.home_ac_kwh / plant.eta_pv_to_ac)
     remainder = max(0.0, q.pv_dc_kwh - pv_home)
-    pv_export = (
-        remainder if q.pv_export_enabled and q.sell_dkk_per_kwh >= 0.40 else 0.0
-    )
+    pv_export = remainder if q.pv_export_enabled and q.sell_dkk_per_kwh >= 0.40 else 0.0
     return Dispatch(pv_home, 0.0, pv_export, remainder - pv_export, 0.0, 0.0)
 
 
@@ -132,8 +130,7 @@ def evaluate_preview(
                         q = quarters[discharge_at]
                         base_load_ac = (
                             q.home_ac_kwh
-                            - base[discharge_at].pv_to_home_dc_kwh
-                            * plant.eta_pv_to_ac
+                            - base[discharge_at].pv_to_home_dc_kwh * plant.eta_pv_to_ac
                         )
                         energy = min(
                             headroom,
@@ -160,9 +157,7 @@ def evaluate_preview(
                             schedules.append((charge_at, discharge_at))
                         except InfeasibleCandidate:
                             continue
-        selected, result = lowest_cost_candidate(
-            plant, quarters, tuple(candidates)
-        )
+        selected, result = lowest_cost_candidate(plant, quarters, tuple(candidates))
         _, reference = lowest_cost_candidate(plant, quarters, (base,))
     except (PlanningInputError, InfeasibleCandidate) as error:
         code = getattr(error, "code", str(error))
@@ -189,12 +184,8 @@ def evaluate_preview(
         source_load_method=inputs.load_method,
         reference_cost_dkk=reference.objective_dkk,
         scenario_cost_dkk=result.objective_dkk,
-        modeled_saving_dkk=max(
-            0.0, reference.objective_dkk - result.objective_dkk
-        ),
-        max_charge_current_a=max(
-            q.charge_current_a for q in result.quarters
-        ),
+        modeled_saving_dkk=max(0.0, reference.objective_dkk - result.objective_dkk),
+        max_charge_current_a=max(q.charge_current_a for q in result.quarters),
         charge_start=quarters[charge_idx].start if charge_idx is not None else None,
         discharge_start=(
             quarters[discharge_idx].start if discharge_idx is not None else None
