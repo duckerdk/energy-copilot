@@ -84,7 +84,7 @@
         }
       },
       "planning_status": {
-        "name": "Planning status (experimental)",
+        "name": "Planning status",
         "state": {
           "monitor": "Monitor mode",
           "blocked": "Blocked",
@@ -92,7 +92,7 @@
         }
       },
       "modeled_saving": {
-        "name": "Modeled saving (experimental)"
+        "name": "Modeled saving"
       }
     }
   }
