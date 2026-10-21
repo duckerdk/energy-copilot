@@ -64,12 +64,12 @@ async def test_native_diagnostics_identifies_installed_manifest_without_git_head
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     diagnostics = await async_get_config_entry_diagnostics(hass, entry)
-    assert diagnostics["integration_manifest"]["version"] == "0.1.7"
+    assert diagnostics["integration_manifest"]["version"] == "0.1.8"
     assert diagnostics["installed_build"]["integrity"] == "metadata_unavailable"
     assert diagnostics["installed_build"]["commit"] is None
     assert (
         hass.states.get("sensor.energy_co_pilot_input_quality").attributes[
             "installed_version"
         ]
-        == "0.1.7"
+        == "0.1.8"
     )
