@@ -13,6 +13,7 @@ from custom_components.energy_copilot.planner import (
     lowest_cost_candidate,
     reference_no_battery,
     simulate_candidate,
+    spread_grid_charge_evenly,
 )
 
 START = datetime(2026, 10, 21, 10, tzinfo=UTC)
@@ -294,3 +295,92 @@ def test_candidate_ranking_rejects_empty_or_nonphysical_candidates():
             (quarter(pv_dc_kwh=1),),
             ((dispatch(pv_to_home_dc_kwh=1),),),
         )
+
+
+def charge_window(hours=2, *, first_price=1.0, second_price=1.0):
+    q1 = quarter(home_ac_kwh=0, buy_dkk_per_kwh=first_price)
+    q2 = replace(
+        q1, start=END, end=END + timedelta(minutes=15),
+        buy_dkk_per_kwh=second_price,
+    )
+    return (q1, q2)
+
+
+def test_even_charging_uses_25a_instead_of_50a_when_two_quarters_available():
+    slots = charge_window()
+    spread = spread_grid_charge_evenly(PLANT, slots, 0.64, (True, True))
+    result = simulate_candidate(PLANT, slots, spread)
+    assert [r.charge_current_a for r in result.quarters] == pytest.approx([25, 25])
+    assert [r.grid_charge_current_a for r in result.quarters] == pytest.approx([25, 25])
+    assert result.final_soc_pct == pytest.approx(100 * (5.12 + 0.64) / 10.24)
+
+
+def test_one_available_quarter_needs_50a_but_never_more():
+    slots = charge_window()
+    spread = spread_grid_charge_evenly(PLANT, slots, 0.64, (True, False))
+    result = simulate_candidate(PLANT, slots, spread)
+    assert [r.charge_current_a for r in result.quarters] == pytest.approx([50, 0])
+    with pytest.raises(InfeasibleCandidate, match="charge_window:insufficient_time"):
+        spread_grid_charge_evenly(PLANT, slots, 0.641, (True, False))
+
+
+def test_current_is_even_lower_with_four_eligible_quarters():
+    slots = charge_window()
+    extra = tuple(
+        replace(q, start=q.start + timedelta(minutes=30), end=q.end + timedelta(minutes=30))
+        for q in slots
+    )
+    all_slots = slots + extra
+    spread = spread_grid_charge_evenly(PLANT, all_slots, 0.64, (True,) * 4)
+    r = simulate_candidate(PLANT, all_slots, spread)
+    assert [q.charge_current_a for q in r.quarters] == pytest.approx([12.5] * 4)
+
+
+def test_cost_tie_selects_lower_charging_current_even_when_fast_candidate_is_first():
+    slots = charge_window()
+    fast = spread_grid_charge_evenly(PLANT, slots, 0.64, (True, False))
+    slow = spread_grid_charge_evenly(PLANT, slots, 0.64, (True, True))
+    i, result = lowest_cost_candidate(PLANT, slots, (fast, slow))
+    assert i == 1
+    assert [q.charge_current_a for q in result.quarters] == pytest.approx([25, 25])
+    assert simulate_candidate(PLANT, slots, fast).objective_dkk == pytest.approx(
+        result.objective_dkk
+    )
+
+
+def test_economic_savings_take_priority_over_lower_charge_current():
+    slots = charge_window(first_price=0.1, second_price=1.0)
+    fast = spread_grid_charge_evenly(PLANT, slots, 0.64, (True, False))
+    slow = spread_grid_charge_evenly(PLANT, slots, 0.64, (True, True))
+    i, result = lowest_cost_candidate(PLANT, slots, (slow, fast))
+    assert i == 1
+    assert [q.charge_current_a for q in result.quarters] == pytest.approx([50, 0])
+
+
+def test_spreading_does_not_invent_a_charge_window_or_override_limits():
+    slots = charge_window()
+    with pytest.raises(InfeasibleCandidate, match="charge_window:no_eligible_quarters"):
+        spread_grid_charge_evenly(PLANT, slots, 0.2, (False, False))
+    with pytest.raises(InfeasibleCandidate, match="charge_window:missing_or_mismatched"):
+        spread_grid_charge_evenly(PLANT, slots, 0.2, (True,))
+    with pytest.raises(InfeasibleCandidate, match="charge_window:invalid_flag"):
+        spread_grid_charge_evenly(PLANT, slots, 0.2, (1, False))
+    with pytest.raises(InfeasibleCandidate, match="charge_window:insufficient_time"):
+        spread_grid_charge_evenly(
+            replace(PLANT, grid_charge_limit_a=10),
+            slots, 0.64, (True, True),
+        )
+
+
+def test_spreading_validates_pv_export_not_allowed_during_grid_import():
+    q = quarter(home_ac_kwh=0, pv_dc_kwh=1, pv_export_enabled=True)
+    with pytest.raises(InfeasibleCandidate, match="grid:simultaneous_import_export"):
+        spread_grid_charge_evenly(PLANT, (q,), 0.1, (True,))
+
+
+def test_zero_charge_target_has_no_unnecessary_cycling():
+    slots = charge_window()
+    spread = spread_grid_charge_evenly(PLANT, slots, 0, (False, False))
+    r = simulate_candidate(PLANT, slots, spread)
+    assert all(q.charge_current_a == 0 for q in r.quarters)
+    assert r.final_soc_pct == 50
