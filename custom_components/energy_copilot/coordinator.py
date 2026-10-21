@@ -29,7 +29,7 @@ from .live_measurements import (
     derived_templates,
 )
 from .models import InputSnapshot, Issue
-from .planning_preview import evaluate_preview
+from .planning_preview import Preview, evaluate_preview
 from .quality import quality_report
 from .solar import solar_evidence
 from .validation import forecast, measurement, measurements, prices
@@ -258,12 +258,23 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         # Forecast.Solar may have completed after the initial coordinator tick.
         # Evaluate a snapshot only when its observation is already available.
         snapshot.at = dt_util.utcnow()
-        self.planning_preview = evaluate_preview(
-            snapshot,
-            mode=self.settings.get("mode", "monitor"),
-            pv_export_enabled=solar_sell is not None and solar_sell.state == "on",
-        )
+        try:
+            self.planning_preview = evaluate_preview(
+                snapshot,
+                mode=self.settings.get("mode", "monitor"),
+                pv_export_enabled=solar_sell is not None and solar_sell.state == "on",
+            )
+        except Exception:  # Preview must never interrupt reliable M1/M2 polling.
+            _LOGGER.exception("M3 read-only preview failed")
+            self.planning_preview = Preview("blocked", "planner:internal_error")
         self.quality = quality_report(snapshot.issues, self.forecast_coverage)
+        if self.planning_preview.status == "preview":
+            readiness = "experimental_m3_preview_only"
+        elif self.planning_preview.status == "blocked":
+            readiness = "m3_preview_blocked"
+        else:
+            readiness = "not_evaluated_monitor"
+        self.quality["planning_readiness"] = readiness
         return snapshot
 
     async def _async_forecast(self, now):
