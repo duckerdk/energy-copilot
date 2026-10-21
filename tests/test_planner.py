@@ -300,7 +300,9 @@ def test_candidate_ranking_rejects_empty_or_nonphysical_candidates():
 def charge_window(hours=2, *, first_price=1.0, second_price=1.0):
     q1 = quarter(home_ac_kwh=0, buy_dkk_per_kwh=first_price)
     q2 = replace(
-        q1, start=END, end=END + timedelta(minutes=15),
+        q1,
+        start=END,
+        end=END + timedelta(minutes=15),
         buy_dkk_per_kwh=second_price,
     )
     return (q1, q2)
@@ -327,7 +329,9 @@ def test_one_available_quarter_needs_50a_but_never_more():
 def test_current_is_even_lower_with_four_eligible_quarters():
     slots = charge_window()
     extra = tuple(
-        replace(q, start=q.start + timedelta(minutes=30), end=q.end + timedelta(minutes=30))
+        replace(
+            q, start=q.start + timedelta(minutes=30), end=q.end + timedelta(minutes=30)
+        )
         for q in slots
     )
     all_slots = slots + extra
@@ -361,14 +365,18 @@ def test_spreading_does_not_invent_a_charge_window_or_override_limits():
     slots = charge_window()
     with pytest.raises(InfeasibleCandidate, match="charge_window:no_eligible_quarters"):
         spread_grid_charge_evenly(PLANT, slots, 0.2, (False, False))
-    with pytest.raises(InfeasibleCandidate, match="charge_window:missing_or_mismatched"):
+    with pytest.raises(
+        InfeasibleCandidate, match="charge_window:missing_or_mismatched"
+    ):
         spread_grid_charge_evenly(PLANT, slots, 0.2, (True,))
     with pytest.raises(InfeasibleCandidate, match="charge_window:invalid_flag"):
         spread_grid_charge_evenly(PLANT, slots, 0.2, (1, False))
     with pytest.raises(InfeasibleCandidate, match="charge_window:insufficient_time"):
         spread_grid_charge_evenly(
             replace(PLANT, grid_charge_limit_a=10),
-            slots, 0.64, (True, True),
+            slots,
+            0.64,
+            (True, True),
         )
 
 
