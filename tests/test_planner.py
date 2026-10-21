@@ -10,6 +10,8 @@ from custom_components.energy_copilot.planner import (
     InfeasibleCandidate,
     Plant,
     Quarter,
+    lowest_cost_candidate,
+    reference_no_battery,
     simulate_candidate,
 )
 
@@ -243,3 +245,58 @@ def test_missing_forecasts_are_not_treated_as_zero():
 def test_no_candidate_without_matching_quarters():
     with pytest.raises(InfeasibleCandidate, match="quarters:missing"):
         simulate_candidate(PLANT, (), ())
+
+
+def test_reference_without_battery_is_explicit_not_fake_deye_baseline():
+    q = quarter(pv_dc_kwh=1.0, home_ac_kwh=0.38, pv_export_enabled=True)
+    r = reference_no_battery(PLANT, (q,))
+    assert r.quarters[0].grid_import_kwh == 0
+    assert r.quarters[0].grid_export_kwh == pytest.approx(0.57)
+    assert r.final_soc_pct == 50
+    assert r.status == "physical_candidate_only_tou_unverified"
+
+
+def test_reference_curtailed_pv_if_below_export_price_threshold():
+    q = quarter(
+        pv_dc_kwh=1.0, home_ac_kwh=0.38,
+        sell_dkk_per_kwh=0.399, pv_export_enabled=True,
+    )
+    r = reference_no_battery(PLANT, (q,))
+    assert r.quarters[0].grid_import_kwh == 0
+    assert r.quarters[0].grid_export_kwh == 0
+    assert r.final_soc_pct == 50
+
+
+def test_ranking_compares_real_energy_degradation_and_terminal_value():
+    idle = dispatch()
+    discharge = dispatch(battery_to_home_dc_kwh=0.5)
+    index, result = lowest_cost_candidate(
+        PLANT, (quarter(),), ((idle,), (discharge,))
+    )
+    assert index == 1
+    assert result.degradation_cost_dkk == pytest.approx(0.2)
+    cheap = quarter(buy_dkk_per_kwh=0.1)
+    index, result = lowest_cost_candidate(
+        PLANT, (cheap,), ((idle,), (discharge,))
+    )
+    assert index == 0
+    assert result.degradation_cost_dkk == 0
+
+
+def test_candidate_ranking_never_labels_dispatch_as_executable_tou():
+    index, result = lowest_cost_candidate(
+        PLANT, (quarter(),), ((dispatch(),),)
+    )
+    assert index == 0
+    assert result.status == "physical_candidate_only_tou_unverified"
+
+
+def test_candidate_ranking_rejects_empty_or_nonphysical_candidates():
+    with pytest.raises(InfeasibleCandidate, match="candidates:missing"):
+        lowest_cost_candidate(PLANT, (quarter(),), ())
+    with pytest.raises(InfeasibleCandidate, match="home:oversupply"):
+        lowest_cost_candidate(
+            PLANT,
+            (quarter(pv_dc_kwh=1),),
+            ((dispatch(pv_to_home_dc_kwh=1),),),
+        )
