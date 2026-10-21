@@ -41,6 +41,9 @@ class PlanningInput:
     load_method: str
     # Incomplete physical calibration and Deye's six TOUs forbid execution.
     actionable: bool = False
+    coverage_status: str = "complete"
+    first_missing_code: str | None = None
+    first_missing_at: datetime | None = None
 
 
 def _utc(value: datetime, label: str) -> datetime:
@@ -124,6 +127,7 @@ def build_planning_input(
     pv_forecast_to_dc_multiplier: float,
     load_projection: LoadProjection | None = None,
     pv_export_enabled: bool = False,
+    allow_prefix: bool = False,
 ) -> PlanningInput:
     """Prepare all complete future 15-minute quarters up to published price end.
 
@@ -176,6 +180,7 @@ def build_planning_input(
         sorted(projection.periods, key=lambda period: _utc(period.start, "load"))
     )
     quarters = []
+    first_gap = None
     price_index = 0
     cursor = start
     while cursor < last:
@@ -192,8 +197,14 @@ def build_planning_input(
         ):
             raise PlanningInputError("price:coverage_gap", cursor)
         price = prices[price_index]
-        pv_energy = _exact_quarter_energy(pv_periods, cursor, right, "pv")
-        load_energy = _exact_quarter_energy(load_periods, cursor, right, "load")
+        try:
+            pv_energy = _exact_quarter_energy(pv_periods, cursor, right, "pv")
+            load_energy = _exact_quarter_energy(load_periods, cursor, right, "load")
+        except PlanningInputError as error:
+            if not allow_prefix or not quarters:
+                raise
+            first_gap = error
+            break
         quarters.append(
             Quarter(
                 cursor,
@@ -214,6 +225,9 @@ def build_planning_input(
         snapshot.forecast.version,
         multiplier,
         projection.method,
+        coverage_status="partial" if first_gap is not None else "complete",
+        first_missing_code=first_gap.code if first_gap is not None else None,
+        first_missing_at=first_gap.at if first_gap is not None else None,
     )
 
 
