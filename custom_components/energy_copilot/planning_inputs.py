@@ -157,7 +157,7 @@ def build_planning_input(
             raise PlanningInputError("price:invalid_hour", left)
         if index and left != _utc(prices[index - 1].end, "price"):
             raise PlanningInputError("price:published_gap", left)
-        _amount(price.buy, "buy_price") if price.buy >= 0 else _finite_price(price.buy)
+        _finite_price(price.buy)
         _finite_price(price.sell)
     start = now.replace(second=0, microsecond=0)
     if start < now or start.minute % 15:
