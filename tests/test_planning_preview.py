@@ -3,7 +3,6 @@
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
-
 from custom_components.energy_copilot.models import (
     ForecastPeriod,
     ForecastSnapshot,
