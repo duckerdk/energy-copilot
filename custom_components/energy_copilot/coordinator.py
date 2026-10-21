@@ -29,6 +29,7 @@ from .live_measurements import (
     derived_templates,
 )
 from .models import InputSnapshot, Issue
+from .planning_preview import evaluate_preview
 from .quality import quality_report
 from .solar import solar_evidence
 from .validation import forecast, measurement, measurements, prices
@@ -69,6 +70,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self.forecast_coverage = None
         self.measurement_source_timing = {}
         self.quality = None
+        self.planning_preview = None
         self.live_context = LiveSourceContext()
         self.live_window = LiveMeasurementWindow()
 
@@ -253,6 +255,14 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                 snapshot.issues.append(
                     Issue("forecast_energy_period_missing", "forecast_solar")
                 )
+        # Forecast.Solar may have completed after the initial coordinator tick.
+        # Evaluate a snapshot only when its observation is already available.
+        snapshot.at = dt_util.utcnow()
+        self.planning_preview = evaluate_preview(
+            snapshot,
+            mode=self.settings.get("mode", "monitor"),
+            pv_export_enabled=solar_sell is not None and solar_sell.state == "on",
+        )
         self.quality = quality_report(snapshot.issues, self.forecast_coverage)
         return snapshot
 
