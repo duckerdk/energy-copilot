@@ -51,7 +51,40 @@ async def async_get_config_entry_diagnostics(hass, entry):
     forecast_periods = data.forecast.periods if data.forecast else ()
     forecast_first = forecast_periods[0].start.isoformat() if forecast_periods else None
     forecast_last = forecast_periods[-1].end.isoformat() if forecast_periods else None
+    preview = coordinator.planning_preview
     return {
+        "planning_preview": {
+            "status": preview.status,
+            "reason": preview.reason,
+            "coverage": preview.coverage,
+            "first_uncovered_at_utc": (
+                preview.first_uncovered_at.isoformat()
+                if preview.first_uncovered_at
+                else None
+            ),
+            "quarter_count": preview.quarters,
+            "start_utc": preview.start.isoformat() if preview.start else None,
+            "end_utc": preview.end.isoformat() if preview.end else None,
+            "price_horizon_end_utc": (
+                preview.published_price_horizon_end.isoformat()
+                if preview.published_price_horizon_end
+                else None
+            ),
+            "forecast_version": preview.pv_version,
+            "load_method": preview.source_load_method,
+            "reference_cost_dkk": preview.reference_cost_dkk,
+            "scenario_cost_dkk": preview.scenario_cost_dkk,
+            "modeled_saving_dkk": preview.modeled_saving_dkk,
+            "maximum_charging_current_a": preview.max_charge_current_a,
+            "scenarios_evaluated": preview.evaluated_scenarios,
+            "voltage_source": preview.voltage_source,
+            "executable": False,
+            "scenario_selection": "single_cycle_bounded_search",
+            "real_deye_baseline": False,
+            "efficiency_calibrated": False,
+            "pv_forecast_dc_basis_verified": False,
+            "tou_six_windows_verified": False,
+        },
         "integration_manifest": {
             "domain": "energy_copilot",
             "version": entry.runtime_data.installed_build["installed_version"],
@@ -109,10 +142,12 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "home_negative_power_policy": "max_zero_when_sources_valid",
         },
         "assumed": {
-            "live_freshness_seconds": 300,
             "live_as_of_skew_warning_seconds": 10,
             "live_future_timestamp_tolerance_seconds": 10,
             "derived_sum_tolerance_w": DERIVED_SUM_TOLERANCE_W,
+            "preview_nominal_battery_kwh": 10.24,
+            "preview_efficiency_each_path": 0.95,
+            "preview_forecast_to_dc_multiplier": 1.0,
             "recent_history_lookback_hours": 24,
             "history_on_demand_max_days": 366,
             "history_chunk_hours": 24,
