@@ -8,7 +8,7 @@ explicitly rather than concealed as defaults.
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from math import isfinite, isclose
+from math import isclose, isfinite
 
 QUARTER = timedelta(minutes=15)
 EPS = 1e-7
