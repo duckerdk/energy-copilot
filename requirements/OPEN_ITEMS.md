@@ -16,7 +16,7 @@
 - [ ] **Recorder i profil domu:** ocenić rzeczywiste pokrycie kwadransów po normalizacji `max(0, home)`, wpływ luk oraz błąd fizycznego bilansu domu (w tym dodatnich anomalii). Diagnostyka v0.1.6 pokazała 88/96 kompletnych kwadransów, ale nie stanowi walidacji dokładności ani pełnej historii pauz Recorder.
 - [ ] **Ceny i DST:** przetestować na rzeczywistym HA precyzję `raw_*` kontra `current_price` przy progu 0,40 DKK/kWh, zachowanie po restarcie i zmianę czasu. Testy offline `PRICE_THRESHOLD_AMBIGUOUS` i 23/25 h istnieją.
 - [ ] **Sprawności i BMS:** oszacować osobno sprawności PV→bateria, sieć→bateria, bateria→AC, PV→AC; historyczne współczynniki 0,9487/0,97 są założeniami, nie zmierzonymi wynikami.
-- [ ] **Planner i backtest:** w M3 zaimplementowano weryfikację fizycznych wariantów 15-minutowych i ich wycenę z SOC, prądami, stratami, degradacją i wartością końcową (bez komend). Następne: adapter prognoz PV i domu z kontrolą luk, optymalizacja 6 TOU, rzeczywisty baseline Deye oraz walk-forward bez future leakage.
+- [ ] **Planner i backtest:** w M3 zaimplementowano weryfikację fizycznych wariantów 15-minutowych i ich wycenę z SOC, prądami, stratami, degradacją i wartością końcową (bez komend). Zaimplementowano również rygorystyczny adapter cen/Forecast.Solar/Recorder, który odmawia wytwarzania fikcyjnych kwadransów; tymczasowy profil domu to poprzednie 24 h UTC i wymaga walidacji. Następne: skalibrować podstawę AC/DC prognozy i profil domu, obsłużyć grubszą rozdzielczość PV bez dowolnej interpolacji, zoptymalizować rzeczywiste 6 TOU oraz porównać z baseline Deye w walk-forward bez future leakage.
 
 ## P2 — przed automatyzacją i szerszą dystrybucją
 
