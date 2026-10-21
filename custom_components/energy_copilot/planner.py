@@ -8,13 +8,14 @@ explicitly rather than concealed as defaults.
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from math import isfinite
+from math import isfinite, isclose
 
 QUARTER = timedelta(minutes=15)
 EPS = 1e-7
 DEGRADATION_DKK_PER_KWH_DC = 0.40
 MIN_SOC = 20.0
 PV_EXPORT_MIN_DKK_PER_KWH = 0.40
+COST_TIE_ABS_TOL_DKK = 1e-7  # Floating-point equality only; no economic sacrifice.
 
 
 class InfeasibleCandidate(ValueError):
@@ -69,6 +70,8 @@ class QuarterResult:
     purchase_dkk: float
     sales_dkk: float
     degradation_dkk: float
+    charge_current_a: float
+    grid_charge_current_a: float
 
 
 @dataclass(frozen=True)
@@ -225,6 +228,13 @@ def simulate_candidate(
         purchase = grid_import * buy
         sales = grid_export * sell
         degradation = discharge_dc * DEGRADATION_DKK_PER_KWH_DC
+        charge_current = charge_dc * 1000 / (plant.battery_voltage_v * quarter_hours)
+        grid_current = (
+            d.grid_to_battery_ac_kwh
+            * plant.eta_grid_to_battery
+            * 1000
+            / (plant.battery_voltage_v * quarter_hours)
+        )
         outcomes.append(
             QuarterResult(
                 q.start,
@@ -237,6 +247,8 @@ def simulate_candidate(
                 purchase,
                 sales,
                 degradation,
+                charge_current,
+                grid_current,
             )
         )
     energy_cost = sum(r.purchase_dkk - r.sales_dkk for r in outcomes)
@@ -295,4 +307,77 @@ def lowest_cost_candidate(
         (index, simulate_candidate(plant, quarters, candidate))
         for index, candidate in enumerate(candidate_dispatches)
     )
-    return min(scored, key=lambda item: (item[1].objective_dkk, item[0]))
+    minimum_cost = min(result.objective_dkk for _, result in scored)
+    equally_cheap = (
+        (index, result)
+        for index, result in scored
+        if isclose(result.objective_dkk, minimum_cost, rel_tol=0, abs_tol=COST_TIE_ABS_TOL_DKK)
+    )
+    return min(
+        equally_cheap,
+        key=lambda item: (
+            sum(q.charge_current_a**2 for q in item[1].quarters),
+            max(q.charge_current_a for q in item[1].quarters),
+            item[0],
+        ),
+    )
+
+
+def spread_grid_charge_evenly(
+    plant: Plant,
+    quarters: tuple[Quarter, ...],
+    target_battery_dc_kwh: float,
+    eligible_quarters: tuple[bool, ...],
+) -> tuple[Dispatch, ...]:
+    """Build a lower-current candidate for a chosen charging window.
+
+    Evenly distribute a required DC energy amount across explicitly eligible
+    15-minute slots. The calling optimizer must choose slots based on published
+    prices and a real deadline; this helper does not determine that window.
+    Never infer a target SOC or pretend a dispatch is a Deye TOU command.
+    """
+    _plant(plant)
+    target = _nonnegative(target_battery_dc_kwh, "target_battery_charge")
+    if not quarters or len(eligible_quarters) != len(quarters):
+        raise InfeasibleCandidate("charge_window:missing_or_mismatched")
+    if any(not isinstance(flag, bool) for flag in eligible_quarters):
+        raise InfeasibleCandidate("charge_window:invalid_flag")
+    count = sum(eligible_quarters)
+    if target > EPS and not count:
+        raise InfeasibleCandidate("charge_window:no_eligible_quarters")
+    dc_per_slot = target / count if count else 0.0
+    max_dc_per_slot = (
+        plant.battery_voltage_v
+        * min(plant.charge_limit_a, plant.grid_charge_limit_a)
+        / 1000
+        * (QUARTER.total_seconds() / 3600)
+    )
+    if dc_per_slot > max_dc_per_slot + EPS:
+        raise InfeasibleCandidate("charge_window:insufficient_time")
+    dispatches = []
+    for q, eligible in zip(quarters, eligible_quarters, strict=True):
+        pv = _nonnegative(q.pv_dc_kwh, "pv")
+        home = _nonnegative(q.home_ac_kwh, "home")
+        sell = _finite(q.sell_dkk_per_kwh, "sell_price")
+        pv_to_home = min(pv, home / plant.eta_pv_to_ac)
+        excess = max(0.0, pv - pv_to_home)
+        export = (
+            excess
+            if q.pv_export_enabled and sell >= PV_EXPORT_MIN_DKK_PER_KWH
+            else 0.0
+        )
+        dispatches.append(
+            Dispatch(
+                pv_to_home_dc_kwh=pv_to_home,
+                pv_to_battery_dc_kwh=0.0,
+                pv_to_export_dc_kwh=export,
+                pv_curtailed_dc_kwh=excess - export,
+                grid_to_battery_ac_kwh=(
+                    dc_per_slot / plant.eta_grid_to_battery if eligible else 0.0
+                ),
+                battery_to_home_dc_kwh=0.0,
+            )
+        )
+    result = tuple(dispatches)
+    simulate_candidate(plant, quarters, result)
+    return result
