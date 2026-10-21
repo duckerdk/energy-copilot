@@ -1,4 +1,5 @@
 name: Publish Energy Co-Pilot v0.1.9 to HACS
+# Re-run after correcting version assertions; checks gate tag and release.
 on:
   push:
     branches: [main]
