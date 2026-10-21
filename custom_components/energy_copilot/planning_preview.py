@@ -38,6 +38,8 @@ class Preview:
     quarters: int = 0
     pv_version: str | None = None
     source_load_method: str | None = None
+    pv_temporal_model: str | None = None
+    pv_temporal_modeled_quarters: int = 0
     reference_cost_dkk: float | None = None
     scenario_cost_dkk: float | None = None
     modeled_saving_dkk: float | None = None
@@ -99,6 +101,7 @@ def evaluate_preview(
             pv_forecast_to_dc_multiplier=PV_FORECAST_TO_DC_MULTIPLIER,
             pv_export_enabled=pv_export_enabled,
             allow_prefix=True,
+            pv_temporal_model="uniform_power_unverified",
         )
         quarters = inputs.quarters
         base = tuple(_reference_dispatch(plant, q) for q in quarters)
@@ -182,6 +185,8 @@ def evaluate_preview(
         quarters=len(quarters),
         pv_version=inputs.pv_forecast_version,
         source_load_method=inputs.load_method,
+        pv_temporal_model=inputs.pv_temporal_model,
+        pv_temporal_modeled_quarters=inputs.pv_temporal_modeled_quarters,
         reference_cost_dkk=reference.objective_dkk,
         scenario_cost_dkk=result.objective_dkk,
         modeled_saving_dkk=max(0.0, reference.objective_dkk - result.objective_dkk),
