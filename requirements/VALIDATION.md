@@ -78,3 +78,9 @@ Każde `decision_id`, `plan_id`, start i ważność, dane wejściowe oraz ich we
 - Oryginalne kwadransowe Forecast.Solar bez alokacji modelowej są opisane `exact_source_periods`.
 - W HA z `dry_run`, pełnymi wymaganymi kwadransami Recorder, SOC i cenami: `planning_status=preview` z `pv_temporal_model=uniform_power_unverified`, liczbą kwadransów i `executable=false`; żadne komendy falownika nie są wywoływane.
 - Nadal blokować niekompletny **pierwszy** przyszły kwadrans obciążenia, nie pomijać luk Recorder; status jakości M1/M2 pozostaje niezależny. Żadna liczba symulacji nie jest oszczędnością rzeczywistą.
+
+## Odbiór M3 dry_run v0.1.10 — luki w prognozie obciążenia
+- Brakujący kwadrans poprzedniej doby otoczony **dwoma kompletnymi** kwadransami Recorder: energia w przyszłym profilu interpolowana liniowo, rekord źródłowy pozostaje niekompletny, model jawnie oznaczony.
+- Dwa i trzy kolejne niekompletne kwadranse: prognoza korzysta z ważnych punktów brzegowych, bez udawania odtworzonych danych źródłowych; ponad trzy, brak punktów brzegowych albo brak historii: nadal `blocked`/`partial`.
+- Pełny zestaw 12 godzin cen i prognozy z dziesięcioma krótkimi przerwami typu Recorder z rzeczywistej diagnostyki v0.1.9: `preview` przez cały dostępny horyzont, modelowane kwadranse policzone, `executable=false`.
+- W teście HA: nowy licznik `load_modeled_quarters` i nazwa metody w encji i diagnostyce; ani odczyty, ani zapisy ustawień falownika nie są wywoływane przez M3. Klasyfikacja jakości historii Recorder i bieżących danych nie zmienia się.
