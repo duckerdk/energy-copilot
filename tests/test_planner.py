@@ -230,9 +230,7 @@ def test_consecutive_quarters_preserve_energy_and_soc():
     assert r.final_soc_pct == pytest.approx(100 * (5.12 + 0.18) / 10.24)
     assert r.quarters[1].soc_start_pct == pytest.approx(r.quarters[0].soc_end_pct)
     with pytest.raises(InfeasibleCandidate, match="time:nonconsecutive"):
-        simulate_candidate(
-            PLANT, (q1, q1), (dispatch(), dispatch())
-        )
+        simulate_candidate(PLANT, (q1, q1), (dispatch(), dispatch()))
 
 
 def test_missing_forecasts_are_not_treated_as_zero():
