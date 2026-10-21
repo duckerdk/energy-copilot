@@ -1,8 +1,8 @@
 """M3 Home Assistant dry-run preview acceptance and read-only behavior."""
 
 from dataclasses import replace
-from unittest.mock import patch
 from datetime import UTC, datetime, timedelta
+from unittest.mock import patch
 
 from custom_components.energy_copilot.models import (
     ForecastPeriod,
