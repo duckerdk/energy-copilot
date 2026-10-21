@@ -1,6 +1,6 @@
 # Energy Co-Pilot
 
-Natywna integracja Home Assistant `custom_components/energy_copilot`. **Aktualne wydanie: [v0.1.7](https://github.com/duckerdk/energy-copilot/releases/tag/v0.1.7).** Obecny zakres **M1/M2**: konfiguracja, odczyt pomiarów i cen, Forecast.Solar, historia Recorder oraz diagnostyka jakości danych. Integracja działa **wyłącznie w trybie odczytu**; nie steruje falownikiem. Planner, dashboard sterowania i wykonanie decyzji (M3–M6) nie są jeszcze zaimplementowane.
+Natywna integracja Home Assistant `custom_components/energy_copilot`. **Aktualne wydanie: [v0.1.7](https://github.com/duckerdk/energy-copilot/releases/tag/v0.1.7).** Obecny zakres: **M1/M2** (pomiary, ceny, prognozy, Recorder, diagnostyka) i eksperymentalny **M3 `dry_run`** (teoretyczne porównanie scenariuszy ładowania/rozładowania). Integracja jest **wyłącznie do odczytu**, bez sterowania falownikiem, bez potwierdzonego planu sześciu TOU i bez wiarygodnej deklaracji rzeczywistych oszczędności.
 
 Celem docelowego rozwiązania jest minimalizacja całkowitego kosztu energii w horyzoncie opublikowanych cen, z uwzględnieniem SOC, sprawności i degradacji baterii. Zatwierdzone reguły i uprawnienia opisuje wyłącznie [REQUIREMENTS.md](requirements/REQUIREMENTS.md).
 
@@ -13,6 +13,15 @@ Wymagany Home Assistant **2026.10 lub nowszy** (testy automatyczne: Core 2026.10
 3. Przy aktualizacji sprawdź w diagnostyce `installed_version`, `installed_build.tag` i `installed_build.integrity`. Pakiet oficjalnego wydania powinien wskazywać `payload_matches_build_info`.
 
 Alternatywą jest ręczne skopiowanie katalogu `custom_components/energy_copilot` do instalacji HA; takie kopiowanie nie zapewnia metadanych `BUILD_INFO.json` z wydania. Nie ma potrzeby zmiany ESPHome, Modbus ani ustawień falownika.
+
+## Test M3 w Home Assistant (bez zapisu nastaw)
+
+1. Po aktualizacji do wydania obsługującego M3 wejdź w **Ustawienia → Urządzenia i usługi → Energy Co-Pilot → Konfiguruj** i wybierz **dry_run**. Tryb **monitor** pozostawia M3 nieaktywny.
+2. Sprawdź `sensor.energy_co_pilot_planning_status`: `monitor` (wyłączony), `blocked` (brak danych — szczegóły w atrybucie `reason`), `preview` (obliczenia tylko na pokrytym horyzoncie).
+3. `sensor.energy_co_pilot_modeled_saving` pokazuje wyłącznie hipotetyczną różnicę DKK między scenariuszem bez cykli baterii i najlepiej ocenionym **ograniczonym** scenariuszem pojedynczego cyklu z sieci; nie jest to oszczędność potwierdzona, wynik globalnego solvera ani realna konfiguracja TOU. Przy `blocked` jego wartość jest `unknown`.
+4. Pobierz standardową diagnostykę integracji: `planning_preview` zawiera kod blokady, zakres czasu, liczbę kwadransów, kompletność i podsumowanie wariantów — bez szczegółowej prywatnej historii domu.
+
+**Rygory i ograniczenia testu:** 15-minutowe okresy Forecast.Solar i Recorder muszą być w pełni pokryte; brakująca prognoza PV (również nocna) nie jest zastępowana zerem, a prognoza godzinowa nie jest arbitralnie dzielona na cztery kwadranse. Możliwe jest krótsze, jawnie oznaczone `partial` preview. Historia zużycia z poprzednich 24 h UTC jest tylko niezweryfikowanym wzorcem. Model stosuje prowizoryczne, niekalibrowane wartości: sprawność 0,95 każdej ścieżki, mnożnik PV Forecast.Solar→DC = 1,0, nominalna pojemność baterii 10,24 kWh oraz napięcie bieżące (lub nominalne 51,2 V, gdy brak opcjonalnego czujnika). Warianty mają końcowy SOC równy początkowemu, więc nie zakłada się arbitralnej wartości końcowej baterii. Nie interpretować liczb jako rekomendacji wykonawczej; sześć TOU, kalibracja DC/AC i rzeczywisty Deye baseline pozostają do zrobienia. M3 **nie wykonuje żadnych usług zapisu HA** i nie zmienia oceny `Input quality`.
 
 ## Źródła i zasady bieżących danych
 
@@ -38,7 +47,7 @@ Dokładne mapowanie, ograniczenia i potwierdzone formaty HA: [HA_CONTRACT.md](re
 - **Recorder**: bieżąca diagnostyka wykorzystuje ostatnie 24 h; `history_reader.async_iter_slots(start, end)` umożliwia odczyt na żądanie w porcjach do 24 h (maks. 366 dni). Kwadrans bez pełnych, wiarygodnych danych ma `home_kwh=None`. Zachowana energia częściowa nie jest ekstrapolowana. Sama historia stanów nie dowodzi ciągłego raportowania sprzętu.
 - **Prywatność**: standardowy eksport diagnostyki zawiera agregaty jakości i korekt, nie szereg prywatnych próbek mocy domu ani szczegółowe zdarzenia audytu.
 
-Sensor **Input quality** ocenia wymagane **bieżące** dane: `valid` (brak obecnych problemów blokujących i niepewności), `uncertain` (akceptowane wejścia z istotną niepewnością), `degraded` (nieważne wymagane wejście). Kwestie historyczne i Forecast.Solar są widoczne oddzielnie; `valid` **nie** potwierdza poprawności fizycznego bilansu AC/DC ani gotowości planera. Status `planning_readiness=not_evaluated_m2` pozostaje prawidłowy do wdrożenia M3.
+Sensor **Input quality** ocenia wymagane **bieżące** dane: `valid` (brak obecnych problemów blokujących i niepewności), `uncertain` (akceptowane wejścia z istotną niepewnością), `degraded` (nieważne wymagane wejście). Kwestie historyczne i Forecast.Solar są widoczne oddzielnie; `valid` **nie** potwierdza poprawności fizycznego bilansu AC/DC ani gotowości planera. W trybie `monitor` status planowania pozostaje `not_evaluated_m2`; w `dry_run` diagnostyka rozróżnia `m3_preview_blocked` i `experimental_m3_preview_only`. Żaden z tych stanów nie oznacza możliwości sterowania falownikiem.
 
 ## Dokumentacja projektu
 
