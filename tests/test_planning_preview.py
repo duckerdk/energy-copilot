@@ -186,7 +186,6 @@ def test_real_price_ambiguity_blocks_export_preview_activation():
     assert result.reason == "pv_export:price_ambiguous"
 
 
-
 async def test_ha_diagnostics_labels_unverified_pv_resolution_and_no_commands(
     hass, populated_hass, entry, freezer
 ):
@@ -228,10 +227,7 @@ async def test_ha_diagnostics_labels_unverified_pv_resolution_and_no_commands(
     assert state.attributes["pv_temporal_modeled_quarters"] > 0
     assert state.attributes["executable"] is False
     diag = await async_get_config_entry_diagnostics(hass, entry)
-    assert (
-        diag["planning_preview"]["pv_temporal_model"]
-        == "uniform_power_unverified"
-    )
+    assert diag["planning_preview"]["pv_temporal_model"] == "uniform_power_unverified"
     assert diag["planning_preview"]["pv_temporal_modeled_quarters"] > 0
     assert diag["read_only"] is True
 
