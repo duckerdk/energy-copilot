@@ -258,8 +258,10 @@ def test_reference_without_battery_is_explicit_not_fake_deye_baseline():
 
 def test_reference_curtailed_pv_if_below_export_price_threshold():
     q = quarter(
-        pv_dc_kwh=1.0, home_ac_kwh=0.38,
-        sell_dkk_per_kwh=0.399, pv_export_enabled=True,
+        pv_dc_kwh=1.0,
+        home_ac_kwh=0.38,
+        sell_dkk_per_kwh=0.399,
+        pv_export_enabled=True,
     )
     r = reference_no_battery(PLANT, (q,))
     assert r.quarters[0].grid_import_kwh == 0
@@ -270,23 +272,17 @@ def test_reference_curtailed_pv_if_below_export_price_threshold():
 def test_ranking_compares_real_energy_degradation_and_terminal_value():
     idle = dispatch()
     discharge = dispatch(battery_to_home_dc_kwh=0.5)
-    index, result = lowest_cost_candidate(
-        PLANT, (quarter(),), ((idle,), (discharge,))
-    )
+    index, result = lowest_cost_candidate(PLANT, (quarter(),), ((idle,), (discharge,)))
     assert index == 1
     assert result.degradation_cost_dkk == pytest.approx(0.2)
     cheap = quarter(buy_dkk_per_kwh=0.1)
-    index, result = lowest_cost_candidate(
-        PLANT, (cheap,), ((idle,), (discharge,))
-    )
+    index, result = lowest_cost_candidate(PLANT, (cheap,), ((idle,), (discharge,)))
     assert index == 0
     assert result.degradation_cost_dkk == 0
 
 
 def test_candidate_ranking_never_labels_dispatch_as_executable_tou():
-    index, result = lowest_cost_candidate(
-        PLANT, (quarter(),), ((dispatch(),),)
-    )
+    index, result = lowest_cost_candidate(PLANT, (quarter(),), ((dispatch(),),))
     assert index == 0
     assert result.status == "physical_candidate_only_tou_unverified"
 
