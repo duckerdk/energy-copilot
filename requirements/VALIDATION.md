@@ -65,3 +65,8 @@ Każde `decision_id`, `plan_id`, start i ważność, dane wejściowe oraz ich we
 - Niespójna opcjonalna kontrola mocy bateria vs. V×I: ostrzeżenie o nieatomowym pomiarze, nie fałszywe `Degraded` głównego odczytu.
 - Różne czasy poprawnych raportów nie są błędem synchronizacji. Wykryta awaria/recovery i rzeczywista rozbieżność wartości domu nadal wymagają weryfikacji.
 - Brak prognozy w nocy nie degraduje wejść, a brak danych o zmierzchu pozostaje jawny, bez dopisywania Wh.
+
+## Odbiór HA M3 dry_run v0.1.8
+- W `monitor`: status M3 `monitor`, bez modelowanej oszczędności i bez zapisu komend. W `dry_run` z brakiem prognozy: `blocked` i kod `pv:forecast_missing` w encji oraz diagnostyce, bez wpływu na `Input quality`.
+- Ze znanym, kompletnym zestawem 15-minutowych prognoz i cen, przedziałem rekordów Recorder oraz poprawnym SOC: `preview`, rzeczywisty wynik kosztowy podglądu i `executable=false`. Brak rozpoczętego/pustego okresu nigdy nie jest zastępowany zerem.
+- Niepełne Forecast.Solar: co najwyżej jawnie oznaczony `partial` bez interpolacji, bez twierdzenia o optymalnym planie pełnego horyzontu. Awaria samego preview nie może zatrzymać M1/M2 ani zmienić statusu `Input quality`.
