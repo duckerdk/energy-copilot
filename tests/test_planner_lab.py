@@ -169,6 +169,63 @@ def test_public_sample_home_profile_has_hourly_source_not_fictitious_constant():
     assert "spot;pv_kw;home_kw" in page
 
 
+
+def test_continuous_dispatch_covers_small_evening_deficit_after_pv():
+    """Regression: old 0.1 kWh lattice cannot cover 0.0726 kWh/quarter."""
+    hours = [
+        {"spot": 0.6, "pv_kw": 0.0, "home_kw": 0.5} for _ in range(24)
+    ]
+    hours[18] = {"spot": 4.0, "pv_kw": 0.5, "home_kw": 0.7654}
+    hours[19] = {"spot": 4.0, "pv_kw": 0.0, "home_kw": 0.7710}
+    case = scenario(hours, soc=92)
+    case["start_utc"] = "2026-10-21T22:00:00Z"  # 00:00 Copenhagen
+    result = simulate_scenario(case)
+    q18 = result["quarters"][18 * 4 : 19 * 4]
+    q19 = result["quarters"][19 * 4 : 20 * 4]
+    assert result["summary"]["soc_step_dc_kwh"] == 0.0
+    assert result["summary"]["solver"].startswith("lab_continuous_")
+    assert result["hourly"][18]["grid_import_ac_kwh"] == pytest.approx(
+        0.0, abs=0.0001
+    )
+    assert result["hourly"][19]["grid_import_ac_kwh"] == pytest.approx(
+        0.0, abs=0.0001
+    )
+    assert [row["discharge_dc_kwh"] for row in q18] == pytest.approx(
+        [0.0726 / 0.95] * 4, abs=0.00003
+    )
+    assert sum(row["discharge_dc_kwh"] for row in q19) == pytest.approx(
+        0.7710 / 0.95, abs=0.0001
+    )
+    assert all(row["soc_end_pct"] >= 20 for row in result["quarters"])
+
+
+def test_continuous_lab_respects_export_toggle_above_threshold():
+    # Selling the PV surplus should not depend on battery cycle choices
+    # once SOC=100% and the battery has no room to store that energy.
+    hours = [{"spot": 1.0, "pv_kw": 5, "home_kw": 0.4}] * 4
+    case = scenario(hours, soc=100)
+    case["start_utc"] = "2026-10-21T22:00:00Z"
+    case["pv_export_enabled"] = True
+    selling = simulate_scenario(case)
+    assert selling["summary"]["grid_export_ac_kwh"] > 0
+    assert selling["summary"]["pv_curtailed_dc_kwh"] == pytest.approx(0.0)
+    case["pv_export_enabled"] = False
+    no_selling = simulate_scenario(case)
+    assert no_selling["summary"]["grid_export_ac_kwh"] == pytest.approx(0.0)
+    assert no_selling["summary"]["pv_curtailed_dc_kwh"] > 0
+
+
+def test_lab_only_solver_does_not_change_production_0_1_kwh_optimizer():
+    planner, production = _core_modules()
+    assert production.SOC_STEP_DC_KWH == 0.1
+    assert callable(production.optimize_horizon)
+    assert planner.MIN_SOC == 20
+    case = scenario()
+    result = simulate_scenario(case)
+    assert result["summary"]["soc_step_dc_kwh"] == 0.0
+    assert list(result.keys()) == ["summary", "hourly", "quarters"]
+    assert len(result["quarters"]) == 4 * len(case["hours"])
+
 def test_browser_script_is_syntactically_valid():
     """Catch frontend typos in CI; Node is optional for users of the lab."""
     if which("node") is None:
