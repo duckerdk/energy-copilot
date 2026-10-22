@@ -2,6 +2,7 @@
 
 Stats are read at most on the coordinator's slow refresh; no raw-history backfill.
 """
+
 from datetime import UTC, datetime, timedelta
 from math import isfinite
 
