@@ -161,7 +161,8 @@ def evaluate_preview(
     last = quarters[-1].end
     charge_idx = next(
         (
-            i for i, d in enumerate(dispatches)
+            i
+            for i, d in enumerate(dispatches)
             if d.grid_to_battery_ac_kwh > 1e-7 or d.pv_to_battery_dc_kwh > 1e-7
         ),
         None,
@@ -189,7 +190,9 @@ def evaluate_preview(
         modeled_saving_dkk=max(0.0, reference.objective_dkk - candidate.objective_dkk),
         max_charge_current_a=max(q.charge_current_a for q in candidate.quarters),
         charge_start=quarters[charge_idx].start if charge_idx is not None else None,
-        discharge_start=quarters[discharge_idx].start if discharge_idx is not None else None,
+        discharge_start=quarters[discharge_idx].start
+        if discharge_idx is not None
+        else None,
         evaluated_scenarios=0,
         evaluated_transitions=result.evaluated_transitions,
         voltage_source=voltage_source,
