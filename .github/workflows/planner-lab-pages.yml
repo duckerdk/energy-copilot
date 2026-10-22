@@ -1,0 +1,51 @@
+name: Publish Planner Lab on GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - tools/planner_lab/**
+      - custom_components/energy_copilot/planner.py
+      - custom_components/energy_copilot/horizon_optimizer.py
+      - .github/workflows/planner-lab-pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages-planner-lab
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Assemble static site with exact production Python sources
+        run: |
+          set -euo pipefail
+          mkdir -p _site/planner-lab
+          cp tools/planner_lab/index.html tools/planner_lab/worker.js tools/planner_lab/engine.py _site/planner-lab/
+          cp custom_components/energy_copilot/planner.py custom_components/energy_copilot/horizon_optimizer.py _site/planner-lab/
+          touch _site/.nojekyll
+          printf '%s\n' '<!doctype html><html lang="pl"><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=./planner-lab/"><title>Planner Lab</title><a href="./planner-lab/">Otwórz Planner Lab</a></html>' > _site/index.html
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages website
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
