@@ -26,10 +26,31 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(content)
 
     def do_GET(self):
-        if self.path not in ("/", "/index.html"):
+        static = {
+            "/": (Path(__file__).parent / "index.html", "text/html; charset=utf-8"),
+            "/index.html": (Path(__file__).parent / "index.html", "text/html; charset=utf-8"),
+            "/worker.js": (Path(__file__).parent / "worker.js", "text/javascript; charset=utf-8"),
+            "/engine.py": (Path(__file__).parent / "engine.py", "text/plain; charset=utf-8"),
+            "/planner.py": (
+                Path(__file__).resolve().parents[2]
+                / "custom_components"
+                / "energy_copilot"
+                / "planner.py",
+                "text/plain; charset=utf-8",
+            ),
+            "/horizon_optimizer.py": (
+                Path(__file__).resolve().parents[2]
+                / "custom_components"
+                / "energy_copilot"
+                / "horizon_optimizer.py",
+                "text/plain; charset=utf-8",
+            ),
+        }
+        selected = static.get(self.path)
+        if selected is None:
             return self._reply(404, b"Not found", "text/plain; charset=utf-8")
-        page = (Path(__file__).parent / "index.html").read_bytes()
-        return self._reply(200, page, "text/html; charset=utf-8")
+        path, media_type = selected
+        return self._reply(200, path.read_bytes(), media_type)
 
     def do_POST(self):
         if self.path != "/api/simulate":
