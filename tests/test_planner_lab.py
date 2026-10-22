@@ -13,9 +13,9 @@ from tools.planner_lab.server import _core_modules, simulate_scenario
 
 def scenario(hours=None, soc=25, pv=0):
     if hours is None:
-        hours = [
-            {"spot": 0.3, "pv_kw": pv, "home_kw": 1} for _ in range(8)
-        ] + [{"spot": 2.8, "pv_kw": pv, "home_kw": 1} for _ in range(8)]
+        hours = [{"spot": 0.3, "pv_kw": pv, "home_kw": 1} for _ in range(8)] + [
+            {"spot": 2.8, "pv_kw": pv, "home_kw": 1} for _ in range(8)
+        ]
     return {
         "start_utc": "2026-10-22T00:00:00Z",
         "initial_soc_pct": soc,
@@ -103,9 +103,7 @@ def test_rejects_missing_hour_or_nonfinite_value():
 
 
 def test_export_flag_does_not_enable_battery_export():
-    payload = scenario(
-        [{"spot": 5, "pv_kw": 0, "home_kw": 0.4}] * 8, soc=75
-    )
+    payload = scenario([{"spot": 5, "pv_kw": 0, "home_kw": 0.4}] * 8, soc=75)
     payload["pv_export_enabled"] = True
     r = simulate_scenario(payload)
     assert all(q["grid_export_ac_kwh"] == 0 for q in r["quarters"])
@@ -124,7 +122,6 @@ def test_hourly_limits():
     p["hours"] *= 5
     with pytest.raises(ValueError, match="72"):
         simulate_scenario(p)
-
 
 
 def test_spot_prices_exactly_match_historical_ha_buy_sell_readings():
@@ -170,6 +167,7 @@ def test_public_sample_home_profile_has_hourly_source_not_fictitious_constant():
     assert max(samples) > 3
     assert 'const keys = ["spot","pv_kw","home_kw"]' in page
     assert "spot;pv_kw;home_kw" in page
+
 
 def test_browser_script_is_syntactically_valid():
     """Catch frontend typos in CI; Node is optional for users of the lab."""
