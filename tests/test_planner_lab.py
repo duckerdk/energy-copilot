@@ -146,6 +146,7 @@ def test_spot_prices_exactly_match_historical_ha_buy_sell_readings():
 
 def test_dst_tariff_local_hour_is_resolved_across_repeated_hour():
     from datetime import UTC, datetime
+
     from tools.planner_lab.engine import _local_hour_copenhagen, _prices_from_spot
 
     summer_2am = datetime(2026, 10, 25, 0, 0, tzinfo=UTC)
