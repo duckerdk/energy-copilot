@@ -33,3 +33,6 @@ Minimalizować **całkowity koszt energii w DKK w pełnym horyzoncie opublikowan
 
 ## Oczekiwany wynik integracji
 Natywne encje HA, config/options flow, prognoza PV i zużycia, plan dla opublikowanych cen, wyjaśnienie decyzji i wariantów, przewidywane koszty/straty, stany `planned/applied/confirmed`, dziennik wszystkich decyzji, dashboard i UI zatwierdzania eksportu baterii. Raporty oszczędności rozróżniają wynik modelowany, backtest i rzeczywisty. Wymagania techniczne: [HA_CONTRACT.md](HA_CONTRACT.md), [OPTIMIZATION.md](OPTIMIZATION.md), [VALIDATION.md](VALIDATION.md).
+
+## Prognoza zużycia — decyzja użytkownika 22.10.2026
+Budować prognozę zużycia domu na następne **7 dni** na podstawie historycznych danych HA, z rozróżnieniem dni roboczych, wolnych i świąt, adaptacją do nowszych obserwacji i **wykresem w HA**. Nie mylić produkcji PV, zakupu z sieci, ładowania/rozładowania baterii ani fizycznego zużycia. Nie zmieniać zakresu uprawnień do sterowania.
