@@ -136,13 +136,10 @@ def test_browser_script_is_syntactically_valid():
     assert checked.returncode == 0, checked.stderr
 
 
-
 def test_browser_worker_javascript_syntax():
     if which("node") is None:
         pytest.skip("Node.js unavailable")
-    worker = (
-        Path(__file__).resolve().parents[1] / "tools" / "planner_lab" / "worker.js"
-    )
+    worker = Path(__file__).resolve().parents[1] / "tools" / "planner_lab" / "worker.js"
     checked = run(["node", "--check", str(worker)], capture_output=True, text=True)
     assert checked.returncode == 0, checked.stderr
 
@@ -161,10 +158,10 @@ def test_site_is_static_without_server_post_or_independent_optimizer():
     root = Path(__file__).resolve().parents[1]
     html = (root / "tools/planner_lab/index.html").read_text(encoding="utf-8")
     worker = (root / "tools/planner_lab/worker.js").read_text(encoding="utf-8")
-    workflow = (
-        root / ".github/workflows/planner-lab-pages.yml"
-    ).read_text(encoding="utf-8")
-    assert '/api/simulate' not in html
+    workflow = (root / ".github/workflows/planner-lab-pages.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "/api/simulate" not in html
     assert 'new Worker("./worker.js")' in html
     assert "engine.py" in worker and "planner.py" in worker
     assert "horizon_optimizer.py" in worker
@@ -177,5 +174,6 @@ def test_site_is_static_without_server_post_or_independent_optimizer():
 def test_shared_engine_identical_to_server_results():
     from tools.planner_lab.engine import simulate_scenario as direct
     from tools.planner_lab.server import simulate_scenario as local
+
     assert direct is local
     assert direct(scenario()) == local(scenario())
