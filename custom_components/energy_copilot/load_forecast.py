@@ -53,13 +53,13 @@ def _easter(year: int) -> date:
     """Gregorian computus; no service, internet or external calendar dependency."""
     a, b, c = year % 19, year // 100, year % 100
     d, e = b // 4, b % 4
-    f, g = (b + 8) // 25, (b - (b + 8) // 25 + 1) // 3
+    g = (b - (b + 8) // 25 + 1) // 3
     h = (19 * a + b - d - g + 15) % 30
     i, k = c // 4, c % 4
-    l = (32 + 2 * e + 2 * i - h - k) % 7
+    weekday_offset = (32 + 2 * e + 2 * i - h - k) % 7
     m = (a + 11 * h + 22 * l) // 451
-    month = (h + l - 7 * m + 114) // 31
-    day = ((h + l - 7 * m + 114) % 31) + 1
+    month = (h + weekday_offset - 7 * m + 114) // 31
+    day = ((h + weekday_offset - 7 * m + 114) % 31) + 1
     return date(year, month, day)
 
 
