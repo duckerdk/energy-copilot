@@ -7,7 +7,6 @@ This is a physical, not a Deye six-TOU executable, optimum.
 
 from dataclasses import dataclass
 from math import ceil, floor
-from statistics import median
 
 from .planner import (
     DEGRADATION_DKK_PER_KWH_DC,
@@ -95,20 +94,17 @@ def optimize_horizon(plant: Plant, quarters: tuple[Quarter, ...]) -> HorizonResu
 
     No max duration or single-charge/single-discharge restriction. End SOC may
     differ from initial SOC; remaining energy is given a transparent, uncertain
-    terminal opportunity value based only on the last two published price hours.
+    conservative terminal replacement value from the cheapest published hour.
     Grid/PV power and SOC constraints are checked again by the existing
     independent quarter-by-quarter simulator.
     """
     if not quarters:
         raise InfeasibleCandidate("horizon:empty")
     # Validate plant and time-aligned inputs through the independent evaluator.
-    reference = reference_no_battery(plant, quarters)
     if plant.initial_soc_pct < MIN_SOC:
         raise InfeasibleCandidate("soc:below_minimum")
-    terminal_price = median(q.buy_dkk_per_kwh for q in quarters[-8:])
-    terminal_value = max(
-        0.0, terminal_price * plant.eta_battery_to_ac - DEGRADATION_DKK_PER_KWH_DC
-    )
+    terminal_price = min(q.buy_dkk_per_kwh for q in quarters)
+    terminal_value = max(0.0, terminal_price / plant.eta_grid_to_battery)
     calibrated = Plant(
         **{
             **vars(plant),
