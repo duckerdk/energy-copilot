@@ -1,5 +1,6 @@
 """Offline Planner Lab is a thin adapter around production optimizer modules."""
 
+import sys
 from copy import deepcopy
 from pathlib import Path
 from shutil import which
@@ -133,3 +134,46 @@ def test_browser_script_is_syntactically_valid():
     script = page.split("<script>", 1)[1].split("</script>", 1)[0]
     checked = run(["node", "--check"], input=script, text=True, capture_output=True)
     assert checked.returncode == 0, checked.stderr
+
+
+def test_browser_worker_javascript_syntax():
+    if which("node") is None:
+        pytest.skip("Node.js unavailable")
+    worker = Path(__file__).resolve().parents[1] / "tools" / "planner_lab" / "worker.js"
+    checked = run(["node", "--check", str(worker)], capture_output=True, text=True)
+    assert checked.returncode == 0, checked.stderr
+
+
+def test_local_launcher_imports_shared_engine():
+    """Shared adapter remains usable without a Home Assistant installation."""
+    server = Path(__file__).resolve().parents[1] / "tools" / "planner_lab" / "server.py"
+    checked = run(
+        [sys.executable, str(server), "--help"], capture_output=True, text=True
+    )
+    assert checked.returncode == 0, checked.stderr
+    assert "--port" in checked.stdout
+
+
+def test_site_is_static_without_server_post_or_independent_optimizer():
+    root = Path(__file__).resolve().parents[1]
+    html = (root / "tools/planner_lab/index.html").read_text(encoding="utf-8")
+    worker = (root / "tools/planner_lab/worker.js").read_text(encoding="utf-8")
+    workflow = (root / ".github/workflows/planner-lab-pages.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "/api/simulate" not in html
+    assert 'new Worker("./worker.js")' in html
+    assert "engine.py" in worker and "planner.py" in worker
+    assert "horizon_optimizer.py" in worker
+    assert "actions/deploy-pages@v4" in workflow
+    assert "custom_components/energy_copilot/planner.py" in workflow
+    assert "custom_components/energy_copilot/horizon_optimizer.py" in workflow
+    assert "payload:payload()" in html
+
+
+def test_shared_engine_identical_to_server_results():
+    from tools.planner_lab.engine import simulate_scenario as direct
+    from tools.planner_lab.server import simulate_scenario as local
+
+    assert direct is local
+    assert direct(scenario()) == local(scenario())

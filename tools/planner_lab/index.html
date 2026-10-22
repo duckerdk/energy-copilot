@@ -56,10 +56,10 @@ tbody tr:nth-child(2n){background:#1b2938}
 <header>
   <div><div class="kicker">Energy Co-Pilot / laboratory</div><h1>Laboratorium planowania energii</h1>
     <small>Ręczne dane → prawdziwy optymalizator → decyzje, SOC i koszty</small></div>
-  <span class="tag">LOKALNIE · BEZ HA · BEZ STEROWANIA</span>
+  <span class="tag">GITHUB PAGES · BEZ HA · BEZ STEROWANIA</span>
 </header>
 
-<div class="note">Używany jest <b>oryginalny silnik v1.12</b> z repozytorium, a nie kopia algorytmu w JavaScript. Wariant bazowy oznacza brak cykli baterii, <b>nie</b> rzeczywistą strategię Deye. Plan nie jest zweryfikowany dla sześciu okien TOU. Parametry godzinowe PV i domu są równomiernie rozłożone na cztery kwadranse.</div>
+<div class="note">Strona GitHub Pages wykonuje <b>oryginalny silnik v1.12 w przeglądarce</b> (Pyodide/Python), a nie kopię algorytmu w JavaScript. Przy pierwszym otwarciu wymagany jest internet do załadowania środowiska Pyodide. Wprowadzone scenariusze nie są wysyłane na serwer. Wariant bazowy oznacza brak cykli baterii, <b>nie</b> rzeczywistą strategię Deye. Plan nie jest zweryfikowany dla sześciu okien TOU. Parametry godzinowe PV i domu są równomiernie rozłożone na cztery kwadranse.</div>
 
 <section class="panel">
   <h2>Scenariusz i parametry instalacji</h2>
@@ -210,15 +210,49 @@ function payload(){
     hours:rows.map(r=>({...r}))
   };
 }
-async function simulate(){
-  const b=$("simulate");b.disabled=true;setStatus("Obliczanie wszystkich kwadransów…");
+let computeWorker = null;
+let workerReady = false;
+let requestId = 0;
+function initializeEngine(){
+  const button=$("simulate");
+  button.disabled=true;
+  setStatus("Ładowanie silnika Python w przeglądarce…");
   try{
-    const res=await fetch("/api/simulate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload())});
-    const json=await res.json();
-    if(!res.ok)throw new Error(json.error||"Błąd symulacji");
-    latest=json;renderOutput(json);setStatus("Plan policzony i zweryfikowany niezależnym symulatorem.");
-  }catch(e){setStatus(String(e.message||e),true);}
-  finally{b.disabled=false;}
+    computeWorker=new Worker("./worker.js");
+    computeWorker.onmessage=event=>{
+      const msg=event.data||{};
+      if(msg.kind==="ready"){
+        workerReady=true;
+        button.disabled=false;
+        setStatus("Silnik Python gotowy. Można uruchomić symulację.");
+      }else if(msg.kind==="init_error"){
+        workerReady=false;button.disabled=true;setStatus(msg.error,true);
+      }else if(msg.id===requestId && msg.kind==="result"){
+        latest=msg.data;renderOutput(msg.data);
+        setStatus("Plan policzony przez oryginalny optymalizator Python.");
+        button.disabled=false;
+      }else if(msg.id===requestId && msg.kind==="error"){
+        setStatus(msg.error||"Nieznany błąd optymalizacji",true);
+        button.disabled=false;
+      }
+    };
+    computeWorker.onerror=event=>{
+      workerReady=false;button.disabled=true;
+      setStatus("Błąd uruchamiania silnika w przeglądarce: "+(event.message||"Sprawdź połączenie z internetem"),true);
+    };
+  }catch(error){setStatus("Nie można uruchomić Web Worker: "+error.message,true);}
+}
+function simulate(){
+  if(!workerReady || !computeWorker){
+    setStatus("Silnik Python nie jest jeszcze gotowy.",true);return;
+  }
+  const b=$("simulate");b.disabled=true;
+  setStatus("Obliczanie całego horyzontu przez Python…");
+  try{
+    computeWorker.postMessage({type:"simulate",id:++requestId,payload:payload()});
+  }catch(error){
+    setStatus(String(error.message||error),true);b.disabled=false;
+  }
 }
 function renderOutput(data){
   $("output").hidden=false;
@@ -367,7 +401,7 @@ $("export-results").addEventListener("click",()=>{
   const lines=[fields.join(";"),...latest.quarters.map(d=>fields.map(key=>d[key]).join(";"))];
   download("planner_lab_dispatch_quarters.csv",lines.join("\n")+"\n","text/csv");
 });
-$("start").value=starter();makePreset();
+$("start").value=starter();makePreset();initializeEngine();
 </script>
 </body>
 </html>

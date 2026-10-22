@@ -5,9 +5,13 @@ Natywna integracja Home Assistant `custom_components/energy_copilot`. **Wersja k
 Celem docelowego rozwiązania jest minimalizacja całkowitego kosztu energii w horyzoncie opublikowanych cen, z uwzględnieniem SOC, sprawności i degradacji baterii. Zatwierdzone reguły i uprawnienia opisuje wyłącznie [REQUIREMENTS.md](requirements/REQUIREMENTS.md).
 
 
-## Lokalne laboratorium planowania (bez Home Assistant)
+## Planner Lab — strona GitHub Pages
 
-Dostępne jest osobne środowisko do ręcznego wprowadzania danych i testowania **tego samego** silnika optymalizacji, którego używa M3. Uruchom **tools/planner_lab/start_windows.bat** (Windows) albo **python3 tools/planner_lab/server.py**; w przeglądarce otwórz **http://127.0.0.1:8765**. Możesz wprowadzić ceny zakupu/sprzedaży, PV, zużycie, początkowy SOC i limity baterii dla 24–72 godzin. Dostępne są wykresy, wynik kwadransowy, import/eksport CSV i JSON. Nie potrzeba HA, internetu ani dodatkowych pakietów Python. Narzędzie niczego nie zapisuje do falownika. [Instrukcja i ograniczenia](tools/planner_lab/HELP.txt).
+**Uruchomienie bez instalacji:** [Energy Co-Pilot Planner Lab](https://duckerdk.github.io/energy-copilot/planner-lab/) — strona publikowana automatycznie przez GitHub Actions po włączeniu **Settings → Pages → Build and deployment → Source: GitHub Actions** w repozytorium. Nie wymaga instalacji Pythona, serwera ani Home Assistant.
+
+Ceny zakupu/sprzedaży, prognozy PV i zużycia domu, SOC i limity baterii można edytować w przeglądarce dla 24–72 h. Wyniki pokazują harmonogram ładowania, rozładowania, zmian SOC, koszty i dane kwartalne. Obsługiwany eksport CSV/JSON. Obliczenia wykonuje oryginalny kod Python `horizon_optimizer.py` i `planner.py` przez **Pyodide w Web Worker** — bez przekazywania wprowadzonych danych do serwera. Pyodide v0.27.7 ładuje się z jsDelivr przy otwieraniu strony, więc wymagany jest dostęp do sieci. Strona jest publiczna; scenariusze użytkownika pozostają w pamięci przeglądarki (do czasu własnego eksportu).
+
+Publikacja z repozytorium odbywa się przez `.github/workflows/planner-lab-pages.yml`. Wszelkie zmiany w produkcyjnym solverze zostaną dołączone do kolejnej publikacji Pages automatycznie. Lokalny serwer Python pozostaje opcjonalny dla deweloperów, ale **nie jest potrzebny użytkownikowi strony**. Więcej: [instrukcja](tools/planner_lab/HELP.txt). Laboratorium niczego nie zapisuje do falownika.
 
 ## Instalacja i aktualizacja
 

@@ -2,16 +2,17 @@
 
 **Cel:** ręcznie ustawiać ceny zakupu i sprzedaży, produkcję PV, zużycie domu i SOC, a następnie oglądać decyzje **prawdziwego** silnika Energy Co-Pilot (pliki horizon_optimizer.py i planner.py). Narzędzie jest całkowicie niezależne od działającego Home Assistant, nie odczytuje jego danych ani nie steruje falownikiem.
 
-## Uruchomienie — Windows
+## Uruchomienie — GitHub Pages (zalecane)
 
-1. Pobierz / rozpakuj całe repozytorium duckerdk/energy-copilot (GitHub → Code → Download ZIP). Pozostaw oryginalny układ katalogów.
-2. Zainstaluj Python 3.11 lub nowszy, jeżeli nie jest dostępny. Żadne dodatkowe pakiety nie są potrzebne.
-3. Uruchom dwuklikiem **tools/planner_lab/start_windows.bat**, albo otwórz terminal w katalogu repozytorium i wpisz: **py -3 tools/planner_lab/server.py**
-4. W przeglądarce otwórz **http://127.0.0.1:8765**. Zatrzymanie: Ctrl+C w konsoli.
+Otwórz: **https://duckerdk.github.io/energy-copilot/planner-lab/**
 
-Linux/macOS: z katalogu głównego repozytorium uruchom **python3 tools/planner_lab/server.py**. Przy zajętym porcie: dodaj **--port 8766** i otwórz nowy adres.
+Repozytorium → **Settings → Pages → Build and deployment → Source: GitHub Actions** (jednorazowo, jeśli Pages nie jest włączone).
 
-Serwer wiąże wyłącznie 127.0.0.1. Nie potrzebuje internetu, telemetrii, połączenia z HA ani falownikiem.
+Strona działa bez instalacji Pythona, Home Assistant i lokalnego serwera. Silnik produkcyjny Python jest uruchamiany **w przeglądarce** przez Pyodide. Przy pierwszym uruchomieniu trzeba pobrać Pyodide v0.27.7 z jsDelivr. Wprowadzane wartości nie są przekazywane na serwer. Strona publiczna, obliczenia lokalnie w przeglądarce.
+
+## Lokalnie (opcjonalnie, dla deweloperów)
+
+Po pobraniu repozytorium można także uruchomić Windows: **tools/planner_lab/start_windows.bat**, a na Linux/macOS: **python3 tools/planner_lab/server.py**. Otwórz **http://127.0.0.1:8765**. Ten serwer jest tylko do lokalnego podglądu plików, obliczenia w obu wariantach wykonuje przeglądarka.
 
 ## Użytkowanie
 
