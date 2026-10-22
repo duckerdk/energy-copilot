@@ -72,7 +72,7 @@ def snapshot(*, hours=2, pv=0.0, soc=50.0, voltage=51.2):
     )
 
 
-def test_cost_preview_uses_actual_hourly_prices_and_returns_soc_to_initial():
+def test_cost_preview_uses_actual_prices_without_forcing_final_soc():
     preview = evaluate_preview(snapshot(), mode="dry_run")
     assert preview.status == "preview"
     assert preview.reason is None
@@ -84,8 +84,10 @@ def test_cost_preview_uses_actual_hourly_prices_and_returns_soc_to_initial():
     assert preview.hourly_plan
     assert preview.scenario_cost_dkk < preview.reference_cost_dkk
     assert preview.modeled_saving_dkk > 0
-    assert 0 < preview.max_charge_current_a <= 50
-    assert BASE <= preview.charge_start < preview.discharge_start
+    assert 0 <= preview.max_charge_current_a <= 50
+    assert preview.discharge_start is not None
+    assert preview.final_soc_pct < 50
+    assert preview.terminal_value_dkk_per_kwh_dc is not None
     assert preview.executable is False
 
 
