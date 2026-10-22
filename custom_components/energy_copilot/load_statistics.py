@@ -48,7 +48,7 @@ def _read_single(stats, sensor, unit, end):
         try:
             at = datetime.fromtimestamp(row["start"], UTC)
             last = datetime.fromtimestamp(row["end"], UTC)
-        except (KeyError, TypeError, ValueError, OverflowError):
+        except KeyError, TypeError, ValueError, OverflowError:
             continue
         if last - at != HOUR or last > end:
             continue
@@ -66,7 +66,7 @@ def _read_power_means(stats, sensor, unit, end):
         try:
             at = datetime.fromtimestamp(row["start"], UTC)
             last = datetime.fromtimestamp(row["end"], UTC)
-        except (KeyError, TypeError, ValueError, OverflowError):
+        except KeyError, TypeError, ValueError, OverflowError:
             continue
         value = _positive_number(row.get("mean"))
         if value is not None and last - at == HOUR and last <= end:
@@ -94,12 +94,16 @@ class LoadStatisticsReader:
         end = now.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
         start = end - timedelta(days=LOOKBACK_DAYS)
         preferred = self.statistic_sensor or self.entities["home"]
-        ids = sorted({preferred, *(self.entities[r] for r in ("pv", "grid", "battery"))})
+        ids = sorted(
+            {preferred, *(self.entities[r] for r in ("pv", "grid", "battery"))}
+        )
         ids = [i for i in ids if i]
         units = {}
         for entity_id in ids:
             state = self.hass.states.get(entity_id)
-            units[entity_id] = state.attributes.get("unit_of_measurement") if state else None
+            units[entity_id] = (
+                state.attributes.get("unit_of_measurement") if state else None
+            )
         try:
             raw = await instance.async_add_executor_job(
                 statistics_during_period,
@@ -135,7 +139,9 @@ class LoadStatisticsReader:
         for component in components[1:]:
             valid_times &= component.keys()
         modeled = [
-            HourlyLoad(hour, max(0.0, sum(component[hour] for component in components)) / 1000)
+            HourlyLoad(
+                hour, max(0.0, sum(component[hour] for component in components)) / 1000
+            )
             for hour in sorted(valid_times)
         ]
         try:
