@@ -103,7 +103,7 @@ tbody tr:nth-child(2n){background:#1b2938}
     <button id="export-results">Eksport wyników CSV (kwadranse)</button></div>
     <div class="table-wrap"><table><thead><tr>
       <th>Czas (DK)</th><th>Cena</th><th>PV kW</th><th>Dom kW</th><th>Decyzja</th>
-      <th>Sieć→bat. AC</th><th>PV→bat. DC</th><th>Bat.→dom DC</th><th>SOC końcowy</th><th>Import sieci</th>
+      <th>Sieć→bat. AC</th><th>PV→bat. DC</th><th>Bat.→dom DC</th><th>SOC końcowy</th><th>Import sieci</th><th>PV ograniczona</th>
     </tr></thead><tbody id="result-rows"></tbody></table></div>
     <div class="plain">Na życzenie możesz także zbadać pojedyncze kwadranse: CSV wynikowe zawiera dla każdego z nich przepływy, SOC, koszty i tryb pracy. Zmienianie ceny albo PV w tabeli wejściowej nie uruchamia automatyki — użyj „Oblicz plan”.</div>
   </div>
@@ -152,7 +152,7 @@ function makePreset(){
   const type=$("preset").value,count=Number($("duration").value);
   const newRows=[];
   for(let i=0;i<count;i++){
-    const localHour=new Date(Date.parse($("start").value)+i*3600000).getUTCHours();
+    const localHour=Number(new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Copenhagen",hour:"2-digit",hourCycle:"h23"}).format(new Date(Date.parse($("start").value)+i*3600000)));
     const daylight=localHour>=7&&localHour<=15;
     const pvShape=daylight?Math.max(0,Math.sin(Math.PI*(localHour-6)/11)):0;
     let buy=1.35,pv=0,home=.58;
@@ -228,6 +228,7 @@ function renderOutput(data){
     ["SOC końcowy",nfmt(s.final_soc_pct,1)+"%","Początek "+nfmt(s.initial_soc_pct,1)+"%"],
     ["Ładowanie z sieci",nfmt(s.grid_charge_ac_kwh)+" kWh","Energia AC"],
     ["Ładowanie z PV",nfmt(s.pv_charge_dc_kwh)+" kWh","Energia DC"],
+    ["Niewykorzystane PV",nfmt(s.pv_curtailed_dc_kwh)+" kWh","Produkcja ograniczona"],
     ["Rozładowanie",nfmt(s.battery_discharge_dc_kwh)+" kWh","Energia DC"],
     ["Bilans energii",nfmt(s.energy_cost_dkk)+" DKK","Zakup minus sprzedaż"],
     ["Degradacja",nfmt(s.degradation_cost_dkk)+" DKK","0,40 DKK/kWh DC"],
@@ -252,7 +253,7 @@ function renderOutput(data){
     });
     const status=document.createElement("td");const b=document.createElement("span");b.className="mode "+d.mode;
     b.textContent=label[d.mode];status.append(b);tr.append(status);
-    [d.grid_charge_ac_kwh,d.pv_charge_dc_kwh,d.discharge_dc_kwh,d.soc_end_pct,d.grid_import_ac_kwh].forEach((v,i)=>{
+    [d.grid_charge_ac_kwh,d.pv_charge_dc_kwh,d.discharge_dc_kwh,d.soc_end_pct,d.grid_import_ac_kwh,d.pv_curtailed_dc_kwh].forEach((v,i)=>{
       const td=document.createElement("td");td.textContent=nfmt(v,i===3?1:3);tr.append(td);
     });
     $("result-rows").append(tr);
@@ -362,7 +363,7 @@ $("json-file").addEventListener("change",async e=>{
 });
 $("export-results").addEventListener("click",()=>{
   if(!latest)return;
-  const fields=["start_utc","mode","soc_start_pct","soc_end_pct","grid_charge_ac_kwh","pv_charge_dc_kwh","discharge_dc_kwh","grid_import_ac_kwh","grid_export_ac_kwh","purchase_dkk","sales_dkk","degradation_dkk"];
+  const fields=["start_utc","mode","soc_start_pct","soc_end_pct","grid_charge_ac_kwh","pv_charge_dc_kwh","discharge_dc_kwh","grid_import_ac_kwh","grid_export_ac_kwh","pv_curtailed_dc_kwh","purchase_dkk","sales_dkk","degradation_dkk"];
   const lines=[fields.join(";"),...latest.quarters.map(d=>fields.map(key=>d[key]).join(";"))];
   download("planner_lab_dispatch_quarters.csv",lines.join("\n")+"\n","text/csv");
 });
