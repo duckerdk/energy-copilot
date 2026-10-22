@@ -281,19 +281,23 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             except PlanningInputError as err:
                 self.load_forecast_error = err.code
         try:
-            if self.settings.get("mode", "monitor") == "dry_run" and self.load_forecast is None:
+            if (
+                self.settings.get("mode", "monitor") == "dry_run"
+                and self.load_forecast is None
+            ):
                 self.planning_preview = Preview(
                     "blocked", self.load_forecast_error or "load:forecast_missing"
                 )
             else:
                 self.planning_preview = evaluate_preview(
-                snapshot,
-                mode=self.settings.get("mode", "monitor"),
-                pv_export_enabled=solar_sell is not None and solar_sell.state == "on",
-                load_projection=(
-                    self.load_forecast.projection if self.load_forecast else None
-                ),
-            )
+                    snapshot,
+                    mode=self.settings.get("mode", "monitor"),
+                    pv_export_enabled=solar_sell is not None
+                    and solar_sell.state == "on",
+                    load_projection=(
+                        self.load_forecast.projection if self.load_forecast else None
+                    ),
+                )
         except Exception:  # Preview must never interrupt reliable M1/M2 polling.
             _LOGGER.exception("M3 read-only preview failed")
             self.planning_preview = Preview("blocked", "planner:internal_error")
