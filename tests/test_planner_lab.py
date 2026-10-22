@@ -13,9 +13,9 @@ from tools.planner_lab.server import _core_modules, simulate_scenario
 
 def scenario(hours=None, soc=25, pv=0):
     if hours is None:
-        hours = [
-            {"buy": 0.5, "sell": 0.3, "pv_kw": pv, "home_kw": 1} for _ in range(8)
-        ] + [{"buy": 2.8, "sell": 0.3, "pv_kw": pv, "home_kw": 1} for _ in range(8)]
+        hours = [{"spot": 0.3, "pv_kw": pv, "home_kw": 1} for _ in range(8)] + [
+            {"spot": 2.8, "pv_kw": pv, "home_kw": 1} for _ in range(8)
+        ]
     return {
         "start_utc": "2026-10-22T00:00:00Z",
         "initial_soc_pct": soc,
@@ -54,8 +54,8 @@ def test_end_to_end_price_arbitrage_and_quarter_outputs():
 
 
 def test_pv_forecast_changes_result_and_exposes_pv_charging():
-    hours = [{"buy": 1, "sell": 0, "pv_kw": 6, "home_kw": 0.5} for _ in range(8)] + [
-        {"buy": 3, "sell": 0, "pv_kw": 0, "home_kw": 1} for _ in range(8)
+    hours = [{"spot": 1, "pv_kw": 6, "home_kw": 0.5} for _ in range(8)] + [
+        {"spot": 3, "pv_kw": 0, "home_kw": 1} for _ in range(8)
     ]
     result = simulate_scenario(scenario(hours, soc=20))
     assert result["summary"]["pv_charge_dc_kwh"] > 0
@@ -63,8 +63,10 @@ def test_pv_forecast_changes_result_and_exposes_pv_charging():
 
 
 def test_equal_price_no_arbitrage():
-    hours = [{"buy": 1.5, "sell": 0.0, "pv_kw": 0, "home_kw": 0.6}] * 24
-    result = simulate_scenario(scenario(hours, soc=50))
+    hours = [{"spot": 1.5, "pv_kw": 0, "home_kw": 0.6}] * 6
+    test_case = scenario(hours, soc=50)
+    test_case["start_utc"] = "2026-10-22T07:00:00Z"  # Local 09:00–15:00, same N1 tariff
+    result = simulate_scenario(test_case)
     assert result["summary"]["grid_charge_ac_kwh"] == 0
     assert result["summary"]["battery_discharge_dc_kwh"] == 0
 
@@ -101,9 +103,7 @@ def test_rejects_missing_hour_or_nonfinite_value():
 
 
 def test_export_flag_does_not_enable_battery_export():
-    payload = scenario(
-        [{"buy": 0.4, "sell": 5, "pv_kw": 0, "home_kw": 0.4}] * 8, soc=75
-    )
+    payload = scenario([{"spot": 5, "pv_kw": 0, "home_kw": 0.4}] * 8, soc=75)
     payload["pv_export_enabled"] = True
     r = simulate_scenario(payload)
     assert all(q["grid_export_ac_kwh"] == 0 for q in r["quarters"])
@@ -122,6 +122,51 @@ def test_hourly_limits():
     p["hours"] *= 5
     with pytest.raises(ValueError, match="72"):
         simulate_scenario(p)
+
+
+def test_spot_prices_exactly_match_historical_ha_buy_sell_readings():
+    # HA source dated 2026-10-20, N1; prices may differ by 0.001
+    # in raw HA due to source rounding.
+    hours = [{"spot": 1.567, "pv_kw": 0, "home_kw": 0.6}] * 24
+    hours[6] = {"spot": 1.652, "pv_kw": 0, "home_kw": 0.6}
+    hours[17] = {"spot": 1.903, "pv_kw": 0, "home_kw": 0.6}
+    test_case = scenario(hours, soc=50)
+    test_case["start_utc"] = "2026-10-19T22:00:00Z"  # Local 20 Oct 00:00
+    result = simulate_scenario(test_case)
+    assert result["hourly"][0]["sell"] == pytest.approx(1.567)
+    assert result["hourly"][0]["buy"] == pytest.approx(1.831)
+    assert result["hourly"][6]["buy"] == pytest.approx(2.135)
+    assert result["hourly"][17]["buy"] == pytest.approx(3.045)
+    assert result["summary"]["tariff_source"] == "N1_2026-10-20_HA_export_snapshot"
+
+
+def test_dst_tariff_local_hour_is_resolved_across_repeated_hour():
+    from datetime import UTC, datetime
+
+    from tools.planner_lab.engine import _local_hour_copenhagen, _prices_from_spot
+
+    summer_2am = datetime(2026, 10, 25, 0, 0, tzinfo=UTC)
+    winter_2am = datetime(2026, 10, 25, 1, 0, tzinfo=UTC)
+    assert _local_hour_copenhagen(summer_2am) == 2
+    assert _local_hour_copenhagen(winter_2am) == 2
+    assert _prices_from_spot(1, summer_2am) == pytest.approx((1.264, 1.0))
+    assert _prices_from_spot(1, winter_2am) == pytest.approx((1.264, 1.0))
+
+
+def test_public_sample_home_profile_has_hourly_source_not_fictitious_constant():
+    import re
+
+    root = Path(__file__).resolve().parents[1]
+    page = (root / "tools/planner_lab/index.html").read_text(encoding="utf-8")
+    profile = re.search(r"const OBSERVED_HOME_KW = \[([0-9.,\s]+)\];", page)
+    assert profile
+    samples = [float(x.strip()) for x in profile.group(1).split(",")]
+    assert len(samples) == 24
+    assert sum(samples) == pytest.approx(27.5156, abs=0.001)
+    assert min(samples) > 0
+    assert max(samples) > 3
+    assert 'const keys = ["spot","pv_kw","home_kw"]' in page
+    assert "spot;pv_kw;home_kw" in page
 
 
 def test_browser_script_is_syntactically_valid():

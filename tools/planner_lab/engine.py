@@ -22,6 +22,45 @@ if not CORE_PATH.is_dir():
 PACKAGE = "_energy_copilot_planner_lab_core"
 MAX_HOURS = 72
 
+# N1, October 2026 — actual Home Assistant source export 2026-10-20:
+# sensor.energi_data_service - sensor.energi_data_spotpris.
+# Additional tariffs: Energinet transmission 0.054, system 0.090,
+# elafgift 0.010; N1 hour rates 0.110 / 0.329 / 0.988 DKK/kWh.
+# All figures come from already-priced HA sensors. Do NOT add VAT twice.
+FIXED_SURCHARGE_DKK_KWH = 0.054 + 0.090 + 0.010
+N1_NIGHT = 0.110
+N1_DAY = 0.329
+N1_PEAK = 0.988
+
+
+def _last_sunday(year: int, month: int) -> int:
+    if month == 12:
+        first_next = datetime(year + 1, 1, 1, tzinfo=UTC)
+    else:
+        first_next = datetime(year, month + 1, 1, tzinfo=UTC)
+    last = first_next - timedelta(days=1)
+    return last.day - (last.weekday() + 1) % 7
+
+
+def _local_hour_copenhagen(when: datetime) -> int:
+    """Copenhagen local hour using current EU DST (March/October last Sunday).
+
+    Works in browsers with Python WASM, even when zoneinfo databases are absent.
+    """
+    value = when.astimezone(UTC)
+    year = value.year
+    dst_start = datetime(year, 3, _last_sunday(year, 3), 1, tzinfo=UTC)
+    dst_end = datetime(year, 10, _last_sunday(year, 10), 1, tzinfo=UTC)
+    return (value + timedelta(hours=2 if dst_start <= value < dst_end else 1)).hour
+
+
+def _prices_from_spot(spot: float, at: datetime) -> tuple[float, float]:
+    """Return buy/sell DKK/kWh from a raw spot value and N1 snapshot tariffs."""
+    hour = _local_hour_copenhagen(at)
+    network = N1_NIGHT if hour < 6 else N1_PEAK if 17 <= hour < 21 else N1_DAY
+    return spot + FIXED_SURCHARGE_DKK_KWH + network, spot
+
+
 
 def _core_modules():
     """Load original production modules without running HA integration setup."""
@@ -111,12 +150,12 @@ def simulate_scenario(payload):
     for i, hour in enumerate(hours):
         if not isinstance(hour, dict):
             raise ValueError(f"Godzina {i + 1}: wymagany obiekt")
-        buy = _number(hour.get("buy"), f"Godzina {i + 1} / zakup", -20, 100)
-        sell = _number(hour.get("sell"), f"Godzina {i + 1} / sprzedaż", -20, 100)
+        spot = _number(hour.get("spot"), f"Godzina {i + 1} / spot", -20, 100)
         pv_kw = _number(hour.get("pv_kw"), f"Godzina {i + 1} / PV", 0, 100)
         home_kw = _number(hour.get("home_kw"), f"Godzina {i + 1} / dom", 0, 100)
         for part in range(4):
             at = start + timedelta(hours=i, minutes=15 * part)
+            buy, sell = _prices_from_spot(spot, at)
             quarters.append(
                 planner.Quarter(
                     start=at,
@@ -184,8 +223,9 @@ def simulate_scenario(payload):
         per_hour.append(
             {
                 "start_utc": (start + timedelta(hours=i)).isoformat(),
-                "buy": values["buy"],
-                "sell": values["sell"],
+                "spot": values["spot"],
+                "buy": quarters[i * 4].buy_dkk_per_kwh,
+                "sell": quarters[i * 4].sell_dkk_per_kwh,
                 "pv_kw": values["pv_kw"],
                 "home_kw": values["home_kw"],
                 "mode": mode,
@@ -218,6 +258,7 @@ def simulate_scenario(payload):
             "evaluated_transitions": result.evaluated_transitions,
             "soc_step_dc_kwh": result.soc_resolution_dc_kwh,
             "solver": result.method,
+            "tariff_source": "N1_2026-10-20_HA_export_snapshot",
             "physical_dispatch_verified": True,
             "deye_tou_verified": False,
             "device_commands_executed": False,
