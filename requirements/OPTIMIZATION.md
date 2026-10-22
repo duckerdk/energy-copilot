@@ -59,3 +59,14 @@ W `dry_run` projektor poprzedniej doby UTC może **jawnie modelować wyłącznie
 
 ## M3 v1.11.0 — historyczny model 7 dni
 Domyślny dry_run przestaje korzystać z projekcji poprzednich 24 godzin. Zamiast tego pobiera estymację 7 dni z godzinowych statystyk do 365 dni wstecz: mediana ważona, malejąca waga starszych danych, dzień tygodnia, dzień roboczy/wolny i duńskie święta. Rozkład godzinowej energii na kwadranse jest równomierny i jeszcze niezweryfikowany. Horyzont prognozy zużycia nie rozszerza horyzontu opublikowanych cen ani Forecast.Solar. Poprzedni opis 24h dotyczy wydań historycznych. Brak modelu blokuje dry_run.
+
+
+## M3 v1.12.0 — optymalizacja całego horyzontu, nadal tylko dry_run
+
+Nowy `horizon_optimizer.py` zastępuje ograniczone badanie pojedynczego cyklu 15/30 min pełnohoryzontowym programowaniem dynamicznym po dyskretnym stanie energii baterii. Krok `0.10 kWh DC` i 15-minutowy krok czasowy są **przybliżeniem obliczeniowym**, a nie sterowaniem Deye co kwadrans. Każdy stan uwzględnia SOC 20–100%, maksymalne prądy ładowania/rozładowania, przepływy do domu, PV→dom, PV→bateria, sieć→bateria, stratę sprawności, brak eksportu baterii i degradację 0,40 DKK/kWh DC. Cena i obciążenie są oceniane przez cały wspólny horyzont opublikowanych danych. Plan może mieć wiele kwadransów ładowania i rozładowania, także gdy opłaca się zachować SOC w tańszych godzinach.
+
+Wartość końcowej energii nie jest zerowana: jako **ostrożny, niezweryfikowany zamiennik kosztu odtworzenia kWh DC** używana jest najniższa opublikowana cena zakupu dzielona przez modelową sprawność ładowania z sieci (dolne ograniczenie 0). Nie dodaje się hipotetycznych cen po horyzoncie. Taki model wartości końcowej wymaga walidacji; bieżący plan nie jest globalnym optimum ciągłym i nie zakłada równości SOC końcowego/początkowego.
+
+Wybrana 15-minutowa dyspozycja jest **ponownie niezależnie weryfikowana** przez istniejący symulator `simulate_candidate`. W HA widoczny jest godzinowy agregat planu (przewidywany SOC, zakup energii, energia PV, ładowanie sieciowe i PV, rozładowanie i eksport). Wariant bazowy nadal nie odtwarza rzeczywistych TOU falownika, dlatego `modeled_saving_dkk` pozostaje porównaniem do **teoretycznego braku cykli baterii**, a nie osiągalną oszczędnością. `tou_feasibility=not_evaluated`, `executable=False`. Konwersja planu na rzeczywistych sześć okien TOU, walidacja BMS i prawdziwy baseline Deye wymagają dalszego wdrożenia.
+
+Brak prognozy PV lub opublikowanego okresu pozostaje jawną luką. Program nie wpisuje arbitralnego zera dla nieopublikowanej nocnej energii Forecast.Solar; plan może mieć `partial` horyzont krótszy niż horyzont cen. To ograniczenie wymaga osobnego, potwierdzonego źródła nocnego PV, nie cichej ekstrapolacji.
