@@ -11,10 +11,13 @@ import types
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
 CORE_PATH = Path(__file__).resolve().parent / "core"
 if not CORE_PATH.is_dir():
-    CORE_PATH = ROOT / "custom_components" / "energy_copilot"
+    CORE_PATH = (
+        Path(__file__).resolve().parents[2]
+        / "custom_components"
+        / "energy_copilot"
+    )
 
 PACKAGE = "_energy_copilot_planner_lab_core"
 MAX_HOURS = 72
