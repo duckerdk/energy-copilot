@@ -1,6 +1,9 @@
 """Offline Planner Lab is a thin adapter around production optimizer modules."""
 
 from copy import deepcopy
+from pathlib import Path
+from shutil import which
+from subprocess import run
 
 import pytest
 
@@ -118,3 +121,18 @@ def test_hourly_limits():
     p["hours"] *= 5
     with pytest.raises(ValueError, match="72"):
         simulate_scenario(p)
+
+
+def test_browser_script_is_syntactically_valid():
+    """Catch frontend typos in CI; Node is optional for users of the lab."""
+    if which("node") is None:
+        pytest.skip("Node.js is not installed in this test environment")
+    page = (
+        Path(__file__).resolve().parents[1]
+        / "tools"
+        / "planner_lab"
+        / "index.html"
+    ).read_text(encoding="utf-8")
+    script = page.split("<script>", 1)[1].split("</script>", 1)[0]
+    checked = run(["node", "--check"], input=script, text=True, capture_output=True)
+    assert checked.returncode == 0, checked.stderr
