@@ -3,6 +3,7 @@
 import asyncio
 import logging
 from datetime import timedelta
+from functools import partial
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -290,14 +291,17 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                     "blocked", self.load_forecast_error or "load:forecast_missing"
                 )
             else:
-                self.planning_preview = evaluate_preview(
-                    snapshot,
-                    mode=self.settings.get("mode", "monitor"),
-                    pv_export_enabled=solar_sell is not None
-                    and solar_sell.state == "on",
-                    load_projection=(
-                        self.load_forecast.projection if self.load_forecast else None
-                    ),
+                self.planning_preview = await self.hass.async_add_executor_job(
+                    partial(
+                        evaluate_preview,
+                        snapshot,
+                        mode=self.settings.get("mode", "monitor"),
+                        pv_export_enabled=solar_sell is not None
+                        and solar_sell.state == "on",
+                        load_projection=(
+                            self.load_forecast.projection if self.load_forecast else None
+                        ),
+                    )
                 )
         except Exception:  # Preview must never interrupt reliable M1/M2 polling.
             _LOGGER.exception("M3 read-only preview failed")
