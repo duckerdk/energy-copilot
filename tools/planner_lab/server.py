@@ -254,7 +254,7 @@ class Handler(BaseHTTPRequestHandler):
             response, status = {"error": str(exc)}, 400
         except Exception:
             # Do not expose server tracebacks to the browser.
-            self.log_error("Unexpected simulation exception", exc_info=True)
+            self.log_error("Unexpected simulation exception: %r", sys.exc_info()[1])
             response, status = {"error": "Wewnętrzny błąd symulacji. Sprawdź konsolę."}, 500
         data = json.dumps(response, ensure_ascii=False, allow_nan=False).encode("utf-8")
         self._reply(status, data, "application/json; charset=utf-8")
