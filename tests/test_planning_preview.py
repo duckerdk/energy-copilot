@@ -387,6 +387,7 @@ async def test_ha_dry_run_with_real_coordinator_snapshot_renders_model_result(
         for q in forecast
     )
     coordinator._last_external = NOW
+    install_hourly_model(coordinator, NOW)
 
     with patch(
         "homeassistant.core.ServiceRegistry.async_call",
@@ -410,7 +411,9 @@ async def test_preview_exception_does_not_turn_m2_input_quality_unavailable(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     coordinator = entry.runtime_data.coordinator
-    install_hourly_model(coordinator, datetime.now(UTC))
+    from .conftest import NOW
+
+    install_hourly_model(coordinator, NOW)
     with patch(
         "custom_components.energy_copilot.coordinator.evaluate_preview",
         side_effect=RuntimeError("broken experimental optimizer"),
