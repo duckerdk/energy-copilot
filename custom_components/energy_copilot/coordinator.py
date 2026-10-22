@@ -284,6 +284,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             if (
                 self.settings.get("mode", "monitor") == "dry_run"
                 and self.load_forecast is None
+                and snapshot.forecast is not None
             ):
                 self.planning_preview = Preview(
                     "blocked", self.load_forecast_error or "load:forecast_missing"
