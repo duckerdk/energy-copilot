@@ -1,9 +1,9 @@
 """Offline Planner Lab is a thin adapter around production optimizer modules."""
 
+import sys
 from copy import deepcopy
 from pathlib import Path
 from shutil import which
-import sys
 from subprocess import run
 
 import pytest
