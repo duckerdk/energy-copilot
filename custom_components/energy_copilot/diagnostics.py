@@ -58,7 +58,8 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "status": "ready" if load_forecast else "unavailable",
             "reason": coordinator.load_forecast_error,
             "forecast_quarters": len(load_forecast.projection.periods)
-            if load_forecast else 0,
+            if load_forecast
+            else 0,
             "training_hours": load_forecast.training_hours if load_forecast else 0,
             "training_days": load_forecast.training_days if load_forecast else 0,
             "method": load_forecast.projection.method if load_forecast else None,
