@@ -4,6 +4,11 @@ Natywna integracja Home Assistant `custom_components/energy_copilot`. **Wersja k
 
 Celem docelowego rozwiązania jest minimalizacja całkowitego kosztu energii w horyzoncie opublikowanych cen, z uwzględnieniem SOC, sprawności i degradacji baterii. Zatwierdzone reguły i uprawnienia opisuje wyłącznie [REQUIREMENTS.md](requirements/REQUIREMENTS.md).
 
+
+## Lokalne laboratorium planowania (bez Home Assistant)
+
+Dostępne jest osobne środowisko do ręcznego wprowadzania danych i testowania **tego samego** silnika optymalizacji, którego używa M3. Uruchom **tools/planner_lab/start_windows.bat** (Windows) albo **python3 tools/planner_lab/server.py**; w przeglądarce otwórz **http://127.0.0.1:8765**. Możesz wprowadzić ceny zakupu/sprzedaży, PV, zużycie, początkowy SOC i limity baterii dla 24–72 godzin. Dostępne są wykresy, wynik kwadransowy, import/eksport CSV i JSON. Nie potrzeba HA, internetu ani dodatkowych pakietów Python. Narzędzie niczego nie zapisuje do falownika. [Instrukcja i ograniczenia](tools/planner_lab/README.md).
+
 ## Instalacja i aktualizacja
 
 Wymagany Home Assistant **2026.10 lub nowszy** (testy automatyczne: Core 2026.10.2, Python 3.14).
