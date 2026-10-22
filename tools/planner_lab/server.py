@@ -156,6 +156,7 @@ def simulate_scenario(payload):
                 "discharge_dc_kwh": _round(d.battery_to_home_dc_kwh),
                 "grid_import_ac_kwh": _round(observation.grid_import_kwh),
                 "grid_export_ac_kwh": _round(observation.grid_export_kwh),
+                "pv_curtailed_dc_kwh": _round(d.pv_curtailed_dc_kwh),
                 "purchase_dkk": _round(observation.purchase_dkk),
                 "sales_dkk": _round(observation.sales_dkk),
                 "degradation_dkk": _round(observation.degradation_dkk),
@@ -165,7 +166,7 @@ def simulate_scenario(payload):
     per_hour = []
     sum_keys = (
         "grid_charge_ac_kwh", "pv_charge_dc_kwh", "discharge_dc_kwh",
-        "grid_import_ac_kwh", "grid_export_ac_kwh",
+        "grid_import_ac_kwh", "grid_export_ac_kwh", "pv_curtailed_dc_kwh",
         "purchase_dkk", "sales_dkk", "degradation_dkk",
     )
     for i, values in enumerate(hours):
@@ -211,6 +212,7 @@ def simulate_scenario(payload):
             "battery_discharge_dc_kwh": _round(sum(d.battery_to_home_dc_kwh for d in result.dispatches)),
             "grid_import_ac_kwh": _round(sum(q.grid_import_kwh for q in candidate.quarters)),
             "grid_export_ac_kwh": _round(sum(q.grid_export_kwh for q in candidate.quarters)),
+            "pv_curtailed_dc_kwh": _round(sum(d.pv_curtailed_dc_kwh for d in result.dispatches)),
             "evaluated_transitions": result.evaluated_transitions,
             "soc_step_dc_kwh": result.soc_resolution_dc_kwh,
             "solver": result.method,
