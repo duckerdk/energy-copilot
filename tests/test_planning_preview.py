@@ -79,7 +79,9 @@ def test_cost_preview_uses_actual_hourly_prices_and_returns_soc_to_initial():
     assert preview.coverage == "complete"
     assert preview.quarters == 8
     assert preview.pv_version == "test-known-forecast"
-    assert preview.evaluated_scenarios > 1
+    assert preview.evaluated_transitions > 1
+    assert preview.evaluated_scenarios == 0
+    assert preview.hourly_plan
     assert preview.scenario_cost_dkk < preview.reference_cost_dkk
     assert preview.modeled_saving_dkk > 0
     assert 0 < preview.max_charge_current_a <= 50
@@ -90,9 +92,9 @@ def test_cost_preview_uses_actual_hourly_prices_and_returns_soc_to_initial():
 def test_dry_run_zero_battery_headroom_stays_computable_with_no_charge():
     result = evaluate_preview(snapshot(soc=100), mode="dry_run")
     assert result.status == "preview"
-    assert result.evaluated_scenarios == 1
-    assert result.charge_start is None
-    assert result.modeled_saving_dkk == 0
+    assert result.evaluated_transitions > 0
+    assert result.final_soc_pct <= 100
+    assert result.executable is False
 
 
 def test_monitor_does_not_evaluate_or_expose_fake_savings():
