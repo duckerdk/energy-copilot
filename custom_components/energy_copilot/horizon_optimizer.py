@@ -165,14 +165,19 @@ def optimize_horizon(plant: Plant, quarters: tuple[Quarter, ...]) -> HorizonResu
             raise InfeasibleCandidate("horizon:no_feasible_dispatch")
         costs = next_costs
         trace.append(predecessors)
+    objectives = {
+        state: cost[0] - terminal_value * (initial_energy + state * SOC_STEP_DC_KWH)
+        for state, cost in costs.items()
+    }
+    minimum_objective = min(objectives.values())
+    # Treat only numerical cost ties as equal; then avoid unnecessary charging.
     best = min(
-        costs,
-        key=lambda state: (
-            costs[state][0]
-            - terminal_value * (initial_energy + state * SOC_STEP_DC_KWH),
-            costs[state][1],
-            abs(state),
+        (
+            state
+            for state in costs
+            if objectives[state] <= minimum_objective + COST_TIE_DKK
         ),
+        key=lambda state: (costs[state][1], abs(state), objectives[state]),
     )
     selected = []
     current = best
