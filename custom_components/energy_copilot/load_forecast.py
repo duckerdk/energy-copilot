@@ -2,6 +2,7 @@
 
 Forecasts and historical profiles are estimates; no inverter writes or new database.
 """
+
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -68,10 +69,7 @@ def danish_public_holidays(year: int) -> frozenset[date]:
     easter = _easter(year)
     return frozenset(
         {date(year, 1, 1), date(year, 12, 25), date(year, 12, 26)}
-        | {
-            easter + timedelta(days=offset)
-            for offset in (-3, -2, 0, 1, 39, 49, 50)
-        }
+        | {easter + timedelta(days=offset) for offset in (-3, -2, 0, 1, 39, 49, 50)}
     )
 
 
