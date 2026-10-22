@@ -68,6 +68,7 @@ def evaluate_preview(
     *,
     mode: str,
     pv_export_enabled: bool = False,
+    load_projection=None,
 ) -> Preview:
     """Model only counterfactual charge/discharge cycles with unchanged ending SOC.
 
@@ -107,7 +108,7 @@ def evaluate_preview(
             pv_export_enabled=pv_export_enabled,
             allow_prefix=True,
             pv_temporal_model="uniform_power_unverified",
-            load_projection=project_previous_utc_day_load(
+            load_projection=load_projection or project_previous_utc_day_load(
                 snapshot, short_gap_model="linear_bracketed_unverified"
             ),
         )
