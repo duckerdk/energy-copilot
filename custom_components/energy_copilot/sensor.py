@@ -14,6 +14,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             InputQualitySensor(entry),
             PlanningStatusSensor(entry),
             ModeledSavingSensor(entry),
+            SevenDayLoadSensor(entry),
         ]
     )
 
@@ -165,4 +166,60 @@ class ModeledSavingSensor(CoordinatorEntity, SensorEntity):
             "baseline": "no_battery_cycling_not_actual_deye",
             "not_actual_savings": True,
             "tou_verified": False,
+        }
+
+
+class SevenDayLoadSensor(CoordinatorEntity, SensorEntity):
+    """Seven-day forecast total; hourly series is usable by a future-time chart."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "load_forecast_7d"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_native_unit_of_measurement = "kWh"
+
+    def __init__(self, entry):
+        super().__init__(entry.runtime_data.coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_load_forecast_7d"
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
+
+    @property
+    def native_value(self):
+        forecast = self.coordinator.load_forecast
+        return round(forecast.total_kwh, 2) if forecast is not None else None
+
+    @property
+    def extra_state_attributes(self):
+        forecast = self.coordinator.load_forecast
+        if forecast is None:
+            return {
+                "status": "unavailable",
+                "reason": self.coordinator.load_forecast_error,
+                "read_only": True,
+            }
+        daily = {}
+        from zoneinfo import ZoneInfo
+
+        local = ZoneInfo("Europe/Copenhagen")
+        for quarter in forecast.projection.periods:
+            day = quarter.start.astimezone(local).date().isoformat()
+            daily[day] = daily.get(day, 0.0) + quarter.kwh
+        return {
+            "status": "ready",
+            "method": forecast.projection.method,
+            "source": forecast.source,
+            "generated_at": forecast.projection.captured_at.isoformat(),
+            "start": forecast.projection.periods[0].start.isoformat(),
+            "end": forecast.projection.periods[-1].end.isoformat(),
+            "training_hours": forecast.training_hours,
+            "training_days": forecast.training_days,
+            "accuracy_verified": False,
+            "read_only": True,
+            "hourly": [
+                {"start": item.start.isoformat(), "kwh": round(item.kwh, 4)}
+                for item in forecast.hourly
+            ],
+            "daily": [
+                {"date": day, "kwh": round(value, 3)}
+                for day, value in sorted(daily.items())
+            ],
         }
