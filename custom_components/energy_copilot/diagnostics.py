@@ -104,7 +104,6 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "discharge_dc_kwh": preview.discharge_dc_kwh,
             "dispatch_scope": "whole_published_horizon",
             "tou_feasibility": "not_evaluated",
-
             "voltage_source": preview.voltage_source,
             "executable": False,
             "scenario_selection": "single_cycle_bounded_search",
