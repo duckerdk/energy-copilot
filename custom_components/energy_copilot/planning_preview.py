@@ -7,8 +7,8 @@ Output is never a Deye TOU plan, a confirmed saving or an actuator command.
 from dataclasses import dataclass
 from datetime import datetime
 
-from .models import InputSnapshot
 from .horizon_optimizer import optimize_horizon
+from .models import InputSnapshot
 from .planner import InfeasibleCandidate, Plant
 from .planning_inputs import (
     PlanningInputError,
