@@ -36,3 +36,12 @@ Natywne encje HA, config/options flow, prognoza PV i zużycia, plan dla opubliko
 
 ## Prognoza zużycia — decyzja użytkownika 22.10.2026
 Budować prognozę zużycia domu na następne **7 dni** na podstawie historycznych danych HA, z rozróżnieniem dni roboczych, wolnych i świąt, adaptacją do nowszych obserwacji i **wykresem w HA**. Nie mylić produkcji PV, zakupu z sieci, ładowania/rozładowania baterii ani fizycznego zużycia. Nie zmieniać zakresu uprawnień do sterowania.
+
+
+## Pełnohoryzontowy planer energii — decyzja użytkownika 22.10.2026
+
+- Obliczać **cały nieprzerwany okres dostępnych, opublikowanych cen zakupu i sprzedaży**, przy dostępnej prognozie PV i zużycia, a nie pary 15/30-minutowe. Krok kwadransowy pozostaje tylko rozdzielczością bilansu i SOC.
+- Wybierać godziny ładowania z sieci, gdy zabraknie korzystnej energii PV, i używać energii baterii podczas droższych godzin. **Dopuszczać kupowanie prądu z sieci mimo niepustej baterii**, jeżeli zachowanie energii na później zmniejsza koszt planu.
+- Uwzględniać całe prognozowane PV: pokrywanie domu, magazynowanie nadwyżek, ewentualny eksport nadwyżek i pozostawianie pojemności na zapowiedziane PV. Pozwalać na kilka kolejnych godzin ładowania, rozładowania i powtarzające się cykle, a także świadomy brak cyklu.
+- Ograniczenia fizyczne, polityka ceny zakupu/sprzedaży, degradacja 0,40 DKK/kWh DC, SOC min. 20%, eksport wyłącznie PV i sześć TOU pozostają obowiązujące. Model zużycia v1.11.0 **bez zmian**.
+- Najpierw wdrożyć model w nieegzekwowalnym `dry_run`, wyraźnie rozdzielić fizyczny harmonogram 15-minutowy od harmonogramu wykonywalnego przez sześć okien TOU. Nie sugerować w HA możliwych do wykonania oszczędności, dopóki nie ma walidacji TOU i rzeczywistego baseline Deye.

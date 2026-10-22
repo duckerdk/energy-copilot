@@ -1,6 +1,6 @@
 # Energy Co-Pilot
 
-Natywna integracja Home Assistant `custom_components/energy_copilot`. **Wersja na gałęzi zmian: v1.11.0 (HACS po opublikowaniu tagu i GitHub Release).** Poprzednie wydanie: [v0.1.10](https://github.com/duckerdk/energy-copilot/releases/tag/v0.1.10). Obecny zakres: **M1/M2** (pomiary, ceny, prognozy, Recorder, diagnostyka) i eksperymentalny **M3 `dry_run`** (teoretyczne porównanie scenariuszy ładowania/rozładowania). Integracja jest **wyłącznie do odczytu**, bez sterowania falownikiem, bez potwierdzonego planu sześciu TOU i bez wiarygodnej deklaracji rzeczywistych oszczędności.
+Natywna integracja Home Assistant `custom_components/energy_copilot`. **Wersja kodu: v1.12.0 — publikowana po przejściu CI i utworzeniu GitHub Release.** Poprzednie wydanie: [v1.11.0](https://github.com/duckerdk/energy-copilot/releases/tag/v1.11.0). Obecny zakres: **M1/M2** (pomiary, ceny, prognozy, Recorder, diagnostyka) i eksperymentalny **M3 `dry_run`** (teoretyczne porównanie scenariuszy ładowania/rozładowania). Integracja jest **wyłącznie do odczytu**, bez sterowania falownikiem, bez potwierdzonego planu sześciu TOU i bez wiarygodnej deklaracji rzeczywistych oszczędności.
 
 Celem docelowego rozwiązania jest minimalizacja całkowitego kosztu energii w horyzoncie opublikowanych cen, z uwzględnieniem SOC, sprawności i degradacji baterii. Zatwierdzone reguły i uprawnienia opisuje wyłącznie [REQUIREMENTS.md](requirements/REQUIREMENTS.md).
 
@@ -80,6 +80,17 @@ series:
 ```
 
 Karta ApexCharts nie jest częścią samej integracji Energy Co-Pilot. Prognoza 7 dni nie oznacza, że dostępne są ceny energii i PV na 7 dni — podgląd optymalizacji nadal działa tylko w horyzoncie rzeczywiście opublikowanych danych. Test historyczny walk-forward i potwierdzenie kalibracji źródeł pozostają wymagane.
+
+## Nowy optymalizator całego horyzontu — v1.12.0
+
+W `dry_run` M3 nie wyszukuje już tylko pary jednego kwadransa ładowania i jednego kwadransa rozładowania. Optymalizuje **wszystkie kolejne kwadranse**, na które ma opublikowane ceny, prognozę PV i prognozę zużycia domu. Dozwolone są wielogodzinne ładowanie z sieci i z PV, rozładowanie przez wiele godzin, wiele cykli oraz świadome pozostawienie baterii na późniejsze droższe godziny. Wciąż stosowane są limity SOC 20–100%, 50 A ładowania i 100 A rozładowania, zakaz eksportu baterii, próg eksportu tylko nadwyżek PV oraz degradacja 0,40 DKK/kWh DC.
+
+Algorytm jest **dyskretną symulacją** (kwadranse, 0,10 kWh DC na stan baterii), w której istniejący symulator jeszcze raz sprawdza cały plan. Energia pozostawiona na końcu otrzymuje ostrożną wartość kosztu odtworzenia według najtańszej znanej ceny; nie ma wymogu powrotu do początkowego SOC. Prognoza zużycia z v1.11.0 pozostaje bez zmian.
+
+**W HA** atrybuty sensora `Planning status` zawierają `hourly_plan`: godzinowe wartości `price_dkk_kwh`, `home_kwh`, `pv_dc_kwh`, `grid_charge_kwh`, `pv_charge_dc_kwh`, `battery_discharge_dc_kwh`, `grid_import_kwh`, `grid_export_kwh` i `soc_end_pct`. Dodatkowo dostępne są `final_soc_pct`, `grid_charge_kwh`, `discharge_dc_kwh` i `terminal_value_dkk_per_kwh_dc`. Diagnostyka podaje tylko agregaty, bez szczegółowej prywatnej serii godzinowej.
+
+**Ważne:** `hourly_plan` pokazuje fizyczny plan modelu, *nie* zaprogramowane sześć TOU Deye. Brakuje jeszcze weryfikacji rzeczywistych nastaw oraz odwzorowania planu na ograniczenie do sześciu okien. `executable=False`; żadne polecenia nie są wysyłane. Oszczędność jest teoretyczna względem **braku dodatkowych cykli baterii**, nie względem aktualnych nastaw Deye. Plan kończy się na pierwszej nieudokumentowanej luce PV, nawet jeśli ceny dostępne są dalej — bez zgadywania zer dla nieopublikowanej prognozy nocy. Utrzymujemy `partial` zamiast prezentowania fikcyjnego pokrycia całego horyzontu.
+
 
 ## Dokumentacja projektu
 

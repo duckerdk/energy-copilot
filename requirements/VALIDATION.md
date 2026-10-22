@@ -90,3 +90,12 @@ Każde `decision_id`, `plan_id`, start i ważność, dane wejściowe oraz ich we
 - [ ] Sprawdzić wykres 7 dni i sumy 672 kwadransów oraz brak poleceń falownika.
 - [ ] Weryfikować weekendy, duńskie święta, DST, brak danych, źle sformatowane statystyki oraz minimum próbek.
 - [ ] Wykonać walk-forward na historycznych godzinach i porównać MAE/WAPE z naiwnym 24h oraz analogiczną godziną 7 dni temu; raportować pokrycie i nie twierdzić, że walidacja HA została wykonana bez odczytu prawdziwej bazy.
+
+
+## Odbiór M3 v1.12.0 — pełny horyzont
+- [ ] Testy syntetyczne: wielogodzinne ładowanie i rozładowanie, zachowanie baterii przy tańszej energii, wykorzystanie nadwyżki PV, więcej niż jeden cykl, brak opłacalnego cyklu, noc bez PV.
+- [ ] Zewnętrzny, niezależny `simulate_candidate` musi zatwierdzić każde wyjście optymalizatora bez łamania SOC 20–100%, prądów ani bilansu PV / sieć / bateria. Brak eksportu baterii i jednoczesnego importu/eksportu sieci.
+- [ ] Dowieść wartości końcowej energii i jej wpływu na zachowanie planu przy końcu cen; raportować założenie i SOC końcowe. 0,10 kWh DC to rozdzielczość numeryczna, nie obietnica optymalności ciągłej.
+- [ ] Sprawdzić poprawność cen i dat DST, brak nieopublikowanych cen, różną długość prognozy PV i cen, nieregularne okresy Forecast.Solar, bilans 7-dniowego zużycia.
+- [ ] Sprawdzić pełny, aktualny horyzont na prawdziwym HA i zmiany planu po publikacji jutra; diagnostyka musi raportować `partial`, jeżeli źródło PV kończy się wcześniej.
+- [ ] Przed M6: mapowanie planu na **sześć fizycznych TOU Deye**, wymagane przełączenia i możliwość wielodobowej realizacji, realny baseline aktualnych nastaw Deye, walidacja runtime i walk-forward. `dry_run` nie może wywołać zapisu.
