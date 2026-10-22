@@ -278,15 +278,17 @@ function renderOutput(data){
   $("output").hidden=false;
   const s=data.summary;
   const metrics=[
+    ["Koszt zakupu prądu",nfmt(s.purchase_cost_dkk)+" DKK","Przewidywany wydatek za zakup z sieci"],
+    ["Przychód ze sprzedaży PV",nfmt(s.sales_revenue_dkk)+" DKK","Przewidywany wpływ za eksport do sieci"],
+    ["Saldo zakupu i sprzedaży",nfmt(s.energy_cost_dkk)+" DKK","Zakup minus sprzedaż; bez degradacji"],
     ["Modelowana korzyść",nfmt(s.modeled_saving_dkk)+" DKK","Wobec braku cykli magazynu"],
     ["SOC końcowy",nfmt(s.final_soc_pct,1)+"%","Początek "+nfmt(s.initial_soc_pct,1)+"%"],
-    ["Ładowanie z sieci",nfmt(s.grid_charge_ac_kwh)+" kWh","Energia AC"],
-    ["Ładowanie z PV",nfmt(s.pv_charge_dc_kwh)+" kWh","Energia DC"],
+    ["Ładowanie z sieci",nfmt(s.grid_charge_ac_kwh)+" kWh","Energia z sieci do baterii"],
+    ["Ładowanie z PV",nfmt(s.pv_charge_dc_kwh)+" kWh","Energia z PV do baterii"],
     ["Niewykorzystane PV",nfmt(s.pv_curtailed_dc_kwh)+" kWh","Produkcja ograniczona"],
-    ["Rozładowanie",nfmt(s.battery_discharge_dc_kwh)+" kWh","Energia DC"],
-    ["Bilans energii",nfmt(s.energy_cost_dkk)+" DKK","Zakup minus sprzedaż"],
-    ["Degradacja",nfmt(s.degradation_cost_dkk)+" DKK","0,40 DKK/kWh DC"],
-    ["SOC / wartość końcowa",nfmt(s.terminal_value_dkk)+" DKK","Modelowany kredyt"],
+    ["Rozładowanie",nfmt(s.battery_discharge_dc_kwh)+" kWh","Energia z baterii do domu"],
+    ["Degradacja",nfmt(s.degradation_cost_dkk)+" DKK","Koszt modelowy, nie opłata za prąd"],
+    ["SOC / wartość końcowa",nfmt(s.terminal_value_dkk)+" DKK","Modelowany kredyt, nie przychód"],
     ["Koszt planu",nfmt(s.plan_objective_dkk)+" DKK","Z degradacją i SOC końcowym"],
     ["Koszt bazowy",nfmt(s.reference_objective_dkk)+" DKK","Bez cykli baterii"]
   ];

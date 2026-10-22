@@ -44,6 +44,15 @@ def test_end_to_end_price_arbitrage_and_quarter_outputs():
     assert summary["modeled_saving_dkk"] > 0
     assert summary["grid_charge_ac_kwh"] > 0
     assert summary["battery_discharge_dc_kwh"] > 0
+    assert summary["purchase_cost_dkk"] == pytest.approx(
+        sum(q["purchase_dkk"] for q in result["quarters"]), abs=0.001
+    )
+    assert summary["sales_revenue_dkk"] == pytest.approx(
+        sum(q["sales_dkk"] for q in result["quarters"]), abs=0.001
+    )
+    assert summary["energy_cost_dkk"] == pytest.approx(
+        summary["purchase_cost_dkk"] - summary["sales_revenue_dkk"], abs=0.001
+    )
     assert summary["physical_dispatch_verified"] is True
     assert summary["device_commands_executed"] is False
     assert summary["deye_tou_verified"] is False

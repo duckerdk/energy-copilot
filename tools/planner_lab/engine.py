@@ -489,6 +489,8 @@ def simulate_scenario(payload):
             "reference_objective_dkk": _round(reference.objective_dkk),
             "plan_objective_dkk": _round(candidate.objective_dkk),
             "modeled_saving_dkk": _round(reference.objective_dkk - candidate.objective_dkk),
+            "purchase_cost_dkk": _round(sum(q.purchase_dkk for q in candidate.quarters)),
+            "sales_revenue_dkk": _round(sum(q.sales_dkk for q in candidate.quarters)),
             "energy_cost_dkk": _round(candidate.energy_cost_dkk),
             "degradation_cost_dkk": _round(candidate.degradation_cost_dkk),
             "terminal_value_dkk": _round(candidate.terminal_battery_value_dkk),
