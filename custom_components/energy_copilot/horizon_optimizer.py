@@ -38,7 +38,9 @@ class HorizonResult:
     executable: bool = False
 
 
-def _dispatch(plant: Plant, q: Quarter, delta_dc: float) -> tuple[Dispatch, float] | None:
+def _dispatch(
+    plant: Plant, q: Quarter, delta_dc: float
+) -> tuple[Dispatch, float] | None:
     """Cost the best solar-first flow for a single battery energy transition.
 
     Positive delta stores DC energy, negative delta feeds the home. A positive
@@ -54,9 +56,11 @@ def _dispatch(plant: Plant, q: Quarter, delta_dc: float) -> tuple[Dispatch, floa
         pv_battery = min(pv_surplus, delta_dc / plant.eta_pv_to_battery)
         remaining_dc = max(0.0, delta_dc - pv_battery * plant.eta_pv_to_battery)
         grid_battery = remaining_dc / plant.eta_grid_to_battery
-        limit_dc = plant.battery_voltage_v * min(
-            plant.charge_limit_a, plant.grid_charge_limit_a
-        ) / 4000
+        limit_dc = (
+            plant.battery_voltage_v
+            * min(plant.charge_limit_a, plant.grid_charge_limit_a)
+            / 4000
+        )
         if delta_dc > plant.battery_voltage_v * plant.charge_limit_a / 4000 + EPS:
             return None
         if grid_battery * plant.eta_grid_to_battery > limit_dc + EPS:
@@ -65,7 +69,10 @@ def _dispatch(plant: Plant, q: Quarter, delta_dc: float) -> tuple[Dispatch, floa
         battery_home = -delta_dc
         if battery_home * plant.eta_battery_to_ac > grid_home + EPS:
             return None
-        if battery_home > plant.battery_voltage_v * plant.discharge_limit_a / 4000 + EPS:
+        if (
+            battery_home
+            > plant.battery_voltage_v * plant.discharge_limit_a / 4000 + EPS
+        ):
             return None
         grid_home = max(0.0, grid_home - battery_home * plant.eta_battery_to_ac)
     remaining_pv = max(0.0, pv_surplus - pv_battery)
@@ -135,9 +142,7 @@ def optimize_horizon(plant: Plant, quarters: tuple[Quarter, ...]) -> HorizonResu
                 continue
             dispatch, incremental = result
             extra_stress = (
-                (delta * 4000 / calibrated.battery_voltage_v) ** 2
-                if delta > 0
-                else 0.0
+                (delta * 4000 / calibrated.battery_voltage_v) ** 2 if delta > 0 else 0.0
             )
             for previous, (current_cost, current_stress) in costs.items():
                 target = previous + change
@@ -146,9 +151,13 @@ def optimize_horizon(plant: Plant, quarters: tuple[Quarter, ...]) -> HorizonResu
                 transitions += 1
                 proposed = (current_cost + incremental, current_stress + extra_stress)
                 incumbent = next_costs.get(target)
-                if incumbent is None or proposed[0] < incumbent[0] - COST_TIE_DKK or (
-                    abs(proposed[0] - incumbent[0]) <= COST_TIE_DKK
-                    and proposed[1] < incumbent[1]
+                if (
+                    incumbent is None
+                    or proposed[0] < incumbent[0] - COST_TIE_DKK
+                    or (
+                        abs(proposed[0] - incumbent[0]) <= COST_TIE_DKK
+                        and proposed[1] < incumbent[1]
+                    )
                 ):
                     next_costs[target] = proposed
                     predecessors[target] = (previous, dispatch)
