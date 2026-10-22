@@ -9,10 +9,9 @@ from tools.planner_lab.server import _core_modules, simulate_scenario
 
 def scenario(hours=None, soc=25, pv=0):
     if hours is None:
-        hours = (
-            [{"buy": 0.5, "sell": 0.3, "pv_kw": pv, "home_kw": 1} for _ in range(8)]
-            + [{"buy": 2.8, "sell": 0.3, "pv_kw": pv, "home_kw": 1} for _ in range(8)]
-        )
+        hours = [
+            {"buy": 0.5, "sell": 0.3, "pv_kw": pv, "home_kw": 1} for _ in range(8)
+        ] + [{"buy": 2.8, "sell": 0.3, "pv_kw": pv, "home_kw": 1} for _ in range(8)]
     return {
         "start_utc": "2026-10-22T00:00:00Z",
         "initial_soc_pct": soc,
@@ -51,10 +50,9 @@ def test_end_to_end_price_arbitrage_and_quarter_outputs():
 
 
 def test_pv_forecast_changes_result_and_exposes_pv_charging():
-    hours = (
-        [{"buy": 1, "sell": 0, "pv_kw": 6, "home_kw": 0.5} for _ in range(8)]
-        + [{"buy": 3, "sell": 0, "pv_kw": 0, "home_kw": 1} for _ in range(8)]
-    )
+    hours = [{"buy": 1, "sell": 0, "pv_kw": 6, "home_kw": 0.5} for _ in range(8)] + [
+        {"buy": 3, "sell": 0, "pv_kw": 0, "home_kw": 1} for _ in range(8)
+    ]
     result = simulate_scenario(scenario(hours, soc=20))
     assert result["summary"]["pv_charge_dc_kwh"] > 0
     assert result["summary"]["battery_discharge_dc_kwh"] > 0
