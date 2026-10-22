@@ -84,3 +84,9 @@ Każde `decision_id`, `plan_id`, start i ważność, dane wejściowe oraz ich we
 - Dwa i trzy kolejne niekompletne kwadranse: prognoza korzysta z ważnych punktów brzegowych, bez udawania odtworzonych danych źródłowych; ponad trzy, brak punktów brzegowych albo brak historii: nadal `blocked`/`partial`.
 - Pełny zestaw 12 godzin cen i prognozy z dziesięcioma krótkimi przerwami typu Recorder z rzeczywistej diagnostyki v0.1.9: `preview` przez cały dostępny horyzont, modelowane kwadranse policzone, `executable=false`.
 - W teście HA: nowy licznik `load_modeled_quarters` i nazwa metody w encji i diagnostyce; ani odczyty, ani zapisy ustawień falownika nie są wywoływane przez M3. Klasyfikacja jakości historii Recorder i bieżących danych nie zmienia się.
+
+## Odbiór prognozy 7 dni — v1.11.0
+- [ ] Sprawdzić na rzeczywistych statystykach HA, że źródło mierzy zużycie domu i jednostki mean/change są poprawne.
+- [ ] Sprawdzić wykres 7 dni i sumy 672 kwadransów oraz brak poleceń falownika.
+- [ ] Weryfikować weekendy, duńskie święta, DST, brak danych, źle sformatowane statystyki oraz minimum próbek.
+- [ ] Wykonać walk-forward na historycznych godzinach i porównać MAE/WAPE z naiwnym 24h oraz analogiczną godziną 7 dni temu; raportować pokrycie i nie twierdzić, że walidacja HA została wykonana bez odczytu prawdziwej bazy.
