@@ -25,7 +25,12 @@ RETENTION_SETTINGS = {
     ),
     "forecast_max_versions": (DEFAULT_FORECAST_MAX_VERSIONS, MAX_FORECAST_VERSIONS),
 }
-OPTIONAL_SETTINGS = (*sorted(OPTIONAL_ENTITY_ROLES), "solar_sell", "forecast_entry", "load_statistic")
+OPTIONAL_SETTINGS = (
+    *sorted(OPTIONAL_ENTITY_ROLES),
+    "solar_sell",
+    "forecast_entry",
+    "load_statistic",
+)
 
 
 def _optional_key(name, current, suggestion=None):
