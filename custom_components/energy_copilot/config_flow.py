@@ -25,7 +25,7 @@ RETENTION_SETTINGS = {
     ),
     "forecast_max_versions": (DEFAULT_FORECAST_MAX_VERSIONS, MAX_FORECAST_VERSIONS),
 }
-OPTIONAL_SETTINGS = (*sorted(OPTIONAL_ENTITY_ROLES), "solar_sell", "forecast_entry")
+OPTIONAL_SETTINGS = (*sorted(OPTIONAL_ENTITY_ROLES), "solar_sell", "forecast_entry", "load_statistic")
 
 
 def _optional_key(name, current, suggestion=None):
@@ -52,6 +52,9 @@ def schema(current):
         fields[key] = selector.EntitySelector(
             selector.EntitySelectorConfig(domain="sensor")
         )
+    fields[_optional_key("load_statistic", current)] = selector.EntitySelector(
+        selector.EntitySelectorConfig(domain="sensor")
+    )
     fields[_optional_key("forecast_entry", current)] = selector.ConfigEntrySelector(
         selector.ConfigEntrySelectorConfig(integration="forecast_solar")
     )
@@ -73,7 +76,7 @@ def validate(hass, data):
     errors = {}
     # Required sensors may be unavailable, but must be mapped to existing entities.
     # Missing optional diagnostics can be mapped in advance; runtime reports their quality.
-    for role in (*DEFAULT_ENTITIES, "solar_sell"):
+    for role in (*DEFAULT_ENTITIES, "solar_sell", "load_statistic"):
         entity_id = data.get(role)
         if not entity_id and role not in REQUIRED_ENTITY_ROLES:
             continue
