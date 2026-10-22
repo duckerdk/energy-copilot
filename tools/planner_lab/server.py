@@ -6,7 +6,10 @@ import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from engine import _core_modules, simulate_scenario
+if __package__:
+    from .engine import _core_modules, simulate_scenario
+else:
+    from engine import _core_modules, simulate_scenario
 
 MAX_BODY_BYTES = 160_000
 
