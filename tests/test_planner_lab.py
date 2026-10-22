@@ -128,10 +128,7 @@ def test_browser_script_is_syntactically_valid():
     if which("node") is None:
         pytest.skip("Node.js is not installed in this test environment")
     page = (
-        Path(__file__).resolve().parents[1]
-        / "tools"
-        / "planner_lab"
-        / "index.html"
+        Path(__file__).resolve().parents[1] / "tools" / "planner_lab" / "index.html"
     ).read_text(encoding="utf-8")
     script = page.split("<script>", 1)[1].split("</script>", 1)[0]
     checked = run(["node", "--check"], input=script, text=True, capture_output=True)
