@@ -81,11 +81,18 @@ def test_pv_surplus_changes_dispatch_and_only_pv_is_exported():
     result = optimize_horizon(p, qs)
     assert sum(d.pv_to_battery_dc_kwh for d in result.dispatches[:8]) > 0
     assert sum(d.battery_to_home_dc_kwh for d in result.dispatches[8:]) > 0
-    for q, d, observed in zip(qs, result.dispatches, result.candidate.quarters, strict=True):
+    for q, d, observed in zip(
+        qs, result.dispatches, result.candidate.quarters, strict=True
+    ):
         assert not (observed.grid_import_kwh > 1e-7 and observed.grid_export_kwh > 1e-7)
         assert d.battery_to_home_dc_kwh * p.eta_battery_to_ac <= q.home_ac_kwh + 1e-7
     assert simulate_candidate(
-        Plant(**{**vars(p), "terminal_value_dkk_per_kwh_dc": result.terminal_value_dkk_per_kwh_dc}),
+        Plant(
+            **{
+                **vars(p),
+                "terminal_value_dkk_per_kwh_dc": result.terminal_value_dkk_per_kwh_dc,
+            }
+        ),
         qs,
         result.dispatches,
     ).objective_dkk == pytest.approx(result.candidate.objective_dkk)
@@ -120,5 +127,8 @@ def test_near_equal_prices_do_not_create_unprofitable_extra_cycles():
 def test_no_battery_export_even_with_high_export_price():
     qs = series([0.4] * 8 + [3] * 8, pv=[0] * 16, load=0.3, export=True)
     result = optimize_horizon(plant(75), qs)
-    assert all(d.battery_to_home_dc_kwh * 0.95 <= q.home_ac_kwh for q, d in zip(qs, result.dispatches))
+    assert all(
+        d.battery_to_home_dc_kwh * 0.95 <= q.home_ac_kwh
+        for q, d in zip(qs, result.dispatches)
+    )
     assert all(row.grid_export_kwh == 0 for row in result.candidate.quarters)
