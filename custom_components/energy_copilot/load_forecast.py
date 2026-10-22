@@ -32,6 +32,7 @@ class LoadModel:
     samples: tuple[HourlyLoad, ...]
     source: str
     distinct_days: int
+    by_local_hour: tuple[tuple[HourlyLoad, ...], ...]
 
 
 @dataclass(frozen=True)
@@ -113,7 +114,11 @@ def train_load_model(
     days = {row.start.astimezone(LOCAL).date() for row in ordered}
     if len(ordered) < MIN_TRAINING_HOURS or len(days) < MIN_TRAINING_DATES:
         raise PlanningInputError("load:insufficient_hourly_statistics")
-    return LoadModel(now, ordered, source, len(days))
+    hour_buckets = tuple(
+        tuple(row for row in ordered if row.start.astimezone(LOCAL).hour == hour)
+        for hour in range(24)
+    )
+    return LoadModel(now, ordered, source, len(days), hour_buckets)
 
 
 def _weighted_median(samples: list[tuple[float, float]]) -> float:
@@ -137,10 +142,8 @@ def _predict_hour(
     same_weekday = []
     same_type = []
     any_day = []
-    for sample in model.samples:
+    for sample in model.by_local_hour[local.hour]:
         historic = sample.start.astimezone(LOCAL)
-        if historic.hour != local.hour:
-            continue
         age_days = max(0.0, (model.trained_at - sample.start).total_seconds() / 86400)
         weight = exp(-age_days / 45)
         element = (sample.kwh, weight)
