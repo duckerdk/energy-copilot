@@ -1,4 +1,5 @@
 """Seven-day model unit tests using synthetic history only, never future leakage."""
+
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -48,9 +49,15 @@ def test_forecast_seven_days_separates_weekday_and_weekend():
     assert result.projection.periods[0].start == datetime(
         2026, 10, 22, 10, 15, tzinfo=UTC
     )
-    assert result.projection.periods[-1].end - result.projection.periods[0].start == timedelta(days=7)
-    saturday = next(p for p in result.projection.periods if p.start.astimezone(LOCAL).weekday() == 5)
-    monday = next(p for p in result.projection.periods if p.start.astimezone(LOCAL).weekday() == 0)
+    assert result.projection.periods[-1].end - result.projection.periods[
+        0
+    ].start == timedelta(days=7)
+    saturday = next(
+        p for p in result.projection.periods if p.start.astimezone(LOCAL).weekday() == 5
+    )
+    monday = next(
+        p for p in result.projection.periods if p.start.astimezone(LOCAL).weekday() == 0
+    )
     assert saturday.kwh > monday.kwh
     assert sum(p.kwh for p in result.projection.periods) == pytest.approx(
         sum(p.kwh for p in result.hourly)
@@ -59,7 +66,10 @@ def test_forecast_seven_days_separates_weekday_and_weekend():
 
 
 def test_spring_and_autumn_dst_keep_contiguous_utc_quarters():
-    for at in (datetime(2026, 3, 28, 10, tzinfo=UTC), datetime(2026, 10, 24, 10, tzinfo=UTC)):
+    for at in (
+        datetime(2026, 3, 28, 10, tzinfo=UTC),
+        datetime(2026, 10, 24, 10, tzinfo=UTC),
+    ):
         model = train_load_model(history(at), at, "synthetic")
         periods = forecast_seven_days(model, at).projection.periods
         assert len(periods) == 672
@@ -75,15 +85,26 @@ def test_invalid_and_insufficient_history_never_become_zero():
     model = train_load_model(rows, now, "test")
     assert all(p.start < now for p in model.samples)
     with pytest.raises(PlanningInputError, match="load:duplicate_hour"):
-        train_load_model((*history(now, count=16), history(now, count=16)[0]), now, "test")
+        train_load_model(
+            (*history(now, count=16), history(now, count=16)[0]), now, "test"
+        )
 
 
 def test_energy_and_power_statistics_have_explicit_units_and_missing_gaps():
     at = datetime(2026, 10, 20, tzinfo=UTC)
-    row = {"start": at.timestamp(), "end": (at + timedelta(hours=1)).timestamp(), "mean": 1000.0, "change": 1.5}
+    row = {
+        "start": at.timestamp(),
+        "end": (at + timedelta(hours=1)).timestamp(),
+        "mean": 1000.0,
+        "change": 1.5,
+    }
     assert _convert_hour(row, "W") == 1.0
     assert _convert_hour(row, "kWh") == 1.5
     assert _convert_hour({"mean": None}, "W") is None
     assert _convert_hour({"change": -1}, "kWh") is None
-    assert _read_single({"sensor.a": [row]}, "sensor.a", "kWh", at + timedelta(hours=2)) == {at: 1.5}
-    assert _read_power_means({"sensor.a": [row]}, "sensor.a", "W", at + timedelta(hours=2)) == {at: 1000.0}
+    assert _read_single(
+        {"sensor.a": [row]}, "sensor.a", "kWh", at + timedelta(hours=2)
+    ) == {at: 1.5}
+    assert _read_power_means(
+        {"sensor.a": [row]}, "sensor.a", "W", at + timedelta(hours=2)
+    ) == {at: 1000.0}
