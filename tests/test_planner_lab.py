@@ -127,7 +127,6 @@ def test_hourly_limits():
 
 
 
-
 def test_spot_prices_exactly_match_historical_ha_buy_sell_readings():
     # HA source dated 2026-10-20, N1; prices may differ by 0.001
     # in raw HA due to source rounding.
@@ -162,7 +161,7 @@ def test_public_sample_home_profile_has_hourly_source_not_fictitious_constant():
 
     root = Path(__file__).resolve().parents[1]
     page = (root / "tools/planner_lab/index.html").read_text(encoding="utf-8")
-    profile = re.search(r"const OBSERVED_HOME_KW = \\[([0-9.,\\s]+)\\];", page)
+    profile = re.search(r"const OBSERVED_HOME_KW = \[([0-9.,\s]+)\];", page)
     assert profile
     samples = [float(x.strip()) for x in profile.group(1).split(",")]
     assert len(samples) == 24
