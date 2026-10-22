@@ -23,7 +23,8 @@
           "forecast_entry": "Forecast.Solar configuration entry (optional)",
           "solar_sell": "PV export permission switch (optional, read only)",
           "forecast_retention_days": "Forecast retention (days)",
-          "forecast_max_versions": "Maximum retained forecast versions"
+          "forecast_max_versions": "Maximum retained forecast versions",
+          "load_statistic": "Historical household load sensor (optional; W/kW or Wh/kWh/MWh long-term statistics)"
         }
       }
     },
@@ -60,7 +61,8 @@
           "forecast_entry": "Forecast.Solar configuration entry (optional)",
           "solar_sell": "PV export permission switch (optional, read only)",
           "forecast_retention_days": "Forecast retention (days)",
-          "forecast_max_versions": "Maximum retained forecast versions"
+          "forecast_max_versions": "Maximum retained forecast versions",
+          "load_statistic": "Historical household load sensor (optional)"
         },
         "description": "Choose dry_run to inspect experimental M3 planning preview. No inverter commands are sent."
       }
@@ -93,6 +95,9 @@
       },
       "modeled_saving": {
         "name": "Modeled saving"
+      },
+      "load_forecast_7d": {
+        "name": "7-day home energy forecast"
       }
     }
   }

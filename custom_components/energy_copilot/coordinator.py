@@ -28,7 +28,10 @@ from .live_measurements import (
     LiveSourceContext,
     derived_templates,
 )
+from .load_forecast import forecast_seven_days
+from .load_statistics import LoadStatisticsError, LoadStatisticsReader
 from .models import InputSnapshot, Issue
+from .planning_inputs import PlanningInputError
 from .planning_preview import Preview, evaluate_preview
 from .quality import quality_report
 from .solar import solar_evidence
@@ -65,6 +68,13 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self._archive_available = True
         self._forecast = None
         self._history = ()
+        self.load_statistics_reader = LoadStatisticsReader(
+            hass, self.entities, self.settings.get("load_statistic")
+        )
+        self.load_model = None
+        self.load_forecast = None
+        self.load_forecast_error = "load:awaiting_statistics"
+        self._last_load_training = None
         self._external_issues = []
         self._last_external = None
         self.forecast_coverage = None
@@ -211,6 +221,11 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                 )
             await self._async_forecast(now)
             await self._async_history(now)
+            if (
+                self._last_load_training is None
+                or now - self._last_load_training >= timedelta(hours=12)
+            ):
+                await self._async_train_load(now)
             self._last_external = now
         snapshot.forecast = self._forecast
         snapshot.history = self._history
@@ -258,12 +273,32 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         # Forecast.Solar may have completed after the initial coordinator tick.
         # Evaluate a snapshot only when its observation is already available.
         snapshot.at = dt_util.utcnow()
+        self.load_forecast = None
+        if self.load_model is not None:
+            try:
+                self.load_forecast = forecast_seven_days(self.load_model, snapshot.at)
+                self.load_forecast_error = None
+            except PlanningInputError as err:
+                self.load_forecast_error = err.code
         try:
-            self.planning_preview = evaluate_preview(
-                snapshot,
-                mode=self.settings.get("mode", "monitor"),
-                pv_export_enabled=solar_sell is not None and solar_sell.state == "on",
-            )
+            if (
+                self.settings.get("mode", "monitor") == "dry_run"
+                and self.load_forecast is None
+                and snapshot.forecast is not None
+            ):
+                self.planning_preview = Preview(
+                    "blocked", self.load_forecast_error or "load:forecast_missing"
+                )
+            else:
+                self.planning_preview = evaluate_preview(
+                    snapshot,
+                    mode=self.settings.get("mode", "monitor"),
+                    pv_export_enabled=solar_sell is not None
+                    and solar_sell.state == "on",
+                    load_projection=(
+                        self.load_forecast.projection if self.load_forecast else None
+                    ),
+                )
         except Exception:  # Preview must never interrupt reliable M1/M2 polling.
             _LOGGER.exception("M3 read-only preview failed")
             self.planning_preview = Preview("blocked", "planner:internal_error")
@@ -349,3 +384,17 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             "corrected_seconds", 0
         ):
             self._external_issues.append(Issue("negative_home_normalized", "recorder"))
+
+    async def _async_train_load(self, now):
+        """Refresh long-term statistics periodically, never on each 30s poll."""
+        self._last_load_training = now
+        try:
+            self.load_model = await self.load_statistics_reader.async_train(now)
+            self.load_forecast_error = None
+        except LoadStatisticsError as err:
+            self.load_model = None
+            self.load_forecast_error = err.code
+        except Exception:
+            _LOGGER.exception("Seven-day historical load training failed")
+            self.load_model = None
+            self.load_forecast_error = "load:statistics_internal_error"

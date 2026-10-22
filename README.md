@@ -1,6 +1,6 @@
 # Energy Co-Pilot
 
-Natywna integracja Home Assistant `custom_components/energy_copilot`. **Aktualne wydanie: [v0.1.10](https://github.com/duckerdk/energy-copilot/releases/tag/v0.1.10).** Obecny zakres: **M1/M2** (pomiary, ceny, prognozy, Recorder, diagnostyka) i eksperymentalny **M3 `dry_run`** (teoretyczne porównanie scenariuszy ładowania/rozładowania). Integracja jest **wyłącznie do odczytu**, bez sterowania falownikiem, bez potwierdzonego planu sześciu TOU i bez wiarygodnej deklaracji rzeczywistych oszczędności.
+Natywna integracja Home Assistant `custom_components/energy_copilot`. **Wersja na gałęzi zmian: v1.11.0 (HACS po opublikowaniu tagu i GitHub Release).** Poprzednie wydanie: [v0.1.10](https://github.com/duckerdk/energy-copilot/releases/tag/v0.1.10). Obecny zakres: **M1/M2** (pomiary, ceny, prognozy, Recorder, diagnostyka) i eksperymentalny **M3 `dry_run`** (teoretyczne porównanie scenariuszy ładowania/rozładowania). Integracja jest **wyłącznie do odczytu**, bez sterowania falownikiem, bez potwierdzonego planu sześciu TOU i bez wiarygodnej deklaracji rzeczywistych oszczędności.
 
 Celem docelowego rozwiązania jest minimalizacja całkowitego kosztu energii w horyzoncie opublikowanych cen, z uwzględnieniem SOC, sprawności i degradacji baterii. Zatwierdzone reguły i uprawnienia opisuje wyłącznie [REQUIREMENTS.md](requirements/REQUIREMENTS.md).
 
@@ -21,7 +21,7 @@ Alternatywą jest ręczne skopiowanie katalogu `custom_components/energy_copilot
 3. `sensor.energy_co_pilot_modeled_saving` pokazuje wyłącznie hipotetyczną różnicę DKK między scenariuszem bez cykli baterii i najlepiej ocenionym **ograniczonym** scenariuszem pojedynczego cyklu z sieci; nie jest to oszczędność potwierdzona, wynik globalnego solvera ani realna konfiguracja TOU. Przy `blocked` jego wartość jest `unknown`.
 4. Pobierz standardową diagnostykę integracji: `planning_preview` zawiera kod blokady, zakres czasu, liczbę kwadransów, kompletność i podsumowanie wariantów — bez szczegółowej prywatnej historii domu.
 
-**Rygory i ograniczenia testu v0.1.9:** kompletne kwadranse Recorder nadal są wymagane; brakująca prognoza PV (również nocna) nie jest zastępowana zerem. W `dry_run` dłuższe lub nieregularne przedziały energii Forecast.Solar przeliczane są na kwadranse **jawnym, niezweryfikowanym modelem stałej mocy w ramach oryginalnego okresu**: całkowite kWh okresu pozostaje zachowane, a części już minionej nie liczy się ponownie jako energii przyszłej. Nie jest to zweryfikowany profil 15-minutowy ani prognoza fizyczna. Atrybuty `pv_temporal_model` i `pv_temporal_modeled_quarters` pokazują zakres użycia modelu. Luka lub nałożenie się okresów nadal blokuje; brak kompletnej historii zużycia może zakończyć horyzont jako `partial`. Możliwe jest krótsze, jawnie oznaczone `partial` preview. Historia zużycia z poprzednich 24 h UTC jest tylko niezweryfikowanym wzorcem. W v0.1.10 wyłącznie prognoza w `dry_run` może modelować **krótkie luki do 3 kolejnych kwadransów** na podstawie dwóch sąsiednich, w pełni poprawnych kwadransów poprzedniej doby; wykorzystuje interpolację liniową, oznacza wynik `load_model=previous_24h_utc_linear_bracketed_gap_model_unverified` i `load_modeled_quarters`. Dane Recorder, ich jakość i luki pozostają bez zmian. Brak punktów brzegowych lub dłuższa awaria nadal blokują albo skracają podgląd; łączny modelowany koszt nie jest wartością potwierdzoną. Model stosuje prowizoryczne, niekalibrowane wartości: sprawność 0,95 każdej ścieżki, mnożnik PV Forecast.Solar→DC = 1,0, nominalna pojemność baterii 10,24 kWh oraz napięcie bieżące (lub nominalne 51,2 V, gdy brak opcjonalnego czujnika). Warianty mają końcowy SOC równy początkowemu, więc nie zakłada się arbitralnej wartości końcowej baterii. Nie interpretować liczb jako rekomendacji wykonawczej; sześć TOU, kalibracja DC/AC i rzeczywisty Deye baseline pozostają do zrobienia. M3 **nie wykonuje żadnych usług zapisu HA** i nie zmienia oceny `Input quality`.
+**Rygory i ograniczenia testu v0.1.9:** kompletne kwadranse Recorder nadal są wymagane; brakująca prognoza PV (również nocna) nie jest zastępowana zerem. W `dry_run` dłuższe lub nieregularne przedziały energii Forecast.Solar przeliczane są na kwadranse **jawnym, niezweryfikowanym modelem stałej mocy w ramach oryginalnego okresu**: całkowite kWh okresu pozostaje zachowane, a części już minionej nie liczy się ponownie jako energii przyszłej. Nie jest to zweryfikowany profil 15-minutowy ani prognoza fizyczna. Atrybuty `pv_temporal_model` i `pv_temporal_modeled_quarters` pokazują zakres użycia modelu. Luka lub nałożenie się okresów nadal blokuje; brak kompletnej historii zużycia może zakończyć horyzont jako `partial`. Możliwe jest krótsze, jawnie oznaczone `partial` preview. Wersje do v0.1.10 powtarzały poprzednie 24 h UTC; od v1.11.0 aktywny dry_run używa prognozy historycznej 7 dni. W v0.1.10 wyłącznie prognoza w `dry_run` może modelować **krótkie luki do 3 kolejnych kwadransów** na podstawie dwóch sąsiednich, w pełni poprawnych kwadransów poprzedniej doby; wykorzystuje interpolację liniową, oznacza wynik `load_model=previous_24h_utc_linear_bracketed_gap_model_unverified` i `load_modeled_quarters`. Dane Recorder, ich jakość i luki pozostają bez zmian. Brak punktów brzegowych lub dłuższa awaria nadal blokują albo skracają podgląd; łączny modelowany koszt nie jest wartością potwierdzoną. Model stosuje prowizoryczne, niekalibrowane wartości: sprawność 0,95 każdej ścieżki, mnożnik PV Forecast.Solar→DC = 1,0, nominalna pojemność baterii 10,24 kWh oraz napięcie bieżące (lub nominalne 51,2 V, gdy brak opcjonalnego czujnika). Warianty mają końcowy SOC równy początkowemu, więc nie zakłada się arbitralnej wartości końcowej baterii. Nie interpretować liczb jako rekomendacji wykonawczej; sześć TOU, kalibracja DC/AC i rzeczywisty Deye baseline pozostają do zrobienia. M3 **nie wykonuje żadnych usług zapisu HA** i nie zmienia oceny `Input quality`.
 
 ## Źródła i zasady bieżących danych
 
@@ -48,6 +48,38 @@ Dokładne mapowanie, ograniczenia i potwierdzone formaty HA: [HA_CONTRACT.md](re
 - **Prywatność**: standardowy eksport diagnostyki zawiera agregaty jakości i korekt, nie szereg prywatnych próbek mocy domu ani szczegółowe zdarzenia audytu.
 
 Sensor **Input quality** ocenia wymagane **bieżące** dane: `valid` (brak obecnych problemów blokujących i niepewności), `uncertain` (akceptowane wejścia z istotną niepewnością), `degraded` (nieważne wymagane wejście). Kwestie historyczne i Forecast.Solar są widoczne oddzielnie; `valid` **nie** potwierdza poprawności fizycznego bilansu AC/DC ani gotowości planera. W trybie `monitor` status planowania pozostaje `not_evaluated_m2`; w `dry_run` diagnostyka rozróżnia `m3_preview_blocked` i `experimental_m3_preview_only`. Żaden z tych stanów nie oznacza możliwości sterowania falownikiem.
+
+## Prognoza zużycia na 7 dni — v1.11.0
+
+Model odczytuje **godzinowe statystyki długoterminowe HA** (do 365 dni) co 12 godzin; nie skanuje całego roku surowych stanów. Wyznacza prognozę dla **672 kolejnych kwadransów**. Korzysta z profilu dnia tygodnia, dnia roboczego/wolnego, duńskich świąt i odpornej na anomalie mediany ważonej (nowsze próbki mają większą wagę). Klasyfikacja czasu używa Europe/Copenhagen, w tym zmian DST. Energia prognozowanej godziny dzielona jest równomiernie na kwadranse — to niezweryfikowane założenie.
+
+Źródło: opcjonalny sensor **Historical household load sensor** w opcjach integracji (`load_statistic`), a bez niego `sensor.home_energy_consumption`, jeżeli ma statystyki długoterminowe. Może to być statystyka mocy W/kW (`mean`) lub całkowitej energii domu Wh/kWh/MWh (`change`). W razie braku niezależnej statystyki model może użyć godzinowych średnich `pv_sum + grid + battery`; ten bilans DC/AC jest **niezweryfikowany fizycznie**. Nie wybieraj licznika importu z sieci jako całkowitego zużycia domu. Zrzut wykresu HA sam w sobie nie potwierdza, które statystyki nadają się do modelu. Brak poprawnej statystyki nie jest zastępowany zerem; minimalna historia to 96 godzin z 7 różnych dni.
+
+Encja `sensor.energy_co_pilot_7_day_home_energy_forecast` (faktyczną nazwę sprawdź w HA) ma stan **sumy kWh najbliższych 7 dni** oraz atrybuty `hourly` (czas UTC i kWh w godzinie), `daily` (dni lokalne), `source`, `training_hours`, `training_days` i `reason` przy braku prognozy. Nie jest to prognoza zweryfikowana na rzeczywistym HA. Gdy statystyk brak, `dry_run` jest blokowany zamiast po cichu powtarzać wczoraj.
+
+### Wykres 7 dni w Home Assistant
+
+Zainstaluj osobno przez HACS (Frontend) [ApexCharts Card](https://github.com/RomRider/apexcharts-card). Dodaj ręczną kartę dashboardu i wklej YAML, zmieniając `entity` na faktyczny identyfikator:
+
+```yaml
+type: custom:apexcharts-card
+graph_span: 7d
+span:
+  start: hour
+header:
+  show: true
+  title: Prognoza zużycia na 7 dni
+series:
+  - entity: sensor.energy_co_pilot_7_day_home_energy_forecast
+    name: Zużycie (kWh/h)
+    type: column
+    data_generator: |
+      return (entity.attributes.hourly || []).map(p => [
+        new Date(p.start).getTime(), p.kwh
+      ]);
+```
+
+Karta ApexCharts nie jest częścią samej integracji Energy Co-Pilot. Prognoza 7 dni nie oznacza, że dostępne są ceny energii i PV na 7 dni — podgląd optymalizacji nadal działa tylko w horyzoncie rzeczywiście opublikowanych danych. Test historyczny walk-forward i potwierdzenie kalibracji źródeł pozostają wymagane.
 
 ## Dokumentacja projektu
 

@@ -4,6 +4,10 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
+from custom_components.energy_copilot.load_forecast import (
+    HourlyLoad,
+    train_load_model,
+)
 from custom_components.energy_copilot.models import (
     ForecastPeriod,
     ForecastSnapshot,
@@ -18,6 +22,15 @@ from custom_components.energy_copilot.planning_preview import evaluate_preview
 BASE = datetime(2026, 10, 21, 10, tzinfo=UTC)
 STEP = timedelta(minutes=15)
 DAY = timedelta(days=1)
+
+
+def install_hourly_model(coordinator, now):
+    """Supply a trained model for coordinator tests without a real HA database."""
+    end = now.replace(minute=0, second=0, microsecond=0)
+    start = end - timedelta(days=20)
+    rows = tuple(HourlyLoad(start + i * timedelta(hours=1), 0.5) for i in range(480))
+    coordinator.load_model = train_load_model(rows, end, "fixture")
+    coordinator.load_forecast_error = None
 
 
 def snapshot(*, hours=2, pv=0.0, soc=50.0, voltage=51.2):
@@ -273,6 +286,7 @@ async def test_ha_diagnostics_labels_unverified_pv_resolution_and_no_commands(
         for i in range(8)
     )
     coordinator._last_external = NOW
+    install_hourly_model(coordinator, NOW)
     with patch(
         "homeassistant.core.ServiceRegistry.async_call",
         side_effect=AssertionError("no HA service permitted during preview"),
@@ -283,12 +297,12 @@ async def test_ha_diagnostics_labels_unverified_pv_resolution_and_no_commands(
     assert state.state == "preview"
     assert state.attributes["pv_temporal_model"] == "uniform_power_unverified"
     assert state.attributes["pv_temporal_modeled_quarters"] > 0
-    assert state.attributes["load_modeled_quarters"] == 1
+    assert state.attributes["load_modeled_quarters"] == 0
     assert state.attributes["executable"] is False
     diag = await async_get_config_entry_diagnostics(hass, entry)
     assert diag["planning_preview"]["pv_temporal_model"] == "uniform_power_unverified"
     assert diag["planning_preview"]["pv_temporal_modeled_quarters"] > 0
-    assert diag["planning_preview"]["load_modeled_quarters"] == 1
+    assert diag["planning_preview"]["load_modeled_quarters"] == 0
     assert diag["read_only"] is True
 
 
@@ -373,6 +387,7 @@ async def test_ha_dry_run_with_real_coordinator_snapshot_renders_model_result(
         for q in forecast
     )
     coordinator._last_external = NOW
+    install_hourly_model(coordinator, NOW)
 
     with patch(
         "homeassistant.core.ServiceRegistry.async_call",
@@ -396,6 +411,9 @@ async def test_preview_exception_does_not_turn_m2_input_quality_unavailable(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     coordinator = entry.runtime_data.coordinator
+    from .conftest import NOW
+
+    install_hourly_model(coordinator, NOW)
     with patch(
         "custom_components.energy_copilot.coordinator.evaluate_preview",
         side_effect=RuntimeError("broken experimental optimizer"),
