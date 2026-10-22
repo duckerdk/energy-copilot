@@ -1,0 +1,56 @@
+name: Publish versioned HACS release from main
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - custom_components/energy_copilot/manifest.json
+      - .github/workflows/publish-main.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-main-version
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+      - run: pip install -r requirements-test.txt
+      - run: ruff check custom_components tests scripts/build_release.py
+      - run: ruff format --check custom_components tests scripts/build_release.py
+      - run: pytest --cov=custom_components.energy_copilot --cov-report=term-missing
+      - run: python scripts/check_docs.py
+      - name: Tag, verify and publish only an unissued version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          VERSION=$(python -c 'import json;print(json.load(open("custom_components/energy_copilot/manifest.json"))["version"])')
+          TAG="v$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Already released: $TAG"
+            exit 0
+          fi
+          if git ls-remote --exit-code origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists without a published release; refusing to overwrite."
+            exit 1
+          fi
+          git tag "$TAG" "$RELEASE_COMMIT"
+          git push origin "$TAG"
+          python scripts/build_release.py --tag "$TAG" --commit "$RELEASE_COMMIT" --output /tmp/energy-copilot-release
+          gh release create "$TAG" \
+            /tmp/energy-copilot-release/energy_copilot.zip \
+            /tmp/energy-copilot-release/SHA256SUMS \
+            /tmp/energy-copilot-release/BUILD_INFO.json \
+            --verify-tag --generate-notes --title "Energy Co-Pilot $TAG"
