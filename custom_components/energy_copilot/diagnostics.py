@@ -52,7 +52,21 @@ async def async_get_config_entry_diagnostics(hass, entry):
     forecast_first = forecast_periods[0].start.isoformat() if forecast_periods else None
     forecast_last = forecast_periods[-1].end.isoformat() if forecast_periods else None
     preview = coordinator.planning_preview
+    load_forecast = coordinator.load_forecast
     return {
+        "load_forecast": {
+            "status": "ready" if load_forecast else "unavailable",
+            "reason": coordinator.load_forecast_error,
+            "forecast_quarters": len(load_forecast.projection.periods)
+            if load_forecast else 0,
+            "training_hours": load_forecast.training_hours if load_forecast else 0,
+            "training_days": load_forecast.training_days if load_forecast else 0,
+            "method": load_forecast.projection.method if load_forecast else None,
+            "historical_source_is_derived": bool(
+                load_forecast and load_forecast.source.startswith("derived_")
+            ),
+            "physical_accuracy_verified": False,
+        },
         "planning_preview": {
             "status": preview.status,
             "reason": preview.reason,
