@@ -68,7 +68,7 @@ tbody tr:nth-child(2n){background:#1b2938}
       <option value="cheap_peak">Tania noc, drogi wieczór</option>
       <option value="solar">Słoneczny dzień i miejsce na PV</option>
       <option value="cloudy">Pochmurne 48 godzin</option>
-      <option value="flat">Jednakowe ceny – bez arbitrażu</option>
+      <option value="flat">Stała cena spot – zmienne taryfy</option>
       <option value="expensive_first">Wysokie ceny na początku</option>
     </select></label>
     <label class="field">Długość horyzontu<select id="duration"><option value="24">24 godziny</option><option value="48" selected>48 godzin</option><option value="72">72 godziny</option></select></label>
@@ -102,7 +102,7 @@ tbody tr:nth-child(2n){background:#1b2938}
   <div class="panel"><div class="chart-title"><h2>Decyzje planera — godzina po godzinie</h2>
     <button id="export-results">Eksport wyników CSV (kwadranse)</button></div>
     <div class="table-wrap"><table><thead><tr>
-      <th>Czas (DK)</th><th>Cena</th><th>PV kW</th><th>Dom kW</th><th>Decyzja</th>
+      <th>Czas (DK)</th><th>Spot</th><th>Zakup</th><th>Sprzedaż</th><th>PV kW</th><th>Dom kW</th><th>Decyzja</th>
       <th>Sieć→bat. AC</th><th>PV→bat. DC</th><th>Bat.→dom DC</th><th>SOC końcowy</th><th>Import sieci</th><th>PV ograniczona</th>
     </tr></thead><tbody id="result-rows"></tbody></table></div>
     <div class="plain">Na życzenie możesz także zbadać pojedyncze kwadranse: CSV wynikowe zawiera dla każdego z nich przepływy, SOC, koszty i tryb pracy. Zmienianie ceny albo PV w tabeli wejściowej nie uruchamia automatyki — użyj „Oblicz plan”.</div>
@@ -119,17 +119,28 @@ tbody tr:nth-child(2n){background:#1b2938}
       <input id="json-file" type="file" accept=".json,application/json">
     </div>
   </div>
-  <p class="muted" style="font-size:12px;margin-top:0">Wpisz cenę zakupu, cenę sprzedaży, moc PV (DC) i zużycie domu (AC) osobno dla każdej godziny. Wprowadź przecinek lub kropkę jako separator dziesiętny.</p>
+  <p class="muted" style="font-size:12px;margin-top:0">Wpisz jedną cenę spot (DKK/kWh), produkcję PV (kW DC) i zużycie domu (kW AC). Ceny zakupu i sprzedaży są wyliczane automatycznie z potwierdzonych taryf N1 z eksportu HA 20.10.2026. Domyślne zużycie to profil godzinowy odtworzony z historii 19–20.10.2026 (24 godziny, powtarzane dla dłuższych scenariuszy). Możesz zmienić każdą godzinę.</p>
   <div class="table-wrap">
-    <table class="hour-table"><thead><tr><th>Godzina (DK)</th><th>Kupno DKK/kWh</th><th>Sprzedaż DKK/kWh</th><th>PV kW DC</th><th>Dom kW AC</th></tr></thead><tbody id="input-rows"></tbody></table>
+    <table class="hour-table"><thead><tr><th>Godzina (DK)</th><th>Spot DKK/kWh</th><th>PV kW DC</th><th>Dom kW AC</th></tr></thead><tbody id="input-rows"></tbody></table>
   </div>
-  <div class="plain">CSV: kolumny buy;sell;pv_kw;home_kw, z nagłówkiem lub bez. Jednostki PV i domu to średnia moc kW w danej godzinie, nie suma kWh. Dla dziennych cen godzinowych odpowiada to sposobowi wejścia obecnego M3. Obsługiwane są horyzonty 1–72 h. Plik scenariusza JSON zawiera również ustawienia baterii.</div>
+  <div class="plain">CSV: kolumny spot;pv_kw;home_kw, z nagłówkiem lub bez. Jednostki PV i domu to średnia moc kW w danej godzinie, nie suma kWh. Dla dziennych cen godzinowych odpowiada to sposobowi wejścia obecnego M3. Obsługiwane są horyzonty 1–72 h. Plik scenariusza JSON zawiera również ustawienia baterii.</div>
 </section>
 
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
-const keys = ["buy","sell","pv_kw","home_kw"];
+const keys = ["spot","pv_kw","home_kw"];
+// Historical hourly mean consumption of sensor.home_energy_consumption (kW),
+// reconstructed from actual HA recorder states 19 Oct 14:00 to 20 Oct 14:00 CEST.
+// Mapping: 00–23 Europe/Copenhagen. This is one observed day repeated, NOT
+// seven-day modeled demand or an invented generic household profile.
+// Profile total = ~27.516 kWh / 24h, measurement-derived W clipped >= 0.
+const OBSERVED_HOME_KW = [
+  0.6745,0.5872,0.6039,0.6288,0.6688,0.6088,
+  0.5722,0.8059,0.7076,0.7994,0.7056,2.2491,
+  1.2623,4.8447,3.1200,1.2038,1.0302,1.8555,
+  0.7654,0.7710,0.6379,0.7116,0.9676,0.7338
+];
 const label = {charge_grid:"Ładowanie z sieci",charge_pv:"Ładowanie PV",discharge:"Rozładowanie",hold:"Bez cyklu"};
 let rows = [], latest = null;
 const nfmt = (v,n=2) => Number(v).toLocaleString("pl-PL",{minimumFractionDigits:n,maximumFractionDigits:n});
@@ -151,28 +162,37 @@ function starter(){
 function makePreset(){
   const type=$("preset").value,count=Number($("duration").value);
   const newRows=[];
+  const base=Date.parse($("start").value);
+  const formatter=new Intl.DateTimeFormat("en-GB",{
+    timeZone:"Europe/Copenhagen",hour:"2-digit",hourCycle:"h23"
+  });
   for(let i=0;i<count;i++){
-    const localHour=Number(new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Copenhagen",hour:"2-digit",hourCycle:"h23"}).format(new Date(Date.parse($("start").value)+i*3600000)));
+    const localHour=Number(formatter.format(new Date(base+i*3600000)));
     const daylight=localHour>=7&&localHour<=15;
     const pvShape=daylight?Math.max(0,Math.sin(Math.PI*(localHour-6)/11)):0;
-    let buy=1.35,pv=0,home=.58;
+    let spot=1.15,pv=0;
     if(type==="cheap_peak"){
-      buy=localHour<6?.65:localHour>=16&&localHour<21?2.7:1.2;
-      pv=.8*pvShape;home=localHour>=16&&localHour<22?1.0:.55;
+      spot=localHour<6?.35:localHour>=16&&localHour<21?2.4:.85;
+      pv=.8*pvShape;
     }else if(type==="solar"){
-      buy=localHour<6?.85:localHour>=17&&localHour<21?2.4:1.15;
-      pv=5.4*pvShape;home=localHour>=18&&localHour<22?1.1:.48;
+      spot=localHour<6?.55:localHour>=17&&localHour<21?2.0:.85;
+      pv=5.4*pvShape;
     }else if(type==="cloudy"){
-      buy=localHour<6?.75:localHour>=17&&localHour<22?2.5:1.35;
-      pv=.18*pvShape;home=.8;
+      spot=localHour<6?.45:localHour>=17&&localHour<22?2.1:.95;
+      pv=.18*pvShape;
     }else if(type==="flat"){
-      buy=1.5;pv=0;home=.65;
+      spot=1.1;pv=0;
     }else if(type==="expensive_first"){
-      buy=i<8?2.9:i<24?.8:1.5;pv=.2*pvShape;home=.7;
+      spot=i<8?2.55:i<24?.5:1.2;pv=.2*pvShape;
     }
-    newRows.push({buy:Number(buy.toFixed(3)),sell:.35,pv_kw:Number(pv.toFixed(3)),home_kw:home});
+    newRows.push({
+      spot:Number(spot.toFixed(3)),
+      pv_kw:Number(pv.toFixed(3)),
+      home_kw:OBSERVED_HOME_KW[localHour]
+    });
   }
-  rows=newRows;renderInputs();latest=null;$("output").hidden=true;setStatus("Przykład wczytany. Możesz edytować dowolną godzinę.");
+  rows=newRows;renderInputs();latest=null;$("output").hidden=true;
+  setStatus("Wczytano scenariusz i godzinowy profil rzeczywistego zużycia domu.");
 }
 function renderInputs(){
   const tbody=$("input-rows");tbody.replaceChildren();
@@ -282,7 +302,7 @@ function renderOutput(data){
   $("result-rows").replaceChildren();
   data.hourly.forEach(d=>{
     const tr=document.createElement("tr");
-    [local(d.start_utc),nfmt(d.buy,3),nfmt(d.pv_kw),nfmt(d.home_kw)].forEach(v=>{
+    [local(d.start_utc),nfmt(d.spot,3),nfmt(d.buy,3),nfmt(d.sell,3),nfmt(d.pv_kw),nfmt(d.home_kw)].forEach(v=>{
       const td=document.createElement("td");td.textContent=v;tr.append(td);
     });
     const status=document.createElement("td");const b=document.createElement("span");b.className="mode "+d.mode;
@@ -354,7 +374,7 @@ function download(name,text,type="text/plain"){
 }
 function csvInput(){
   syncInputs();
-  return "buy;sell;pv_kw;home_kw\n"+rows.map(r=>keys.map(k=>r[k]).join(";")).join("\n")+"\n";
+  return "spot;pv_kw;home_kw\n"+rows.map(r=>keys.map(k=>r[k]).join(";")).join("\n")+"\n";
 }
 async function readFile(input){
   const file=input.files?.[0];input.value="";return file?await file.text():null;
@@ -372,11 +392,11 @@ $("file").addEventListener("change",async e=>{
   if(text===null)return;
   try{
     const lines=text.trim().split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-    if(lines[0].toLowerCase().startsWith("buy;"))lines.shift();
+    if(lines[0].toLowerCase().startsWith("spot;"))lines.shift();
     if(!lines.length||lines.length>72)throw Error("CSV: dozwolone 1–72 godziny");
     const imported=lines.map((line,i)=>{
       const parts=line.split(";").map(num);
-      if(parts.length!==4||parts.some(v=>!Number.isFinite(v)))throw Error("CSV: błędny wiersz "+(i+1));
+      if(parts.length!==3||parts.some(v=>!Number.isFinite(v)))throw Error("CSV: błędny wiersz "+(i+1));
       return Object.fromEntries(keys.map((key,j)=>[key,parts[j]]));
     });
     rows=imported;$("duration").value=String([24,48,72].includes(rows.length)?rows.length:24);
@@ -391,7 +411,11 @@ $("json-file").addEventListener("change",async e=>{
     $("start").value=d.start_utc;
     [["soc","initial_soc_pct"],["capacity","battery_capacity_kwh"],["voltage","battery_voltage_v"],["charge","charge_limit_a"],["grid","grid_charge_limit_a"],["discharge","discharge_limit_a"],["eta","efficiency"]].forEach(([id,key])=>{if(d[key]!==undefined)$(id).value=d[key];});
     $("export").checked=!!d.pv_export_enabled;
-    rows=d.hours.map(r=>Object.fromEntries(keys.map(key=>[key,r[key]])));
+    rows=d.hours.map(r=>({
+      spot:r.spot===undefined?r.sell:r.spot,
+      pv_kw:r.pv_kw,
+      home_kw:r.home_kw
+    }));
     renderInputs();latest=null;$("output").hidden=true;setStatus("Scenariusz JSON wczytany.");
   }catch(err){setStatus(String(err.message),true);}
 });
