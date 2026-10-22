@@ -299,7 +299,9 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                         pv_export_enabled=solar_sell is not None
                         and solar_sell.state == "on",
                         load_projection=(
-                            self.load_forecast.projection if self.load_forecast else None
+                            self.load_forecast.projection
+                            if self.load_forecast
+                            else None
                         ),
                     )
                 )
