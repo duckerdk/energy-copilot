@@ -10,7 +10,11 @@ from custom_components.energy_copilot.load_forecast import (
     backtest_recent_load,
     train_load_model,
 )
-from custom_components.energy_copilot.models import ForecastPeriod, ForecastSnapshot, Sample
+from custom_components.energy_copilot.models import (
+    ForecastPeriod,
+    ForecastSnapshot,
+    Sample,
+)
 from custom_components.energy_copilot.planning_inputs import LoadProjection
 
 
