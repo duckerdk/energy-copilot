@@ -70,3 +70,12 @@ Wartość końcowej energii nie jest zerowana: jako **ostrożny, niezweryfikowan
 Wybrana 15-minutowa dyspozycja jest **ponownie niezależnie weryfikowana** przez istniejący symulator `simulate_candidate`. W HA widoczny jest godzinowy agregat planu (przewidywany SOC, zakup energii, energia PV, ładowanie sieciowe i PV, rozładowanie i eksport). Wariant bazowy nadal nie odtwarza rzeczywistych TOU falownika, dlatego `modeled_saving_dkk` pozostaje porównaniem do **teoretycznego braku cykli baterii**, a nie osiągalną oszczędnością. `tou_feasibility=not_evaluated`, `executable=False`. Konwersja planu na rzeczywistych sześć okien TOU, walidacja BMS i prawdziwy baseline Deye wymagają dalszego wdrożenia.
 
 Brak prognozy PV lub opublikowanego okresu pozostaje jawną luką. Program nie wpisuje arbitralnego zera dla nieopublikowanej nocnej energii Forecast.Solar; plan może mieć `partial` horyzont krótszy niż horyzont cen. To ograniczenie wymaga osobnego, potwierdzonego źródła nocnego PV, nie cichej ekstrapolacji.
+
+
+## M3 v1.13.0 — ciągły plan fizyczny, sterowanie przez parametry
+
+Domyślny `optimize_horizon` wykonuje całohoryzontową optymalizację ciągłych przepływów energii bez kroku SOC 0,10 kWh. Wariant dyskretny to tylko porównawczy benchmark. Walidacja `simulate_candidate` nadal niezależnie sprawdza SOC, prądy, bilanse, brak równoczesnych przeciwnych przepływów oraz wyłącznie PV do eksportu. Nie jest to wykonywalna translacja na sześć okien TOU.
+
+Przy niezmienionym `Load First` i eksporcie baterii OFF, fizyczną sprzedaż nadwyżki PV realizuje falownik. Planer nie zadaje eksportowanej mocy. Dobiera prąd ładowania i przyszły stan Solar Sell zależny od opublikowanej ceny sprzedaży (próg ≥0,40), a przewidywany eksport jako przepływ wynikowy. Zgodnie z potwierdzeniem użytkownika falownik realizuje zadane wartości prądu ładowania. Nie zmieniać `Load First`, polityki eksportu baterii ani funkcji TOU podczas tej aktualizacji.
+
+Dla niedostępnych jeszcze cen następnego dnia wartość końcowa nie jest równa zero: zapotrzebowanie po końcu cen do następnej prognozowanej produkcji PV pozwala dobrać **oznaczony jako niezweryfikowany** wskaźnik cen z godzin opublikowanych, a nie dopisane fikcyjne ceny. Zmienna nie jest sztywnym docelowym SOC. Godzinowy plan ujawnia ceny zakupu/sprzedaży, eksport, prąd, koszty zakupu i wpływy ze sprzedaży, a diagnostyka pokazuje statystyczne błędy prognoz bez sugerowania kalibracji fizycznej.
