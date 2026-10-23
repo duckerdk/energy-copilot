@@ -1,7 +1,7 @@
 """Solar geometry from the selected HA Forecast.Solar location; no provider API."""
 
 from dataclasses import replace
-from datetime import UTC, datetime, time, timedelta
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from .models import ForecastPeriod
