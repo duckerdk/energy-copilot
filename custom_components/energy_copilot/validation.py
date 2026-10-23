@@ -340,6 +340,13 @@ def forecast(response, captured_at):
             t for t, value in values.items() if t == boundaries[0] and value != 0
         ),
         missing_energy_at=tuple(t for t in boundaries[1:] if t not in values),
+        first_watts_zero=(
+            number(watts[next(t for t in watts if utc(t) == boundaries[0])]) == 0
+            and values.get(boundaries[0], 0) == 0
+        ),
+        last_watts_zero=(
+            number(watts[next(t for t in watts if utc(t) == boundaries[-1])]) == 0
+        ),
     )
 
 
