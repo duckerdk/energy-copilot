@@ -115,6 +115,18 @@ def optimize_continuous(plant, quarters, *, terminal_value_override=None):
         )
         max_charge = plant.battery_voltage_v * plant.charge_limit_a / 4000.0
         max_grid = plant.battery_voltage_v * plant.grid_charge_limit_a / 4000.0
+        # Unusually high feed-in prices can incentivize buying grid AC while
+        # simultaneously exporting the remaining PV. Deye has a single net
+        # connection and cannot execute both opposite flows in a quarter.
+        # In that condition restrict grid charging, leaving PV storage
+        # and automatic PV-only export available.
+        grid_charge_price_dc = q.buy_dkk_per_kwh / plant.eta_grid_to_battery
+        if (
+            pv_export_allowed
+            and surplus > 1e-8
+            and pv_charge_cost >= grid_charge_price_dc - 1e-10
+        ):
+            max_grid = 0.0
         max_discharge = plant.battery_voltage_v * plant.discharge_limit_a / 4000.0
         # SOC gate limits carried + newly charged energy, not merely carry.
         add_edge(before(i), after(i), usable, 0.0)
