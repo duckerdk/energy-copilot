@@ -91,6 +91,31 @@ def test_cost_preview_uses_actual_prices_without_forcing_final_soc():
     assert preview.executable is False
 
 
+def test_solar_sell_is_planned_from_each_future_sell_price_not_current_switch():
+    s = snapshot(hours=2, pv=0.6, soc=100)
+    s.prices = (
+        PriceSlot(BASE, BASE + timedelta(hours=1), 0.10, 0.60),
+        PriceSlot(
+            BASE + timedelta(hours=1),
+            BASE + timedelta(hours=2),
+            1.40,
+            0.20,
+        ),
+    )
+    result = evaluate_preview(s, mode="dry_run", pv_export_enabled=True)
+    assert result.status == "preview"
+    assert result.hourly_plan[0]["solar_sell_planned_on"] is True
+    assert result.hourly_plan[1]["solar_sell_planned_on"] is False
+    assert result.hourly_plan[0]["sell_price_dkk_kwh"] == 0.60
+    assert result.hourly_plan[1]["sell_price_dkk_kwh"] == 0.20
+    assert result.hourly_plan[0]["grid_export_kwh"] > 0
+    assert result.hourly_plan[1]["grid_export_kwh"] == 0
+    assert result.sales_revenue_dkk > 0
+    assert result.purchase_cost_dkk >= 0
+    assert result.hourly_plan[0]["charge_current_setpoint_a"] <= 50
+    assert result.executable is False
+
+
 def test_dry_run_zero_battery_headroom_stays_computable_with_no_charge():
     result = evaluate_preview(snapshot(soc=100), mode="dry_run")
     assert result.status == "preview"
