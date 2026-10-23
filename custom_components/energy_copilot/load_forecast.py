@@ -211,13 +211,9 @@ def backtest_recent_load(model: LoadModel, days: int = 7) -> dict:
     """
     cutoff = model.trained_at - timedelta(days=days)
     train = tuple(
-        row for row in model.samples
-        if row.start + timedelta(hours=1) <= cutoff
+        row for row in model.samples if row.start + timedelta(hours=1) <= cutoff
     )
-    test = tuple(
-        row for row in model.samples
-        if cutoff <= row.start < model.trained_at
-    )
+    test = tuple(row for row in model.samples if cutoff <= row.start < model.trained_at)
     result = {
         "method": "holdout_previous_7_days_train_only_older_data",
         "source": model.source,
