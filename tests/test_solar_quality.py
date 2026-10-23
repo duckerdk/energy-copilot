@@ -266,10 +266,15 @@ async def test_native_lifecycle_exposes_night_quality_without_replacing_forecast
     first = entry.runtime_data.coordinator
     diagnostic = await async_get_config_entry_diagnostics(hass, entry)
     coverage = diagnostic["observed"]["forecast_coverage"]
-    assert coverage["unpublished_night_seconds"] > 5 * 3600
-    assert coverage["unresolved_forecast_seconds"] > 0
+    # The sunset 0 W and selected solar geometry now explain the missing
+    # night, without changing the original archived 0.009 kWh sunset interval.
+    assert coverage["night_zero_filled_seconds"] > 5 * 3600
+    assert coverage["unpublished_night_seconds"] == 0
     assert coverage["solar_evidence"]["available"]
-    assert diagnostic["quality"]["categories"]["blocking"] >= 1
+    assert coverage["solar_evidence"]["zero_energy_inserted"] is True
+    assert diagnostic["observed"]["forecast_raw_last_end_utc"] == (
+        first._forecast.source_end.isoformat()
+    )
     assert diagnostic["quality"]["categories"]["historical"] >= 1
     assert diagnostic["quality"]["planning_readiness"] == "not_evaluated_m2"
     state = hass.states.get("sensor.energy_co_pilot_input_quality")
@@ -277,7 +282,8 @@ async def test_native_lifecycle_exposes_night_quality_without_replacing_forecast
         state.state == "valid"
         and state.attributes["issue_categories"] == diagnostic["quality"]["categories"]
     )
-    assert diagnostic["read_only"] and first.data.forecast.periods[-1].kwh == 0.009
+    assert diagnostic["read_only"] and first._forecast.periods[-1].kwh == 0.009
+    assert first.data.forecast.periods[-1].kwh == 0
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.runtime_data.coordinator is not first
