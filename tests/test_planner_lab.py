@@ -217,10 +217,10 @@ def test_continuous_lab_respects_export_toggle_above_threshold():
     assert no_selling["summary"]["pv_curtailed_dc_kwh"] > 0
 
 
-def test_lab_only_solver_does_not_change_production_0_1_kwh_optimizer():
+def test_lab_output_schema_preserved_while_production_becomes_continuous():
     planner, production = _core_modules()
-    assert production.SOC_STEP_DC_KWH == 0.1
     assert callable(production.optimize_horizon)
+    assert callable(production.optimize_horizon_discrete)
     assert planner.MIN_SOC == 20
     case = scenario()
     result = simulate_scenario(case)
