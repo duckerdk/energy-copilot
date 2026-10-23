@@ -45,3 +45,11 @@ Budować prognozę zużycia domu na następne **7 dni** na podstawie historyczny
 - Uwzględniać całe prognozowane PV: pokrywanie domu, magazynowanie nadwyżek, ewentualny eksport nadwyżek i pozostawianie pojemności na zapowiedziane PV. Pozwalać na kilka kolejnych godzin ładowania, rozładowania i powtarzające się cykle, a także świadomy brak cyklu.
 - Ograniczenia fizyczne, polityka ceny zakupu/sprzedaży, degradacja 0,40 DKK/kWh DC, SOC min. 20%, eksport wyłącznie PV i sześć TOU pozostają obowiązujące. Model zużycia v1.11.0 **bez zmian**.
 - Najpierw wdrożyć model w nieegzekwowalnym `dry_run`, wyraźnie rozdzielić fizyczny harmonogram 15-minutowy od harmonogramu wykonywalnego przez sześć okien TOU. Nie sugerować w HA możliwych do wykonania oszczędności, dopóki nie ma walidacji TOU i rzeczywistego baseline Deye.
+
+
+## Potwierdzone zachowanie falownika — 23.10.2026
+
+- Utrzymać istniejący priorytet **Load First** oraz **eksport z baterii OFF**. Nie planować zmiany tych nastaw w Co-Pilot.
+- Użytkownik potwierdził na instalacji, że falownik **realizuje zadany prąd ładowania** (np. 12 A). Traktować ten fakt jako zweryfikowany w bieżącej konfiguracji, bez ponownego kwestionowania.
+- Przy Solar Sell ON falownik sam eksportuje nadwyżkę po obsłużeniu domu i przyjęciu energii przez baterię w granicach zadanej nastawy. Planer dobiera **prąd baterii** i **zezwolenie Solar Sell według ceny ≥0,40 DKK/kWh**, nie steruje ilością eksportu jako niezależnym poleceniem.
+- Planer musi nadal uwzględniać finansową alternatywę sprzedaż–magazynowanie (i koszt późniejszego zakupu), zachowując ochronę przed eksportem z baterii.
