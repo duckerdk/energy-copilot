@@ -1,6 +1,6 @@
 # Energy Co-Pilot
 
-Natywna integracja Home Assistant `custom_components/energy_copilot`. **Wersja kodu: v1.12.1 — publikowana po przejściu CI i utworzeniu GitHub Release.** Poprzednie wydanie: [v1.12.0](https://github.com/duckerdk/energy-copilot/releases/tag/v1.12.0). Obecny zakres: **M1/M2** (pomiary, ceny, prognozy, Recorder, diagnostyka) i eksperymentalny **M3 `dry_run`** (teoretyczne porównanie scenariuszy ładowania/rozładowania). Integracja jest **wyłącznie do odczytu**, bez sterowania falownikiem, bez potwierdzonego planu sześciu TOU i bez wiarygodnej deklaracji rzeczywistych oszczędności.
+Natywna integracja Home Assistant `custom_components/energy_copilot`. **Wersja kodu: v1.13.0 — publikowana po przejściu CI i utworzeniu GitHub Release.** Poprzednie wydanie: [v1.12.1](https://github.com/duckerdk/energy-copilot/releases/tag/v1.12.1). Obecny zakres: **M1/M2** (pomiary, ceny, prognozy, Recorder, diagnostyka) i eksperymentalny **M3 `dry_run`** (teoretyczne porównanie scenariuszy ładowania/rozładowania). Integracja jest **wyłącznie do odczytu**, bez sterowania falownikiem, bez potwierdzonego planu sześciu TOU i bez wiarygodnej deklaracji rzeczywistych oszczędności.
 
 Celem docelowego rozwiązania jest minimalizacja całkowitego kosztu energii w horyzoncie opublikowanych cen, z uwzględnieniem SOC, sprawności i degradacji baterii. Zatwierdzone reguły i uprawnienia opisuje wyłącznie [REQUIREMENTS.md](requirements/REQUIREMENTS.md).
 
@@ -127,3 +127,13 @@ python3.14 -m venv .venv
 ```
 
 GitHub Actions wykonuje te same kontrole. Wydania HACS wykorzystują **niezmienny tag** `vX.Y.Z`, odpowiadającą wersję manifestu i pakiet `energy_copilot.zip` z `BUILD_INFO.json` oraz `SHA256SUMS`. Utworzenie commitu na `main` **nie jest** publikacją wydania. Szczegółowe zasady odbioru, testów fizycznych i przejścia do M6: [VALIDATION.md](requirements/VALIDATION.md) oraz [EXECUTION.md](requirements/EXECUTION.md).
+
+
+## v1.13.0 — optymalizacja ciągła i diagnostyka planu
+
+- HA `dry_run` korzysta z optymalizatora ciągłego (bez kwantyzacji baterii po 0,1 kWh). Starsza metoda dyskretna pozostaje do porównań regresyjnych. Wyniki nadal są fizycznie walidowane i **nie są komendami falownika**.
+- Planowany Solar Sell zależy od **opublikowanej ceny sprzedaży ≥0,40 DKK/kWh**, a nie od aktualnego stanu przełącznika. Wykonalna konfiguracja instalacji pozostaje niezmieniona: **Load First i eksport z baterii OFF**. Falownik sam realizuje eksport nadwyżek PV; planer planuje limit prądu ładowania, nie zadaną moc eksportu.
+- `sensor.energy_co_pilot_planning_status` publikuje w `hourly_plan`: `buy_price_dkk_kwh`, `sell_price_dkk_kwh`, `solar_sell_planned_on`, `charge_current_setpoint_a`, `grid_export_kwh`, `purchase_cost_dkk`, `sales_revenue_dkk`, `pv_curtailed_dc_kwh`. Zawiera też osobne sumy kosztów zakupu i przychodu ze sprzedaży.
+- Wartość końcowa magazynu nadal **nie zakłada przyszłych cen**. Gdy występuje prognozowane zapotrzebowanie po końcu cen przed kolejną produkcją PV, używany jest wyraźnie oznaczony wskaźnik ceny odtworzenia wyliczony z końcowych **znanych** cen. Nie jest to opublikowana cena następnego dnia ani sztywny docelowy SOC.
+- W diagnostyce `load_forecast.holdout_accuracy` jest błędem prognozy ostatnich 7 dni liczonym bez włączenia okresu testowego do treningu. `observed.prospective_forecast_accuracy` porównuje prognozy PV i domu zamrożone przed kwadransem z przyjętymi bieżącymi odczytami. Oba wskaźniki **nie potwierdzają fizycznej kalibracji**; pomiar PV może być ograniczony przez falownik, a zużycie domu nadal jest bilansem pochodnym.
+- Nie zmieniono przełączników/priorytetów falownika, sześciu TOU ani trybu `automatic`. Integracja nadal działa wyłącznie w `monitor/dry_run` i nie zapisuje do urządzenia.
