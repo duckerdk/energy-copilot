@@ -4,7 +4,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from custom_components.energy_copilot.horizon_optimizer import optimize_horizon
+from custom_components.energy_copilot.horizon_optimizer import (
+    optimize_horizon,
+    optimize_horizon_discrete,
+)
 from custom_components.energy_copilot.planner import (
     Plant,
     Quarter,
@@ -111,7 +114,8 @@ def test_all_day_horizon_not_just_a_pair_of_quarters():
     qs = series([0.5] * 24 + [1.1] * 32 + [2.5] * 40 + [0.8] * 48)
     result = optimize_horizon(p, qs)
     assert len(result.dispatches) == 144
-    assert result.evaluated_transitions > 144
+    assert result.evaluated_transitions > 0
+    assert result.soc_resolution_dc_kwh == 0.0
     assert sum(d.grid_to_battery_ac_kwh for d in result.dispatches) > 0
     assert result.reference.objective_dkk >= result.candidate.objective_dkk - 1e-7
 
@@ -132,3 +136,47 @@ def test_no_battery_export_even_with_high_export_price():
         for q, d in zip(qs, result.dispatches)
     )
     assert all(row.grid_export_kwh == 0 for row in result.candidate.quarters)
+
+
+def test_exact_fractional_discharge_avoids_unnecessary_expensive_grid_purchase():
+    p = plant(80)
+    qs = series(
+        [4.5, 4.5, 4.5, 4.5, 0.5],
+        pv=[0.25] * 4 + [0.0],
+        load=0.30,
+        export=True,
+    )
+    new = optimize_horizon(p, qs)
+    old = optimize_horizon_discrete(p, qs)
+    assert new.soc_resolution_dc_kwh == 0.0
+    assert all(r.grid_import_kwh < 1e-7 for r in new.candidate.quarters[:4])
+    assert sum(r.grid_import_kwh for r in old.candidate.quarters[:4]) > 0.0
+    assert new.candidate.objective_dkk <= old.candidate.objective_dkk + 1e-6
+    assert new.executable is False
+
+
+def test_continuous_dispatch_is_independently_physical_and_pv_only_export():
+    p = plant(75)
+    qs = series(
+        [1.0] * 8 + [4.2] * 8 + [2.0] * 8,
+        pv=[1.6] * 8 + [0.0] * 16,
+        load=0.65,
+        export=True,
+    )
+    result = optimize_horizon(p, qs)
+    assert result.soc_resolution_dc_kwh == 0.0
+    for d, q, actual in zip(result.dispatches, qs, result.candidate.quarters):
+        assert d.pv_to_export_dc_kwh <= q.pv_dc_kwh + 1e-8
+        assert not (d.grid_to_battery_ac_kwh > 1e-7 and d.battery_to_home_dc_kwh > 1e-7)
+        assert actual.soc_end_pct >= 20 - 1e-6
+        assert actual.soc_end_pct <= 100 + 1e-6
+
+
+def test_terminal_override_can_protect_future_value_without_fixed_soc():
+    p = plant(80)
+    qs = series([2.0] * 8 + [3.0] * 8, load=0.4)
+    low = optimize_horizon(p, qs, terminal_value_override=0.3)
+    high = optimize_horizon(p, qs, terminal_value_override=3.5)
+    assert high.candidate.final_soc_pct >= low.candidate.final_soc_pct
+    assert high.terminal_value_dkk_per_kwh_dc == pytest.approx(3.5)
+    assert low.terminal_value_dkk_per_kwh_dc == pytest.approx(0.3)
