@@ -84,6 +84,7 @@ def forecast_coverage(
     return {
         "expected_seconds": expected_seconds,
         "covered_seconds": covered_seconds,
+        "night_zero_filled_seconds": snapshot.night_zero_filled_seconds,
         "coverage_fraction": covered_seconds / expected_seconds
         if expected_seconds
         else None,
