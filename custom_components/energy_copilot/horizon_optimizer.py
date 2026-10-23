@@ -94,7 +94,9 @@ def _dispatch(
     return d, cost
 
 
-def optimize_horizon_discrete(plant: Plant, quarters: tuple[Quarter, ...]) -> HorizonResult:
+def optimize_horizon_discrete(
+    plant: Plant, quarters: tuple[Quarter, ...]
+) -> HorizonResult:
     """Find minimum model cost over all available contiguous quarters.
 
     No max duration or single-charge/single-discharge restriction. End SOC may
