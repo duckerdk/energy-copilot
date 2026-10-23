@@ -20,8 +20,9 @@ from .planner import (
     simulate_candidate,
 )
 
+
 class _FlowArc:
-    """Residual edge in the lab-only continuous energy-flow network."""
+    """Residual edge in the whole-horizon continuous energy-flow network."""
 
     __slots__ = ("to", "reverse", "capacity", "cost", "original")
 
@@ -33,7 +34,7 @@ class _FlowArc:
         self.cost = cost
 
 
-def optimize_continuous(plant, quarters, *, terminal_value_override=None, terminal_reserve_dc_kwh=None):
+def optimize_continuous(plant, quarters, *, terminal_value_override=None):
     """Optimize continuous battery energy (kWh) without an SOC lattice.
 
     Formulate quarter-by-quarter grid/PV charging, carrying and house supply
@@ -44,7 +45,7 @@ def optimize_continuous(plant, quarters, *, terminal_value_override=None, termin
 
     The charge/discharge/exchange constraints remain independently verified by
     the original production simulate_candidate(), not approximated here.
-    This alternative algorithm is used by Planner Lab ONLY.
+    This implementation is used by the HA dry-run planner.
     """
 
     if not quarters:
@@ -68,9 +69,14 @@ def optimize_continuous(plant, quarters, *, terminal_value_override=None, termin
     source, sink = 0, 1
     # B(t): energy at start of quarter t, A(t): after SOC capacity gate,
     # C(t): shared power-limit gate for PV and grid charging in quarter t.
-    before = lambda t: 2 + 3 * t
-    after = lambda t: 3 + 3 * t
-    charge = lambda t: 4 + 3 * t
+    def before(t):
+        return 2 + 3 * t
+
+    def after(t):
+        return 3 + 3 * t
+
+    def charge(t):
+        return 4 + 3 * t
     network = [[] for _ in range(count)]
 
     def add_edge(fr, to, cap, price):
