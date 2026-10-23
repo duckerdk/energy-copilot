@@ -123,6 +123,7 @@ class PlanningStatusSensor(CoordinatorEntity, SensorEntity):
             "purchase_cost_dkk": preview.purchase_cost_dkk,
             "sales_revenue_dkk": preview.sales_revenue_dkk,
             "terminal_value_basis": preview.terminal_value_basis,
+            "post_horizon_load_kwh": preview.post_horizon_load_kwh,
             "max_charge_current_a": preview.max_charge_current_a,
             "charge_start_utc": (
                 preview.charge_start.isoformat() if preview.charge_start else None
