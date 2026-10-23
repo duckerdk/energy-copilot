@@ -180,3 +180,32 @@ def test_terminal_override_can_protect_future_value_without_fixed_soc():
     assert high.candidate.final_soc_pct >= low.candidate.final_soc_pct
     assert high.terminal_value_dkk_per_kwh_dc == pytest.approx(3.5)
     assert low.terminal_value_dkk_per_kwh_dc == pytest.approx(0.3)
+
+
+def test_continuous_solver_randomized_physical_feasibility_and_no_battery_sale():
+    from random import Random
+
+    rng = Random(20261023)
+    for _ in range(45):
+        n = 16
+        start = datetime(2026, 10, 23, 12, tzinfo=UTC)
+        qs = tuple(
+            Quarter(
+                start + timedelta(minutes=15 * i),
+                start + timedelta(minutes=15 * (i + 1)),
+                rng.uniform(0.4, 4.5),
+                rng.uniform(0.0, 4.5),
+                rng.uniform(0.0, 1.8),
+                rng.uniform(0.02, 0.95),
+                True,
+            )
+            for i in range(n)
+        )
+        p = plant(rng.uniform(20, 100))
+        result = optimize_horizon(p, qs)
+        assert result.candidate.status == "physical_candidate_only_tou_unverified"
+        assert result.candidate.final_soc_pct >= 20 - 1e-7
+        for d, q, actual in zip(result.dispatches, qs, result.candidate.quarters):
+            assert d.pv_to_export_dc_kwh <= q.pv_dc_kwh + 1e-7
+            assert d.battery_to_home_dc_kwh * p.eta_battery_to_ac <= q.home_ac_kwh + 1e-7
+            assert not (actual.grid_import_kwh > 1e-7 and actual.grid_export_kwh > 1e-7)
