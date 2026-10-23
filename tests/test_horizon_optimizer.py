@@ -207,5 +207,7 @@ def test_continuous_solver_randomized_physical_feasibility_and_no_battery_sale()
         assert result.candidate.final_soc_pct >= 20 - 1e-7
         for d, q, actual in zip(result.dispatches, qs, result.candidate.quarters):
             assert d.pv_to_export_dc_kwh <= q.pv_dc_kwh + 1e-7
-            assert d.battery_to_home_dc_kwh * p.eta_battery_to_ac <= q.home_ac_kwh + 1e-7
+            assert (
+                d.battery_to_home_dc_kwh * p.eta_battery_to_ac <= q.home_ac_kwh + 1e-7
+            )
             assert not (actual.grid_import_kwh > 1e-7 and actual.grid_export_kwh > 1e-7)
