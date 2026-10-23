@@ -311,7 +311,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                         snapshot,
                         mode=self.settings.get("mode", "monitor"),
                         pv_export_enabled=solar_sell is not None
-                        and solar_sell.state == "on",
+                        and solar_sell.state in {"on", "off"},
                         load_projection=(
                             self.load_forecast.projection
                             if self.load_forecast
