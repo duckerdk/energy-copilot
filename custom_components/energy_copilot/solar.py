@@ -74,7 +74,6 @@ def solar_evidence(location, start, end, evaluated_at):
     return result
 
 
-
 def complete_night_forecast_edges(snapshot, solar, horizon_start, horizon_end):
     """Extend explicit 0 W sunrise/sunset boundaries through their local night.
 
@@ -97,14 +96,10 @@ def complete_night_forecast_edges(snapshot, solar, horizon_start, horizon_end):
 
     windows = solar["intervals"]
     sunrises = [
-        utc(item["start_utc"])
-        for item in windows
-        if item["solar_state"] == "daylight"
+        utc(item["start_utc"]) for item in windows if item["solar_state"] == "daylight"
     ]
     sunsets = [
-        utc(item["end_utc"])
-        for item in windows
-        if item["solar_state"] == "daylight"
+        utc(item["end_utc"]) for item in windows if item["solar_state"] == "daylight"
     ]
     tolerance = timedelta(minutes=30)
     zone = ZoneInfo("Europe/Copenhagen")
