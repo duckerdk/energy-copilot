@@ -97,7 +97,7 @@ class PlanningStatusSensor(CoordinatorEntity, SensorEntity):
             "reason": preview.reason,
             "read_only": True,
             "executable": False,
-            "scenario_type": "whole_published_horizon_discrete_soc_dispatch_unverified_tou",
+            "scenario_type": "whole_published_horizon_continuous_dispatch_unverified_tou",
             "start_utc": preview.start.isoformat() if preview.start else None,
             "end_utc": preview.end.isoformat() if preview.end else None,
             "published_price_horizon_end_utc": (
@@ -120,6 +120,9 @@ class PlanningStatusSensor(CoordinatorEntity, SensorEntity):
             "reference_cost_dkk": preview.reference_cost_dkk,
             "scenario_cost_dkk": preview.scenario_cost_dkk,
             "modeled_saving_dkk": preview.modeled_saving_dkk,
+            "purchase_cost_dkk": preview.purchase_cost_dkk,
+            "sales_revenue_dkk": preview.sales_revenue_dkk,
+            "terminal_value_basis": preview.terminal_value_basis,
             "max_charge_current_a": preview.max_charge_current_a,
             "charge_start_utc": (
                 preview.charge_start.isoformat() if preview.charge_start else None
