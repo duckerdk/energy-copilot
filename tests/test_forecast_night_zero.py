@@ -52,7 +52,9 @@ def test_user_oct23_forecast_stays_raw_but_night_fills_to_full_price_day():
     assert raw.periods[-1].kwh == 0.001
     original = raw.periods
     prices = tuple(
-        PriceSlot(first_day + timedelta(hours=i), first_day + timedelta(hours=i + 1), 1, 1)
+        PriceSlot(
+            first_day + timedelta(hours=i), first_day + timedelta(hours=i + 1), 1, 1
+        )
         for i in range(24)
     )
     sun = solar_evidence(LOCATION, now, end, now)
@@ -82,9 +84,7 @@ def test_missing_daytime_energy_remains_missing_not_fabricated():
     raw = forecast(data, now)
     sun = solar_evidence(LOCATION, now, end, now)
     completed = complete_night_forecast_edges(raw, sun, now, end)
-    covered = forecast_coverage(
-        completed, (PriceSlot(now, end, 1, 1),), now, solar=sun
-    )
+    covered = forecast_coverage(completed, (PriceSlot(now, end, 1, 1),), now, solar=sun)
     assert any(
         m["reason"] == "missing_energy_period" for m in covered["missing_intervals"]
     )
