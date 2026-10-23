@@ -139,6 +139,12 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "forecast_version": data.forecast.version if data.forecast else None,
             "forecast_coverage": coordinator.forecast_coverage,
             "forecast_first_start_utc": forecast_first,
+            "forecast_raw_first_start_utc": data.forecast.source_start.isoformat()
+            if data.forecast and data.forecast.source_start
+            else None,
+            "forecast_raw_last_end_utc": data.forecast.source_end.isoformat()
+            if data.forecast and data.forecast.source_end
+            else None,
             "forecast_last_end_utc": forecast_last,
             "forecast_captured_at": data.forecast.captured_at.isoformat()
             if data.forecast
