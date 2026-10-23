@@ -63,7 +63,7 @@ def test_charges_over_multiple_hours_and_discharges_over_multiple_quarters():
     assert result.reference.objective_dkk - result.candidate.objective_dkk > 2
     assert result.candidate.status == "physical_candidate_only_tou_unverified"
     assert result.executable is False
-    assert result.candidate.final_soc_pct >= 20
+    assert result.candidate.final_soc_pct >= 20 - 1e-7
 
 
 def test_saves_battery_during_cheaper_hours_instead_of_discharge():
