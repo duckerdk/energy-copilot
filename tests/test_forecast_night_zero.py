@@ -4,7 +4,6 @@ Actual published W/Wh values are those supplied by the integration user.
 No private location or household measurements are included in this fixture.
 """
 
-from copy import deepcopy
 from datetime import timedelta
 
 import pytest
