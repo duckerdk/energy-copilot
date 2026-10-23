@@ -1,6 +1,6 @@
 # Otwarte kwestie techniczne
 
-**Stan: v0.1.10, 21.10.2026.** Tylko sprawy nadal wymagające implementacji lub potwierdzenia; nie powtarzać zamkniętych decyzji użytkownika. Ich źródłem jest [REQUIREMENTS.md](REQUIREMENTS.md). Właściciel implementacji: Codex, chyba że wskazano inaczej. Testy offline i pojedynczy eksport HA nie zastępują walidacji pracy ciągłej.
+**Stan: v1.13.0, 23.10.2026.** Tylko sprawy nadal wymagające implementacji lub potwierdzenia; nie powtarzać zamkniętych decyzji użytkownika. Ich źródłem jest [REQUIREMENTS.md](REQUIREMENTS.md). Właściciel implementacji: Codex, chyba że wskazano inaczej. Testy offline i pojedynczy eksport HA nie zastępują walidacji pracy ciągłej.
 
 ## P0 — przed fizycznym sterowaniem (M6)
 
@@ -11,7 +11,7 @@
 
 ## P1 — jakość danych przed M3/M5
 
-- [ ] **Dzień i noc na prawdziwym HA:** zebrać minimum 30 minut ciągłej diagnostyki w obu warunkach dla **v0.1.10**. Sprawdzić `pv_available`, `home_available`, przyjęcia/odrzucenia w `live_measurement_window` oraz epizody `unknown/unavailable` i recovery. Eksport v0.1.6 ujawnił fałszywy `stale_input` SOC, który naprawiono w 0.1.7. Testy offline obejmują 8 h niezmiennych stanów; nadal potrzeba ciągłej obserwacji prawdziwej instalacji w dzień i w nocy.
+- [ ] **Dzień i noc na prawdziwym HA:** zebrać minimum 30 minut ciągłej diagnostyki w obu warunkach dla **v1.13.0**. Sprawdzić `pv_available`, `home_available`, przyjęcia/odrzucenia w `live_measurement_window` oraz epizody `unknown/unavailable` i recovery. Eksport v0.1.6 ujawnił fałszywy `stale_input` SOC, który naprawiono w 0.1.7. Testy offline obejmują 8 h niezmiennych stanów; nadal potrzeba ciągłej obserwacji prawdziwej instalacji w dzień i w nocy.
 - [ ] **Forecast.Solar:** rozwiązać politykę brakujących przedziałów prognozy o zmierzchu i pozostałej części już rozpoczętego okresu. `forecast_state=incomplete` i `unresolved_forecast_seconds>0` pozostają jawnymi ograniczeniami; nie dopisywać fikcyjnych Wh. Kontrakt `wh_period[end]` jest już potwierdzony — nie implementować go ponownie.
 - [ ] **Recorder i profil domu:** ocenić rzeczywiste pokrycie kwadransów po normalizacji `max(0, home)`, wpływ luk oraz błąd fizycznego bilansu domu (w tym dodatnich anomalii). Diagnostyka v0.1.6 pokazała 88/96 kompletnych kwadransów, ale nie stanowi walidacji dokładności ani pełnej historii pauz Recorder.
 - [ ] **Ceny i DST:** przetestować na rzeczywistym HA precyzję `raw_*` kontra `current_price` przy progu 0,40 DKK/kWh, zachowanie po restarcie i zmianę czasu. Testy offline `PRICE_THRESHOLD_AMBIGUOUS` i 23/25 h istnieją.
