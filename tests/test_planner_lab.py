@@ -1,6 +1,5 @@
-"""Offline Planner Lab is a thin adapter around production optimizer modules."""
+"""Browser Planner Lab scenario tests use the same sources as GitHub Pages."""
 
-import sys
 from copy import deepcopy
 from pathlib import Path
 from shutil import which
@@ -8,7 +7,7 @@ from subprocess import run
 
 import pytest
 
-from tools.planner_lab.server import _core_modules, simulate_scenario
+from tools.planner_lab.engine import _core_modules, simulate_scenario
 
 
 def scenario(hours=None, soc=25, pv=0):
@@ -30,7 +29,7 @@ def scenario(hours=None, soc=25, pv=0):
     }
 
 
-def test_local_runner_loads_original_optimizer_without_ha_modules():
+def test_browser_engine_adapter_imports_planner_without_ha_modules():
     planner, horizon = _core_modules()
     assert horizon.optimize_horizon.__module__.endswith(".horizon_optimizer")
     assert planner.simulate_candidate.__module__.endswith(".planner")
@@ -249,16 +248,6 @@ def test_browser_worker_javascript_syntax():
     assert checked.returncode == 0, checked.stderr
 
 
-def test_local_launcher_imports_shared_engine():
-    """Shared adapter remains usable without a Home Assistant installation."""
-    server = Path(__file__).resolve().parents[1] / "tools" / "planner_lab" / "server.py"
-    checked = run(
-        [sys.executable, str(server), "--help"], capture_output=True, text=True
-    )
-    assert checked.returncode == 0, checked.stderr
-    assert "--port" in checked.stdout
-
-
 def test_site_is_static_without_server_post_or_independent_optimizer():
     root = Path(__file__).resolve().parents[1]
     html = (root / "tools/planner_lab/index.html").read_text(encoding="utf-8")
@@ -274,11 +263,3 @@ def test_site_is_static_without_server_post_or_independent_optimizer():
     assert "custom_components/energy_copilot/planner.py" in workflow
     assert "custom_components/energy_copilot/horizon_optimizer.py" in workflow
     assert "payload:payload()" in html
-
-
-def test_shared_engine_identical_to_server_results():
-    from tools.planner_lab.engine import simulate_scenario as direct
-    from tools.planner_lab.server import simulate_scenario as local
-
-    assert direct is local
-    assert direct(scenario()) == local(scenario())

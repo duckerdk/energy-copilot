@@ -66,36 +66,15 @@ Każde `decision_id`, `plan_id`, start i ważność, dane wejściowe oraz ich we
 - Różne czasy poprawnych raportów nie są błędem synchronizacji. Wykryta awaria/recovery i rzeczywista rozbieżność wartości domu nadal wymagają weryfikacji.
 - Brak prognozy w nocy nie degraduje wejść, a brak danych o zmierzchu pozostaje jawny, bez dopisywania Wh.
 
-## Odbiór HA M3 dry_run v0.1.8
-- W `monitor`: status M3 `monitor`, bez modelowanej oszczędności i bez zapisu komend. W `dry_run` z brakiem prognozy: `blocked` i kod `pv:forecast_missing` w encji oraz diagnostyce, bez wpływu na `Input quality`.
-- Ze znanym, kompletnym zestawem 15-minutowych prognoz i cen, przedziałem rekordów Recorder oraz poprawnym SOC: `preview`, rzeczywisty wynik kosztowy podglądu i `executable=false`. Brak rozpoczętego/pustego okresu nigdy nie jest zastępowany zerem.
-- Niepełne Forecast.Solar: co najwyżej jawnie oznaczony `partial` bez interpolacji, bez twierdzenia o optymalnym planie pełnego horyzontu. Awaria samego preview nie może zatrzymać M1/M2 ani zmienić statusu `Input quality`.
+## Odbiór aktualnego M3 — v1.13.0
 
-## Odbiór M3 dry_run v0.1.9 — dane Forecast.Solar o grubej rozdzielczości
-- Opublikowany okres 60 minut z energią 0,8 kWh rozdzielony przez **jawny** niezweryfikowany model stałej średniej mocy daje 4 × 0,2 kWh; dokładna suma zachowana, bez duplikowania energii.
-- Okres rozpoczęty przed pierwszym przyszłym kwadransem: uwzględnić tylko przecięcie przyszłe, bez przypisania całej energii okresu do reszty.
-- Nieregularne odcinki 20 i 40 minut, suma energii zachowana, bez luk; nakładanie okresów lub nieopublikowana minuta nadal blokuje.
-- Oryginalne kwadransowe Forecast.Solar bez alokacji modelowej są opisane `exact_source_periods`.
-- W HA z `dry_run`, pełnymi wymaganymi kwadransami Recorder, SOC i cenami: `planning_status=preview` z `pv_temporal_model=uniform_power_unverified`, liczbą kwadransów i `executable=false`; żadne komendy falownika nie są wywoływane.
-- Nadal blokować niekompletny **pierwszy** przyszły kwadrans obciążenia, nie pomijać luk Recorder; status jakości M1/M2 pozostaje niezależny. Żadna liczba symulacji nie jest oszczędnością rzeczywistą.
+- [x] Automatyczne regresje `dry_run`: wielogodzinne i wielocyklowe planowanie, 15-minutowy bilans energii bez siatki 0,10 kWh SOC, zachowanie przy drogim/tańszym prądzie, brak nieopłacalnego dodatkowego cyklu.
+- [x] Niezależny `simulate_candidate` sprawdza SOC, limity prądu, bilans PV/dom/bateria, brak eksportu baterii i niedozwolonego jednoczesnego importu/eksportu. Testowane również zmienne scenariusze.
+- [x] `Solar Sell` planowane na podstawie przyszłej ceny sprzedaży ≥0,40 DKK/kWh, niezależnie od aktualnego stanu przełącznika; raportowane osobno cena zakupu, sprzedaży, przewidywane przepływy i prąd ładowania.
+- [x] Jednoznaczne końce okresów `wh_period`, nierówne odcinki Forecast.Solar, potwierdzone zera nocne, źródłowe luki i brak fikcyjnego pokrycia. Recorder i jego braki nie są modyfikowane.
+- [x] Historyczna prognoza domu 7 dni, dni robocze, święta i DST; 7-dniowy holdout trenowany bez danych z przyszłości oraz obserwacja później wykonanych kwadransów PV i domu. Wynik stanowi raport błędu, nie fizyczną kalibrację.
+- [x] `monitor` i `dry_run` nie wykonują usług HA zapisujących do falownika; błąd planera nie zatrzymuje M1/M2.
+- [ ] Potwierdzić powyższe na rzeczywistych danych pracy HA (dzień/noc, różne ceny i pory roku), porównać z **rzeczywistym** baseline Deye oraz skalibrować sprawności i błąd pochodnego pomiaru zużycia.
+- [ ] Przed M6 sprawdzić translację fizycznego planu na sześć TOU, wykonanie prądu i niezawodny STOP/recovery; zachować `Load First` i zakaz eksportu baterii. Sam `dry_run` nie oznacza planu wykonalnego.
 
-## Odbiór M3 dry_run v0.1.10 — luki w prognozie obciążenia
-- Brakujący kwadrans poprzedniej doby otoczony **dwoma kompletnymi** kwadransami Recorder: energia w przyszłym profilu interpolowana liniowo, rekord źródłowy pozostaje niekompletny, model jawnie oznaczony.
-- Dwa i trzy kolejne niekompletne kwadranse: prognoza korzysta z ważnych punktów brzegowych, bez udawania odtworzonych danych źródłowych; ponad trzy, brak punktów brzegowych albo brak historii: nadal `blocked`/`partial`.
-- Pełny zestaw 12 godzin cen i prognozy z dziesięcioma krótkimi przerwami typu Recorder z rzeczywistej diagnostyki v0.1.9: `preview` przez cały dostępny horyzont, modelowane kwadranse policzone, `executable=false`.
-- W teście HA: nowy licznik `load_modeled_quarters` i nazwa metody w encji i diagnostyce; ani odczyty, ani zapisy ustawień falownika nie są wywoływane przez M3. Klasyfikacja jakości historii Recorder i bieżących danych nie zmienia się.
-
-## Odbiór prognozy 7 dni — v1.11.0
-- [ ] Sprawdzić na rzeczywistych statystykach HA, że źródło mierzy zużycie domu i jednostki mean/change są poprawne.
-- [ ] Sprawdzić wykres 7 dni i sumy 672 kwadransów oraz brak poleceń falownika.
-- [ ] Weryfikować weekendy, duńskie święta, DST, brak danych, źle sformatowane statystyki oraz minimum próbek.
-- [ ] Wykonać walk-forward na historycznych godzinach i porównać MAE/WAPE z naiwnym 24h oraz analogiczną godziną 7 dni temu; raportować pokrycie i nie twierdzić, że walidacja HA została wykonana bez odczytu prawdziwej bazy.
-
-
-## Odbiór M3 v1.12.0 — pełny horyzont
-- [ ] Testy syntetyczne: wielogodzinne ładowanie i rozładowanie, zachowanie baterii przy tańszej energii, wykorzystanie nadwyżki PV, więcej niż jeden cykl, brak opłacalnego cyklu, noc bez PV.
-- [ ] Zewnętrzny, niezależny `simulate_candidate` musi zatwierdzić każde wyjście optymalizatora bez łamania SOC 20–100%, prądów ani bilansu PV / sieć / bateria. Brak eksportu baterii i jednoczesnego importu/eksportu sieci.
-- [ ] Dowieść wartości końcowej energii i jej wpływu na zachowanie planu przy końcu cen; raportować założenie i SOC końcowe. 0,10 kWh DC to rozdzielczość numeryczna, nie obietnica optymalności ciągłej.
-- [ ] Sprawdzić poprawność cen i dat DST, brak nieopublikowanych cen, różną długość prognozy PV i cen, nieregularne okresy Forecast.Solar, bilans 7-dniowego zużycia.
-- [ ] Sprawdzić pełny, aktualny horyzont na prawdziwym HA i zmiany planu po publikacji jutra; diagnostyka musi raportować `partial`, jeżeli źródło PV kończy się wcześniej.
-- [ ] Przed M6: mapowanie planu na **sześć fizycznych TOU Deye**, wymagane przełączenia i możliwość wielodobowej realizacji, realny baseline aktualnych nastaw Deye, walidacja runtime i walk-forward. `dry_run` nie może wywołać zapisu.
+Otwarte punkty: [OPEN_ITEMS](OPEN_ITEMS.md).

@@ -58,7 +58,7 @@ Kontrakt czasów i końcowego indeksowania `wh_period` zweryfikowano na rzeczywi
 | TOU 1…6: początek, moc, SOC | `number.sun12k_time_point_N_start`, `number.sun12k_time_point_N_power`, `number.sun12k_time_point_N_capacity` |
 | TOU 1…6: zezwolenie na Grid Charge | `switch.sun12k_time_point_N_charge_enable` |
 
-Użytkownik potwierdził działanie nastaw 0 A. Przy zapisie walidować zakresy polityki i odczyt po zmianie; zgłaszane przez HA skrajne `min/max` nie muszą odpowiadać granicom sprzętu. Prąd zadany jest limitem, nie gwarancją przepływu. Nie używać nieaktywnych `battery_controller.*` ani nie modyfikować YAML/ESPHome/Modbus. Regresje: [VALIDATION.md](VALIDATION.md).
+Użytkownik potwierdził działanie nastaw 0 A. Przy zapisie walidować zakresy polityki i odczyt po zmianie; zgłaszane przez HA skrajne `min/max` nie muszą odpowiadać granicom sprzętu. Użytkownik potwierdził, że w obecnej konfiguracji falownik realizuje zadany prąd ładowania. Zachować w planie rozróżnienie pomiędzy nastawą prądu a prognozowaną energią z dostępnego PV. Nie używać nieaktywnych `battery_controller.*` ani nie modyfikować YAML/ESPHome/Modbus. Regresje: [VALIDATION.md](VALIDATION.md).
 
-## Prognoza domu v1.11.0 — statystyki Recorder
+## Prognoza domu — statystyki Recorder
 Model czyta 365 dni godzinowych statystyk long-term, **mean** dla W/kW albo **change** dla Wh/kWh/MWh. Przy wyborze sensora `load_statistic` musi on przedstawiać całkowite zużycie domu, nie sam import sieci. W razie braku historycznych statystyk domu może użyć wzoru z trzech średnich mocy PV/grid/battery, oznaczonego jako fizycznie niezweryfikowany, bez mieszania PV1/PV2. Luki nigdy nie są zerowane. Klasyfikacja dat obejmuje DK i DST; prywatnych urlopów model nie zna.

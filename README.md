@@ -1,70 +1,53 @@
 # Energy Co-Pilot
 
-Natywna integracja Home Assistant `custom_components/energy_copilot`. **Wersja kodu: v1.13.0 — publikowana po przejściu CI i utworzeniu GitHub Release.** Poprzednie wydanie: [v1.12.1](https://github.com/duckerdk/energy-copilot/releases/tag/v1.12.1). Obecny zakres: **M1/M2** (pomiary, ceny, prognozy, Recorder, diagnostyka) i eksperymentalny **M3 `dry_run`** (teoretyczne porównanie scenariuszy ładowania/rozładowania). Integracja jest **wyłącznie do odczytu**, bez sterowania falownikiem, bez potwierdzonego planu sześciu TOU i bez wiarygodnej deklaracji rzeczywistych oszczędności.
+Natywna integracja Home Assistant `custom_components/energy_copilot`. **Aktualna wydana wersja: [v1.13.0](https://github.com/duckerdk/energy-copilot/releases/tag/v1.13.0)**. Obecnie dostępne: odczyt pomiarów/cen, Forecast.Solar, Recorder, prognoza domu na 7 dni oraz **ciągła optymalizacja w trybie `dry_run`**. Integracja **nie zapisuje nastaw falownika**. Harmonogram fizyczny 15 minut nie jest jeszcze przetłumaczony na sześć rzeczywistych okien TOU Deye (`executable=false`).
 
-Celem docelowego rozwiązania jest minimalizacja całkowitego kosztu energii w horyzoncie opublikowanych cen, z uwzględnieniem SOC, sprawności i degradacji baterii. Zatwierdzone reguły i uprawnienia opisuje wyłącznie [REQUIREMENTS.md](requirements/REQUIREMENTS.md).
+Zatwierdzone reguły, cele i uprawnienia: [REQUIREMENTS.md](requirements/REQUIREMENTS.md). Jedynym źródłem produkcji w integracji jest `sensor.pv_sum`; nie stosuje się PV1/PV2.
 
+## Planner Lab — tylko GitHub Pages
 
-## Planner Lab — strona GitHub Pages
+**[Otwórz Planner Lab](https://duckerdk.github.io/energy-copilot/planner-lab/)**. Uruchamia się w przeglądarce (Pyodide i Web Worker), bez lokalnego serwera, instalacji Pythona ani Home Assistant. Dane scenariusza nie są wysyłane do serwera aplikacyjnego. Repozytorium publikuje stronę przez [planner-lab-pages.yml](.github/workflows/planner-lab-pages.yml); wymagana konfiguracja Pages: **Settings → Pages → Build and deployment → GitHub Actions**.
 
-**Uruchomienie bez instalacji:** [Energy Co-Pilot Planner Lab](https://duckerdk.github.io/energy-copilot/planner-lab/) — strona publikowana automatycznie przez GitHub Actions po włączeniu **Settings → Pages → Build and deployment → Source: GitHub Actions** w repozytorium. Nie wymaga instalacji Pythona, serwera ani Home Assistant.
+W tabeli można zmienić godzinowe ceny spot, prognozę PV, pobór domu, SOC, pojemność, napięcie, ograniczenia prądowe i sprawność na 24–72 h. Obliczenia wykorzystują **ciągły solver scenariuszy z `engine.py` i oryginalny fizyczny walidator z `planner.py`**. Ceny zakupu: spot + migawka taryf N1 z 20.10.2026 (nie aktualizuje się automatycznie); sprzedaż: spot. Przykładowe dobowe zużycie bazuje na godzinowej historii HA 19–20.10.2026 i powtarza się w scenariuszach dłuższych. Możliwy import/eksport scenariuszy JSON/CSV oraz eksport wyników kwartalnych. Strona nie steruje falownikiem ani nie udowadnia fizycznej wykonalności sześciu TOU.
 
-Cenę **spot**, prognozy PV, zużycie domu, SOC i limity baterii można edytować w przeglądarce dla 24–72 h. Ceny zakupu i sprzedaży wyliczane są z danych taryf N1 (migawka z 20.10.2026; zakup = spot + taryfa + 0,154 DKK/kWh, sprzedaż = spot). Wartości początkowe zużycia domu pochodzą z rzeczywistej godzinowej historii HA 19–20.10.2026, a nie ze zmyślonego profilu. Ten jednodniowy profil jest powtarzany w dłuższych scenariuszach. Wyniki pokazują harmonogram ładowania, rozładowania, zmian SOC, koszty i dane kwartalne. Obsługiwany eksport CSV/JSON. Obliczenia wykonuje oryginalny kod Python `horizon_optimizer.py` i `planner.py` przez **Pyodide w Web Worker** — bez przekazywania wprowadzonych danych do serwera. Pyodide v0.27.7 ładuje się z jsDelivr przy otwieraniu strony, więc wymagany jest dostęp do sieci. Strona jest publiczna; scenariusze użytkownika pozostają w pamięci przeglądarki (do czasu własnego eksportu).
+## Instalacja i aktualizacja HACS
 
-Publikacja z repozytorium odbywa się przez `.github/workflows/planner-lab-pages.yml`. Wszelkie zmiany w produkcyjnym solverze zostaną dołączone do kolejnej publikacji Pages automatycznie. Lokalny serwer Python pozostaje opcjonalny dla deweloperów, ale **nie jest potrzebny użytkownikowi strony**. Więcej: [instrukcja](tools/planner_lab/HELP.txt). Laboratorium niczego nie zapisuje do falownika.
+Wymagany Home Assistant **2026.10 lub nowszy** (testowany Core 2026.10.2, Python 3.14).
 
-## Instalacja i aktualizacja
+1. Dodaj repozytorium `https://github.com/duckerdk/energy-copilot` do HACS jako **Integration**.
+2. Zainstaluj najnowszy opublikowany GitHub Release, uruchom ponownie HA i dodaj integrację w **Ustawienia → Urządzenia i usługi**.
+3. Po aktualizacji sprawdź `installed_version` oraz `installed_build.tag` i `installed_build.integrity` w diagnostyce. Oficjalne wydanie ma `payload_matches_build_info`.
 
-Wymagany Home Assistant **2026.10 lub nowszy** (testy automatyczne: Core 2026.10.2, Python 3.14).
+Alternatywne ręczne kopiowanie `custom_components/energy_copilot` nie zapewnia `BUILD_INFO.json` ani gwarantowanego pochodzenia wydania. Nie trzeba zmieniać ESPHome, Modbus lub ustawień falownika.
 
-1. Dodaj `https://github.com/duckerdk/energy-copilot` jako własne repozytorium typu **Integration** w HACS.
-2. Zainstaluj opublikowane wydanie, zrestartuj Home Assistant i dodaj **Energy Co-Pilot** w **Ustawienia → Urządzenia i usługi**.
-3. Przy aktualizacji sprawdź w diagnostyce `installed_version`, `installed_build.tag` i `installed_build.integrity`. Pakiet oficjalnego wydania powinien wskazywać `payload_matches_build_info`.
+## Planowanie w HA
 
-Alternatywą jest ręczne skopiowanie katalogu `custom_components/energy_copilot` do instalacji HA; takie kopiowanie nie zapewnia metadanych `BUILD_INFO.json` z wydania. Nie ma potrzeby zmiany ESPHome, Modbus ani ustawień falownika.
+W **Energy Co-Pilot → Konfiguruj** ustaw `dry_run`. Status `sensor.energy_co_pilot_planning_status` oznacza: `monitor` — brak planu, `blocked` — brak istotnych danych, `preview` — wygenerowany plan dla dostępnego horyzontu (`complete` albo `partial`). `sensor.energy_co_pilot_modeled_saving` jest **modelowaną** różnicą kosztu względem wariantu bez cykli magazynu, a **nie** realną oszczędnością wobec aktualnego Deye.
 
-## Test M3 w Home Assistant (bez zapisu nastaw)
+Od v1.13.0 optymalizator rozpatruje **cały wspólny horyzont opublikowanych cen i dostępnych prognoz**, z krokiem czasu 15 min, ale **ciągłą energią baterii** (bez dawnej siatki 0,10 kWh). Zachowuje SOC 20–100%, limity prądowe 50/100 A, koszt degradacji 0,40 DKK/kWh DC, zakaz eksportu baterii i niezależną walidację przepływów. Koniec planu uwzględnia modelowaną wartość pozostawionej energii; nie stosuje sztywnego docelowego SOC. Wycena okresu po końcu znanych cen jest niepewnym wskaźnikiem opartym **wyłącznie na opublikowanych cenach i prognozie zużycia**, nie wymyślonymi cenami jutra.
 
-1. Po aktualizacji do wydania obsługującego M3 wejdź w **Ustawienia → Urządzenia i usługi → Energy Co-Pilot → Konfiguruj** i wybierz **dry_run**. Tryb **monitor** pozostawia M3 nieaktywny.
-2. Sprawdź `sensor.energy_co_pilot_planning_status`: `monitor` (wyłączony), `blocked` (brak danych — szczegóły w atrybucie `reason`), `preview` (obliczenia tylko na pokrytym horyzoncie).
-3. `sensor.energy_co_pilot_modeled_saving` pokazuje wyłącznie hipotetyczną różnicę DKK między scenariuszem bez cykli baterii i najlepiej ocenionym **ograniczonym** scenariuszem pojedynczego cyklu z sieci; nie jest to oszczędność potwierdzona, wynik globalnego solvera ani realna konfiguracja TOU. Przy `blocked` jego wartość jest `unknown`.
-4. Pobierz standardową diagnostykę integracji: `planning_preview` zawiera kod blokady, zakres czasu, liczbę kwadransów, kompletność i podsumowanie wariantów — bez szczegółowej prywatnej historii domu.
+**Potwierdzona konfiguracja falownika:** `Load First`, eksport baterii OFF; nie zmieniać. Użytkownik potwierdził, że Deye realizuje zadane prądy ładowania. Planer przewiduje prąd ładowania i stan `Solar Sell`: od **0,40 DKK/kWh ceny sprzedaży** włącznie ON, poniżej OFF. Po włączeniu eksportu falownik sam rozdziela nadwyżkę PV; optymalizator nie nadaje osobnej nastawy mocy eksportu. W trybie `dry_run` żadnej z tych nastaw nie wysyła.
 
-**Rygory i ograniczenia testu v0.1.9:** kompletne kwadranse Recorder nadal są wymagane; od v1.12.1 nocne krańce prognozy PV można oznaczyć zerową produkcją wyłącznie przy oryginalnym 0 W na granicy wschodu/zachodu słońca i potwierdzeniu astronomicznym wybranej lokalizacji. W `dry_run` dłuższe lub nieregularne przedziały energii Forecast.Solar przeliczane są na kwadranse **jawnym, niezweryfikowanym modelem stałej mocy w ramach oryginalnego okresu**: całkowite kWh okresu pozostaje zachowane, a części już minionej nie liczy się ponownie jako energii przyszłej. Nie jest to zweryfikowany profil 15-minutowy ani prognoza fizyczna. Atrybuty `pv_temporal_model` i `pv_temporal_modeled_quarters` pokazują zakres użycia modelu. Luka lub nałożenie się okresów nadal blokuje; brak kompletnej historii zużycia może zakończyć horyzont jako `partial`. Możliwe jest krótsze, jawnie oznaczone `partial` preview. Wersje do v0.1.10 powtarzały poprzednie 24 h UTC; od v1.11.0 aktywny dry_run używa prognozy historycznej 7 dni. W v0.1.10 wyłącznie prognoza w `dry_run` może modelować **krótkie luki do 3 kolejnych kwadransów** na podstawie dwóch sąsiednich, w pełni poprawnych kwadransów poprzedniej doby; wykorzystuje interpolację liniową, oznacza wynik `load_model=previous_24h_utc_linear_bracketed_gap_model_unverified` i `load_modeled_quarters`. Dane Recorder, ich jakość i luki pozostają bez zmian. Brak punktów brzegowych lub dłuższa awaria nadal blokują albo skracają podgląd; łączny modelowany koszt nie jest wartością potwierdzoną. Model stosuje prowizoryczne, niekalibrowane wartości: sprawność 0,95 każdej ścieżki, mnożnik PV Forecast.Solar→DC = 1,0, nominalna pojemność baterii 10,24 kWh oraz napięcie bieżące (lub nominalne 51,2 V, gdy brak opcjonalnego czujnika). Warianty mają końcowy SOC równy początkowemu, więc nie zakłada się arbitralnej wartości końcowej baterii. Nie interpretować liczb jako rekomendacji wykonawczej; sześć TOU, kalibracja DC/AC i rzeczywisty Deye baseline pozostają do zrobienia. M3 **nie wykonuje żadnych usług zapisu HA** i nie zmienia oceny `Input quality`.
+Atrybut `hourly_plan` podaje: `start`, `buy_price_dkk_kwh`, `sell_price_dkk_kwh`, `solar_sell_planned_on`, `home_kwh`, `pv_dc_kwh`, `grid_charge_kwh`, `pv_charge_dc_kwh`, `battery_discharge_dc_kwh`, `charge_current_setpoint_a`, `grid_import_kwh`, `grid_export_kwh`, `purchase_cost_dkk`, `sales_revenue_dkk`, `pv_curtailed_dc_kwh` i `soc_end_pct`. Sumy zakupu i przychodu ze sprzedaży są raportowane **oddzielnie** od degradacji i teoretycznej korzyści.
 
-## Źródła i zasady bieżących danych
+## Źródła danych i jakość
 
 | Rola | Encja |
 | --- | --- |
-| Produkcja PV — **jedyna** | `sensor.pv_sum` |
-| Sieć: dodatnie = import, ujemne = eksport | `sensor.sun12k_total_grid_power` |
-| Bateria: dodatnie = rozładowanie, ujemne = ładowanie | `sensor.sun12k_battery_output_power` |
-| Zużycie domu, pochodna PV + sieć + bateria | `sensor.home_energy_consumption` |
+| Moc PV (jedyna) | `sensor.pv_sum` |
+| Sieć (+ import / − eksport) | `sensor.sun12k_total_grid_power` |
+| Bateria (+ rozładowanie / − ładowanie) | `sensor.sun12k_battery_output_power` |
+| Zużycie domu (pochodne PV + sieć + bateria) | `sensor.home_energy_consumption` |
 | SOC | `sensor.sun12k_battery_capacity` |
-| Ceny zakupu / sprzedaży | `sensor.energi_data_service` / `sensor.energi_data_spotpris` |
+| Zakup / sprzedaż DKK/kWh | `sensor.energi_data_service` / `sensor.energi_data_spotpris` |
 
-PV1/PV2 nie są źródłami danych integracji. Poprawne, dostępne stany wszystkich pomiarów — w tym dodatnie PV, `0 W`, SOC, napięcie, prąd i liczniki dzienne — pozostają ważne nawet bez wielogodzinnych aktualizacji. Sam wiek `last_reported`/`last_updated` nie jest dowodem awarii ani heartbeat sprzętu. Jawne `unknown`, `unavailable`, błędne jednostki, wartości i nieprawidłowe czasy przyszłe nadal są odrzucane. Asynchroniczne raportowanie czujników nie jest samo w sobie błędem wejścia. Rzeczywiste awarie oraz powroty źródeł po awarii nadal są kontrolowane.
+Liczbową ujemną moc domu normalizuje się wewnętrznie do 0 W; `unknown`, `unavailable` oraz luki Recorder **nie są** zerowane. Sam wiek `last_reported` nie oznacza awarii niezmiennej wartości. Pełny kontrakt pomiarów: [HA_CONTRACT.md](requirements/HA_CONTRACT.md).
 
-Ujemne, ale poprawne i zweryfikowane kontekstowo odczyty `home` są na potrzeby obliczeń normalizowane do `max(0, home)`, również w historii. Nie zmienia to encji HA ani surowych danych. Braków, luk Recorder i niewiarygodnych szablonów po awarii **nie wolno** zastępować zerami.
+**Forecast.Solar:** `wh_period[t]` opisuje energię okresu kończącego się w `t`. Brakujące przedziały nocne mogą być uzupełnione zerem **jedynie** przy potwierdzonym 0 W o astronomicznym wschodzie/zachodzie słońca. Braki dzienne pozostają jawne. Oryginalne prognozy W/Wh są archiwizowane bez zmian; model równomiernej mocy wewnątrz opublikowanego okresu jest oznaczony `uniform_power_unverified`.
 
-Dokładne mapowanie, ograniczenia i potwierdzone formaty HA: [HA_CONTRACT.md](requirements/HA_CONTRACT.md).
+**Zużycie domu:** model 7-dniowy czyta godzinowe statystyki HA do 365 dni, uwzględnia dni tygodnia, dni robocze/wolne, duńskie święta i DST. Obejmuje 672 kwadranse; energia godzinowa jest dzielona po równo na kwadranse. Wariant oparty o pochodny bilans domu **nie jest niezależnym pomiarem AC**. Raport jakości pokazuje 7-dniowy holdout historyczny oraz narastające błędy prognozy PV i domu porównywane z odczytami po zamrożeniu prognoz; nie są dowodem fizycznej kalibracji.
 
-## Prognoza, historia i diagnostyka
-
-- **Forecast.Solar**: natywna usługa HA `forecast_solar.get_forecast`; `wh_period[t]` opisuje energię przedziału **kończącego się** w `t`. W v1.12.1 brak publikacji godzin nocnych na początku/końcu doby jest uzupełniany zerem jedynie wtedy, gdy prognoza zawiera 0 W przy wschodzie/zachodzie słońca potwierdzonym dla lokalizacji instalacji (tolerancja 30 min). Braki dzienne nadal nie są zerowane. Archiwum oryginalnej prognozy pozostaje bez zmian; diagnostyka pokazuje liczbę sekund uzupełnienia. Niepełny horyzont jest pokazywany osobno jako `forecast_state=incomplete`, bez automatycznego pogarszania `Input quality`.
-- **Archiwum prognoz**: zachowuje oryginalne W/Wh i czas odczytu do odtworzenia prognozy znanej w chwili decyzji. Domyślna retencja to 90 dni i 10 000 wersji, z limitem 32 MiB; limity można konfigurować w Opcjach. `forecast_history.as_of(...)` zwraca archiwalną obserwację, a `decision_periods_as_of(...)` tylko pełne przyszłe okresy dostępne w chwili decyzji. Nieodtwarzalne stare wersje nie są przedstawiane jako prawidłowe.
-- **Recorder**: bieżąca diagnostyka wykorzystuje ostatnie 24 h; `history_reader.async_iter_slots(start, end)` umożliwia odczyt na żądanie w porcjach do 24 h (maks. 366 dni). Kwadrans bez pełnych, wiarygodnych danych ma `home_kwh=None`. Zachowana energia częściowa nie jest ekstrapolowana. Sama historia stanów nie dowodzi ciągłego raportowania sprzętu.
-- **Prywatność**: standardowy eksport diagnostyki zawiera agregaty jakości i korekt, nie szereg prywatnych próbek mocy domu ani szczegółowe zdarzenia audytu.
-
-Sensor **Input quality** ocenia wymagane **bieżące** dane: `valid` (brak obecnych problemów blokujących i niepewności), `uncertain` (akceptowane wejścia z istotną niepewnością), `degraded` (nieważne wymagane wejście). Kwestie historyczne i Forecast.Solar są widoczne oddzielnie; `valid` **nie** potwierdza poprawności fizycznego bilansu AC/DC ani gotowości planera. W trybie `monitor` status planowania pozostaje `not_evaluated_m2`; w `dry_run` diagnostyka rozróżnia `m3_preview_blocked` i `experimental_m3_preview_only`. Żaden z tych stanów nie oznacza możliwości sterowania falownikiem.
-
-## Prognoza zużycia na 7 dni — v1.11.0
-
-Model odczytuje **godzinowe statystyki długoterminowe HA** (do 365 dni) co 12 godzin; nie skanuje całego roku surowych stanów. Wyznacza prognozę dla **672 kolejnych kwadransów**. Korzysta z profilu dnia tygodnia, dnia roboczego/wolnego, duńskich świąt i odpornej na anomalie mediany ważonej (nowsze próbki mają większą wagę). Klasyfikacja czasu używa Europe/Copenhagen, w tym zmian DST. Energia prognozowanej godziny dzielona jest równomiernie na kwadranse — to niezweryfikowane założenie.
-
-Źródło: opcjonalny sensor **Historical household load sensor** w opcjach integracji (`load_statistic`), a bez niego `sensor.home_energy_consumption`, jeżeli ma statystyki długoterminowe. Może to być statystyka mocy W/kW (`mean`) lub całkowitej energii domu Wh/kWh/MWh (`change`). W razie braku niezależnej statystyki model może użyć godzinowych średnich `pv_sum + grid + battery`; ten bilans DC/AC jest **niezweryfikowany fizycznie**. Nie wybieraj licznika importu z sieci jako całkowitego zużycia domu. Zrzut wykresu HA sam w sobie nie potwierdza, które statystyki nadają się do modelu. Brak poprawnej statystyki nie jest zastępowany zerem; minimalna historia to 96 godzin z 7 różnych dni.
-
-Encja `sensor.energy_co_pilot_7_day_home_energy_forecast` (faktyczną nazwę sprawdź w HA) ma stan **sumy kWh najbliższych 7 dni** oraz atrybuty `hourly` (czas UTC i kWh w godzinie), `daily` (dni lokalne), `source`, `training_hours`, `training_days` i `reason` przy braku prognozy. Nie jest to prognoza zweryfikowana na rzeczywistym HA. Gdy statystyk brak, `dry_run` jest blokowany zamiast po cichu powtarzać wczoraj.
+**Recorder i archiwum:** domyślna diagnostyka pokazuje agregaty jakości, nie prywatne szeregi zużycia. Archiwum surowych prognoz ma domyślną retencję 90 dni i 10 000 wersji (ograniczenie 32 MiB). Zapisy cen dostępne są tylko w okresie ich rzeczywistej publikacji.
 
 ### Wykres 7 dni w Home Assistant
 
@@ -90,30 +73,17 @@ series:
 
 Karta ApexCharts nie jest częścią samej integracji Energy Co-Pilot. Prognoza 7 dni nie oznacza, że dostępne są ceny energii i PV na 7 dni — podgląd optymalizacji nadal działa tylko w horyzoncie rzeczywiście opublikowanych danych. Test historyczny walk-forward i potwierdzenie kalibracji źródeł pozostają wymagane.
 
-## Nowy optymalizator całego horyzontu — v1.12.0
-
-W `dry_run` M3 nie wyszukuje już tylko pary jednego kwadransa ładowania i jednego kwadransa rozładowania. Optymalizuje **wszystkie kolejne kwadranse**, na które ma opublikowane ceny, prognozę PV i prognozę zużycia domu. Dozwolone są wielogodzinne ładowanie z sieci i z PV, rozładowanie przez wiele godzin, wiele cykli oraz świadome pozostawienie baterii na późniejsze droższe godziny. Wciąż stosowane są limity SOC 20–100%, 50 A ładowania i 100 A rozładowania, zakaz eksportu baterii, próg eksportu tylko nadwyżek PV oraz degradacja 0,40 DKK/kWh DC.
-
-Algorytm jest **dyskretną symulacją** (kwadranse, 0,10 kWh DC na stan baterii), w której istniejący symulator jeszcze raz sprawdza cały plan. Energia pozostawiona na końcu otrzymuje ostrożną wartość kosztu odtworzenia według najtańszej znanej ceny; nie ma wymogu powrotu do początkowego SOC. Prognoza zużycia z v1.11.0 pozostaje bez zmian.
-
-**W HA** atrybuty sensora `Planning status` zawierają `hourly_plan`: godzinowe wartości `price_dkk_kwh`, `home_kwh`, `pv_dc_kwh`, `grid_charge_kwh`, `pv_charge_dc_kwh`, `battery_discharge_dc_kwh`, `grid_import_kwh`, `grid_export_kwh` i `soc_end_pct`. Dodatkowo dostępne są `final_soc_pct`, `grid_charge_kwh`, `discharge_dc_kwh` i `terminal_value_dkk_per_kwh_dc`. Diagnostyka podaje tylko agregaty, bez szczegółowej prywatnej serii godzinowej.
-
-**Ważne:** `hourly_plan` pokazuje fizyczny plan modelu, *nie* zaprogramowane sześć TOU Deye. Brakuje jeszcze weryfikacji rzeczywistych nastaw oraz odwzorowania planu na ograniczenie do sześciu okien. `executable=False`; żadne polecenia nie są wysyłane. Oszczędność jest teoretyczna względem **braku dodatkowych cykli baterii**, nie względem aktualnych nastaw Deye. Plan kończy się na pierwszej nieudokumentowanej luce PV; wyjątkiem są nocne krańce prognozy z 0 W potwierdzone wschodem/zachodem słońca, które od v1.12.1 otrzymują jawny model 0 kWh bez zmiany surowych danych. Utrzymujemy `partial` zamiast prezentowania fikcyjnego pokrycia całego horyzontu.
-
-
 ## Dokumentacja projektu
 
-| Plik | Zakres |
+| Plik | Cel |
 | --- | --- |
-| [REQUIREMENTS.md](requirements/REQUIREMENTS.md) | Jedyne źródło decyzji użytkownika, cel ekonomiczny i uprawnienia |
-| [HA_CONTRACT.md](requirements/HA_CONTRACT.md) | Encje HA, znaki, jednostki, kontrakt danych |
-| [OPTIMIZATION.md](requirements/OPTIMIZATION.md) | Model przepływów, prognoz i minimalizacji kosztu |
-| [EXECUTION.md](requirements/EXECUTION.md) | Wykonanie, TOU, STOP, bezpieczeństwo i zgody |
-| [VALIDATION.md](requirements/VALIDATION.md) | Wymagane regresje, odbiór, backtest |
-| [OPEN_ITEMS.md](requirements/OPEN_ITEMS.md) | Wyłącznie nadal otwarte kwestie i wymagane potwierdzenia |
-| [AGENTS.md](AGENTS.md) | Zasady pracy Codexa w tym repozytorium |
-
-Nie dodawaj równoległych specyfikacji, archiwum ani plików zawierających prywatne dane HA. Historia zmian i poprzednie wydania pozostają w Git.
+| [REQUIREMENTS](requirements/REQUIREMENTS.md) | Decyzje użytkownika, ograniczenia, zakres autonomii |
+| [HA_CONTRACT](requirements/HA_CONTRACT.md) | Encje HA, wartości, jednostki, Forecast.Solar |
+| [OPTIMIZATION](requirements/OPTIMIZATION.md) | Model przepływów i cel kosztowy |
+| [EXECUTION](requirements/EXECUTION.md) | Przyszłe wykonanie TOU, STOP i bezpieczeństwo |
+| [VALIDATION](requirements/VALIDATION.md) | Testy automatyczne i kryteria odbioru |
+| [OPEN_ITEMS](requirements/OPEN_ITEMS.md) | Wyłącznie aktualne zadania do wykonania |
+| [AGENTS](AGENTS.md) | Zasady pracy Codexa |
 
 ## Testy i wydania
 
@@ -126,14 +96,4 @@ python3.14 -m venv .venv
 .venv/bin/python scripts/check_docs.py
 ```
 
-GitHub Actions wykonuje te same kontrole. Wydania HACS wykorzystują **niezmienny tag** `vX.Y.Z`, odpowiadającą wersję manifestu i pakiet `energy_copilot.zip` z `BUILD_INFO.json` oraz `SHA256SUMS`. Utworzenie commitu na `main` **nie jest** publikacją wydania. Szczegółowe zasady odbioru, testów fizycznych i przejścia do M6: [VALIDATION.md](requirements/VALIDATION.md) oraz [EXECUTION.md](requirements/EXECUTION.md).
-
-
-## v1.13.0 — optymalizacja ciągła i diagnostyka planu
-
-- HA `dry_run` korzysta z optymalizatora ciągłego (bez kwantyzacji baterii po 0,1 kWh). Starsza metoda dyskretna pozostaje do porównań regresyjnych. Wyniki nadal są fizycznie walidowane i **nie są komendami falownika**.
-- Planowany Solar Sell zależy od **opublikowanej ceny sprzedaży ≥0,40 DKK/kWh**, a nie od aktualnego stanu przełącznika. Wykonalna konfiguracja instalacji pozostaje niezmieniona: **Load First i eksport z baterii OFF**. Falownik sam realizuje eksport nadwyżek PV; planer planuje limit prądu ładowania, nie zadaną moc eksportu.
-- `sensor.energy_co_pilot_planning_status` publikuje w `hourly_plan`: `buy_price_dkk_kwh`, `sell_price_dkk_kwh`, `solar_sell_planned_on`, `charge_current_setpoint_a`, `grid_export_kwh`, `purchase_cost_dkk`, `sales_revenue_dkk`, `pv_curtailed_dc_kwh`. Zawiera też osobne sumy kosztów zakupu i przychodu ze sprzedaży.
-- Wartość końcowa magazynu nadal **nie zakłada przyszłych cen**. Gdy występuje prognozowane zapotrzebowanie po końcu cen przed kolejną produkcją PV, używany jest wyraźnie oznaczony wskaźnik ceny odtworzenia wyliczony z końcowych **znanych** cen. Nie jest to opublikowana cena następnego dnia ani sztywny docelowy SOC.
-- W diagnostyce `load_forecast.holdout_accuracy` jest błędem prognozy ostatnich 7 dni liczonym bez włączenia okresu testowego do treningu. `observed.prospective_forecast_accuracy` porównuje prognozy PV i domu zamrożone przed kwadransem z przyjętymi bieżącymi odczytami. Oba wskaźniki **nie potwierdzają fizycznej kalibracji**; pomiar PV może być ograniczony przez falownik, a zużycie domu nadal jest bilansem pochodnym.
-- Nie zmieniono przełączników/priorytetów falownika, sześciu TOU ani trybu `automatic`. Integracja nadal działa wyłącznie w `monitor/dry_run` i nie zapisuje do urządzenia.
+`main` publikuje nowe wydanie HACS **tylko po zmianie wersji manifestu i udanym CI**. GitHub Release zawiera `energy_copilot.zip`, `BUILD_INFO.json` i `SHA256SUMS`. Scalenie zmian w samej dokumentacji **nie tworzy nowego wydania**.
