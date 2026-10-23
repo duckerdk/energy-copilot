@@ -9,7 +9,11 @@ from datetime import datetime
 
 from .horizon_optimizer import optimize_horizon
 from .models import InputSnapshot
-from .planner import InfeasibleCandidate, Plant
+from .planner import (
+    PV_EXPORT_MIN_DKK_PER_KWH,
+    InfeasibleCandidate,
+    Plant,
+)
 from .planning_inputs import (
     PlanningInputError,
     build_planning_input,
@@ -53,6 +57,9 @@ class Preview:
     grid_charge_kwh: float | None = None
     pv_charge_dc_kwh: float | None = None
     discharge_dc_kwh: float | None = None
+    purchase_cost_dkk: float | None = None
+    sales_revenue_dkk: float | None = None
+    terminal_value_basis: str | None = None
     evaluated_transitions: int = 0
     soc_resolution_dc_kwh: float | None = None
     hourly_plan: tuple[dict, ...] = ()
@@ -70,6 +77,12 @@ def _hourly_plan(quarters, dispatches, results) -> tuple[dict, ...]:
             {
                 "start": at.isoformat(),
                 "price_dkk_kwh": q.buy_dkk_per_kwh,
+                "buy_price_dkk_kwh": q.buy_dkk_per_kwh,
+                "sell_price_dkk_kwh": q.sell_dkk_per_kwh,
+                "solar_sell_planned_on": (
+                    q.pv_export_enabled
+                    and q.sell_dkk_per_kwh >= PV_EXPORT_MIN_DKK_PER_KWH
+                ),
                 "home_kwh": 0.0,
                 "pv_dc_kwh": 0.0,
                 "grid_charge_kwh": 0.0,
@@ -77,6 +90,10 @@ def _hourly_plan(quarters, dispatches, results) -> tuple[dict, ...]:
                 "battery_discharge_dc_kwh": 0.0,
                 "grid_import_kwh": 0.0,
                 "grid_export_kwh": 0.0,
+                "purchase_cost_dkk": 0.0,
+                "sales_revenue_dkk": 0.0,
+                "pv_curtailed_dc_kwh": 0.0,
+                "charge_current_setpoint_a": 0.0,
                 "soc_end_pct": 0.0,
             },
         )
@@ -87,6 +104,12 @@ def _hourly_plan(quarters, dispatches, results) -> tuple[dict, ...]:
         row["battery_discharge_dc_kwh"] += d.battery_to_home_dc_kwh
         row["grid_import_kwh"] += outcome.grid_import_kwh
         row["grid_export_kwh"] += outcome.grid_export_kwh
+        row["purchase_cost_dkk"] += outcome.purchase_dkk
+        row["sales_revenue_dkk"] += outcome.sales_dkk
+        row["pv_curtailed_dc_kwh"] += d.pv_curtailed_dc_kwh
+        row["charge_current_setpoint_a"] = max(
+            row["charge_current_setpoint_a"], outcome.charge_current_a
+        )
         row["soc_end_pct"] = outcome.soc_end_pct
     return tuple(
         {
@@ -201,6 +224,9 @@ def evaluate_preview(
         grid_charge_kwh=sum(d.grid_to_battery_ac_kwh for d in dispatches),
         pv_charge_dc_kwh=sum(d.pv_to_battery_dc_kwh for d in dispatches),
         discharge_dc_kwh=sum(d.battery_to_home_dc_kwh for d in dispatches),
+        purchase_cost_dkk=sum(q.purchase_dkk for q in candidate.quarters),
+        sales_revenue_dkk=sum(q.sales_dkk for q in candidate.quarters),
+        terminal_value_basis="min_published_buy_price_div_grid_charge_efficiency",
         soc_resolution_dc_kwh=result.soc_resolution_dc_kwh,
         hourly_plan=_hourly_plan(quarters, dispatches, candidate.quarters),
     )
