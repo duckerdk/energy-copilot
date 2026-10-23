@@ -53,8 +53,11 @@ def optimize_continuous(plant, quarters, *, terminal_value_override=None):
     if plant.initial_soc_pct < MIN_SOC:
         raise InfeasibleCandidate("soc:below_minimum")
     terminal_price = min(q.buy_dkk_per_kwh for q in quarters)
-    terminal_value = (max(0.0, terminal_price / plant.eta_grid_to_battery)
-                      if terminal_value_override is None else terminal_value_override)
+    terminal_value = (
+        max(0.0, terminal_price / plant.eta_grid_to_battery)
+        if terminal_value_override is None
+        else terminal_value_override
+    )
     calibrated = Plant(
         **{**vars(plant), "terminal_value_dkk_per_kwh_dc": terminal_value}
     )
@@ -67,6 +70,7 @@ def optimize_continuous(plant, quarters, *, terminal_value_override=None):
     n = len(quarters)
     count = 3 * n + 3
     source, sink = 0, 1
+
     # B(t): energy at start of quarter t, A(t): after SOC capacity gate,
     # C(t): shared power-limit gate for PV and grid charging in quarter t.
     def before(t):
@@ -77,6 +81,7 @@ def optimize_continuous(plant, quarters, *, terminal_value_override=None):
 
     def charge(t):
         return 4 + 3 * t
+
     network = [[] for _ in range(count)]
 
     def add_edge(fr, to, cap, price):
@@ -99,23 +104,18 @@ def optimize_continuous(plant, quarters, *, terminal_value_override=None):
         surplus = max(0.0, q.pv_dc_kwh - pv_home)
         home_from_grid = max(0.0, q.home_ac_kwh - pv_home * eta_pv)
         pv_export_allowed = (
-            q.pv_export_enabled
-            and q.sell_dkk_per_kwh >= PV_EXPORT_MIN_DKK_PER_KWH
+            q.pv_export_enabled and q.sell_dkk_per_kwh >= PV_EXPORT_MIN_DKK_PER_KWH
         )
         # Charging with PV replaces potential PV export, if enabled. This
         # opportunity cost must NOT be omitted when sell is above threshold.
         pv_charge_cost = (
-            q.sell_dkk_per_kwh
-            * plant.eta_pv_to_ac
-            / plant.eta_pv_to_battery
+            q.sell_dkk_per_kwh * plant.eta_pv_to_ac / plant.eta_pv_to_battery
             if pv_export_allowed
             else 0.0
         )
         max_charge = plant.battery_voltage_v * plant.charge_limit_a / 4000.0
         max_grid = plant.battery_voltage_v * plant.grid_charge_limit_a / 4000.0
-        max_discharge = (
-            plant.battery_voltage_v * plant.discharge_limit_a / 4000.0
-        )
+        max_discharge = plant.battery_voltage_v * plant.discharge_limit_a / 4000.0
         # SOC gate limits carried + newly charged energy, not merely carry.
         add_edge(before(i), after(i), usable, 0.0)
         add_edge(after(i), before(i + 1), usable, 0.0)
@@ -182,9 +182,7 @@ def optimize_continuous(plant, quarters, *, terminal_value_override=None):
                     continue
                 reduced = edge.cost + potential[u] - potential[edge.to]
                 if reduced < -1e-7:
-                    raise InfeasibleCandidate(
-                        "continuous:negative_reduced_cost"
-                    )
+                    raise InfeasibleCandidate("continuous:negative_reduced_cost")
                 proposal = length + max(0.0, reduced)
                 if proposal < dist[edge.to] - tolerance:
                     dist[edge.to] = proposal
@@ -237,13 +235,10 @@ def optimize_continuous(plant, quarters, *, terminal_value_override=None):
             0.0,
             (grid_edge.original - grid_edge.capacity) / plant.eta_grid_to_battery,
         )
-        battery_to_home = max(
-            0.0, discharge_edge.original - discharge_edge.capacity
-        )
+        battery_to_home = max(0.0, discharge_edge.original - discharge_edge.capacity)
         unused_pv = max(0.0, pv_surplus - pv_to_battery)
         can_export = (
-            q.pv_export_enabled
-            and q.sell_dkk_per_kwh >= PV_EXPORT_MIN_DKK_PER_KWH
+            q.pv_export_enabled and q.sell_dkk_per_kwh >= PV_EXPORT_MIN_DKK_PER_KWH
         )
         pv_export = unused_pv if can_export else 0.0
         dispatches.append(
@@ -269,4 +264,3 @@ def optimize_continuous(plant, quarters, *, terminal_value_override=None):
         soc_resolution_dc_kwh=0.0,
         method="continuous_min_cost_flow_no_soc_lattice",
     )
-
