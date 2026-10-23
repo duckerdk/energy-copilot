@@ -1,10 +1,13 @@
 """Solar geometry from the selected HA Forecast.Solar location; no provider API."""
 
-from datetime import timedelta
+from dataclasses import replace
+from datetime import UTC, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from astral import Observer
 from astral.sun import dawn, dusk, elevation, sunrise, sunset
 
+from .models import ForecastPeriod
 from .validation import number, utc
 
 
@@ -69,3 +72,71 @@ def solar_evidence(location, start, end, evaluated_at):
         return result
     result["available"] = True
     return result
+
+
+def complete_night_forecast_edges(snapshot, solar, horizon_start, horizon_end):
+    """Extend explicit 0 W sunrise/sunset boundaries through their local night.
+
+    Forecast.Solar publishes no hourly Wh before the first sunrise 0 W marker
+    or after the final sunset 0 W marker. Infer zero ONLY when the exact source
+    edge reports 0 W AND the selected PV location confirms a sunrise/sunset
+    within 30 minutes. Missing daytime intervals and missing energy records
+    inside published periods are never replaced. The original archive is not
+    changed: this returns a derived read-only planning snapshot.
+    """
+    if not solar or not solar.get("available") or not snapshot.periods:
+        return snapshot
+    start, end = utc(horizon_start), utc(horizon_end)
+    if end <= start:
+        return snapshot
+    source_first = snapshot.source_start
+    source_last = snapshot.source_end
+    if source_first is None or source_last is None:
+        return snapshot
+
+    windows = solar["intervals"]
+    sunrises = [
+        utc(item["start_utc"]) for item in windows if item["solar_state"] == "daylight"
+    ]
+    sunsets = [
+        utc(item["end_utc"]) for item in windows if item["solar_state"] == "daylight"
+    ]
+    tolerance = timedelta(minutes=30)
+    zone = ZoneInfo("Europe/Copenhagen")
+    modeled = []
+    if (
+        snapshot.first_watts_zero
+        and start < source_first
+        and any(abs(source_first - event) <= tolerance for event in sunrises)
+    ):
+        # Don't extend yesterday's unobserved night through the next daytime.
+        local_day = source_first.astimezone(zone).date()
+        midnight = datetime.combine(local_day, time.min, tzinfo=zone).astimezone(UTC)
+        left = max(start, midnight)
+        if left < source_first:
+            modeled.append(ForecastPeriod(left, source_first, 0.0))
+
+    if (
+        snapshot.last_watts_zero
+        and source_last < end
+        and any(abs(source_last - event) <= tolerance for event in sunsets)
+    ):
+        next_day = source_last.astimezone(zone).date() + timedelta(days=1)
+        midnight = datetime.combine(next_day, time.min, tzinfo=zone).astimezone(UTC)
+        right = min(end, midnight)
+        if source_last < right:
+            modeled.append(ForecastPeriod(source_last, right, 0.0))
+
+    if not modeled:
+        return snapshot
+    periods = tuple(sorted((*snapshot.periods, *modeled), key=lambda p: p.start))
+    if any(a.end > b.start for a, b in zip(periods, periods[1:])):
+        # An internal/overlapping provider period is not a valid night extension.
+        return snapshot
+    return replace(
+        snapshot,
+        periods=periods,
+        night_zero_filled_seconds=sum(
+            (p.end - p.start).total_seconds() for p in modeled
+        ),
+    )

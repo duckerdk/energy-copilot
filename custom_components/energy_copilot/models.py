@@ -47,6 +47,11 @@ class ForecastSnapshot:
     unbounded_energy_at: tuple[datetime, ...] = ()
     unbounded_prior_energy_at: tuple[datetime, ...] = ()
     missing_energy_at: tuple[datetime, ...] = ()
+    # Raw forecast edge markers; never inferred from missing provider energy.
+    first_watts_zero: bool = False
+    last_watts_zero: bool = False
+    # Edge-only zero extensions applied to the live planning copy, not archive.
+    night_zero_filled_seconds: float = 0.0
 
 
 @dataclass(frozen=True)

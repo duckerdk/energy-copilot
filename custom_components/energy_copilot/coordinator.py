@@ -35,7 +35,7 @@ from .models import InputSnapshot, Issue
 from .planning_inputs import PlanningInputError
 from .planning_preview import Preview, evaluate_preview
 from .quality import quality_report
-from .solar import solar_evidence
+from .solar import complete_night_forecast_edges, solar_evidence
 from .validation import forecast, measurement, measurements, prices
 
 _LOGGER = logging.getLogger(__name__)
@@ -244,9 +244,23 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             if snapshot.prices:
                 solar = solar_evidence(
                     solar_entry.data if solar_entry else {},
-                    max(now, snapshot.prices[0].start),
+                    min(
+                        max(now, snapshot.prices[0].start),
+                        snapshot.forecast.source_start or now,
+                    ),
                     snapshot.prices[-1].end,
                     dt_util.utcnow(),
+                )
+                # Only the live planning copy gains solar-confirmed zero-energy
+                # night edges. Stored provider payload and replay stay pristine.
+                snapshot.forecast = complete_night_forecast_edges(
+                    snapshot.forecast,
+                    solar,
+                    max(now, snapshot.prices[0].start),
+                    snapshot.prices[-1].end,
+                )
+                solar["zero_energy_inserted"] = (
+                    snapshot.forecast.night_zero_filled_seconds > 0
                 )
             self.forecast_coverage = forecast_coverage(
                 snapshot.forecast, snapshot.prices, now, solar=solar
