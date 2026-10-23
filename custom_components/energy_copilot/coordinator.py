@@ -20,6 +20,7 @@ from .const import (
     OPTIONAL_ENTITY_ROLES,
     UPDATE_INTERVAL,
 )
+from .forecast_accuracy import ForecastAccuracyWindow
 from .forecast_history import ForecastHistory
 from .forecast_quality import forecast_coverage
 from .history import HistoryReadError, RecorderHistoryReader
@@ -29,7 +30,7 @@ from .live_measurements import (
     LiveSourceContext,
     derived_templates,
 )
-from .load_forecast import forecast_seven_days
+from .load_forecast import backtest_recent_load, forecast_seven_days
 from .load_statistics import LoadStatisticsError, LoadStatisticsReader
 from .models import InputSnapshot, Issue
 from .planning_inputs import PlanningInputError
@@ -75,6 +76,8 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self.load_model = None
         self.load_forecast = None
         self.load_forecast_error = "load:awaiting_statistics"
+        self.load_backtest = None
+        self.forecast_accuracy = ForecastAccuracyWindow()
         self._last_load_training = None
         self._external_issues = []
         self._last_external = None
@@ -295,6 +298,12 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                 self.load_forecast_error = None
             except PlanningInputError as err:
                 self.load_forecast_error = err.code
+        self.forecast_accuracy.remember(
+            snapshot.at,
+            snapshot.forecast,
+            self.load_forecast.projection if self.load_forecast else None,
+        )
+        self.forecast_accuracy.observe(snapshot.at, snapshot.measurements)
         try:
             if (
                 self.settings.get("mode", "monitor") == "dry_run"
@@ -311,7 +320,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                         snapshot,
                         mode=self.settings.get("mode", "monitor"),
                         pv_export_enabled=solar_sell is not None
-                        and solar_sell.state == "on",
+                        and solar_sell.state in {"on", "off"},
                         load_projection=(
                             self.load_forecast.projection
                             if self.load_forecast
@@ -410,9 +419,13 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self._last_load_training = now
         try:
             self.load_model = await self.load_statistics_reader.async_train(now)
+            self.load_backtest = await self.hass.async_add_executor_job(
+                backtest_recent_load, self.load_model
+            )
             self.load_forecast_error = None
         except LoadStatisticsError as err:
             self.load_model = None
+            self.load_backtest = None
             self.load_forecast_error = err.code
         except Exception:
             _LOGGER.exception("Seven-day historical load training failed")

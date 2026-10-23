@@ -5,11 +5,17 @@ Output is never a Deye TOU plan, a confirmed saving or an actuator command.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
+from statistics import median
 
 from .horizon_optimizer import optimize_horizon
 from .models import InputSnapshot
-from .planner import InfeasibleCandidate, Plant
+from .planner import (
+    DEGRADATION_DKK_PER_KWH_DC,
+    PV_EXPORT_MIN_DKK_PER_KWH,
+    InfeasibleCandidate,
+    Plant,
+)
 from .planning_inputs import (
     PlanningInputError,
     build_planning_input,
@@ -53,6 +59,10 @@ class Preview:
     grid_charge_kwh: float | None = None
     pv_charge_dc_kwh: float | None = None
     discharge_dc_kwh: float | None = None
+    purchase_cost_dkk: float | None = None
+    sales_revenue_dkk: float | None = None
+    terminal_value_basis: str | None = None
+    post_horizon_load_kwh: float | None = None
     evaluated_transitions: int = 0
     soc_resolution_dc_kwh: float | None = None
     hourly_plan: tuple[dict, ...] = ()
@@ -70,6 +80,12 @@ def _hourly_plan(quarters, dispatches, results) -> tuple[dict, ...]:
             {
                 "start": at.isoformat(),
                 "price_dkk_kwh": q.buy_dkk_per_kwh,
+                "buy_price_dkk_kwh": q.buy_dkk_per_kwh,
+                "sell_price_dkk_kwh": q.sell_dkk_per_kwh,
+                "solar_sell_planned_on": (
+                    q.pv_export_enabled
+                    and q.sell_dkk_per_kwh >= PV_EXPORT_MIN_DKK_PER_KWH
+                ),
                 "home_kwh": 0.0,
                 "pv_dc_kwh": 0.0,
                 "grid_charge_kwh": 0.0,
@@ -77,6 +93,10 @@ def _hourly_plan(quarters, dispatches, results) -> tuple[dict, ...]:
                 "battery_discharge_dc_kwh": 0.0,
                 "grid_import_kwh": 0.0,
                 "grid_export_kwh": 0.0,
+                "purchase_cost_dkk": 0.0,
+                "sales_revenue_dkk": 0.0,
+                "pv_curtailed_dc_kwh": 0.0,
+                "charge_current_setpoint_a": 0.0,
                 "soc_end_pct": 0.0,
             },
         )
@@ -87,6 +107,12 @@ def _hourly_plan(quarters, dispatches, results) -> tuple[dict, ...]:
         row["battery_discharge_dc_kwh"] += d.battery_to_home_dc_kwh
         row["grid_import_kwh"] += outcome.grid_import_kwh
         row["grid_export_kwh"] += outcome.grid_export_kwh
+        row["purchase_cost_dkk"] += outcome.purchase_dkk
+        row["sales_revenue_dkk"] += outcome.sales_dkk
+        row["pv_curtailed_dc_kwh"] += d.pv_curtailed_dc_kwh
+        row["charge_current_setpoint_a"] = max(
+            row["charge_current_setpoint_a"], outcome.charge_current_a
+        )
         row["soc_end_pct"] = outcome.soc_end_pct
     return tuple(
         {
@@ -94,6 +120,46 @@ def _hourly_plan(quarters, dispatches, results) -> tuple[dict, ...]:
             for key, value in row.items()
         }
         for row in hours.values()
+    )
+
+
+def _terminal_proxy(plant, quarters, projection, pv_periods):
+    """Value unpriced post-horizon household demand without inventing tariffs.
+
+    No hypothetical next-day spot is appended to the optimization. If actual
+    future household demand is forecast before the next predicted PV arrival,
+    use a clearly labeled recent PUBLISHED purchase-price proxy for the energy
+    that would otherwise need to be bought. The old minimum-price replacement
+    value is the conservative floor; there is no fixed terminal SOC target.
+    """
+    end = quarters[-1].end
+    first_future_pv = min(
+        (
+            period.start
+            for period in pv_periods
+            if period.start >= end and period.kwh > 1e-8
+        ),
+        default=end + timedelta(hours=8),
+    )
+    until = min(first_future_pv, end + timedelta(hours=12))
+    demand = sum(
+        period.kwh
+        for period in projection.periods
+        if end <= period.start and period.end <= until
+    )
+    published = [q.buy_dkk_per_kwh for q in quarters]
+    base = max(0.0, min(published) / plant.eta_grid_to_battery)
+    if demand <= 1e-6:
+        return base, "min_published_buy_price_no_confirmed_future_load", demand
+    recent = published[-min(32, len(published)) :]
+    conservative_proxy = max(
+        0.0,
+        median(recent) * plant.eta_battery_to_ac - DEGRADATION_DKK_PER_KWH_DC,
+    )
+    return (
+        max(base, conservative_proxy),
+        "unpriced_overnight_demand_recent_published_price_proxy_unverified",
+        demand,
     )
 
 
@@ -132,19 +198,24 @@ def evaluate_preview(
         terminal_value_dkk_per_kwh_dc=TERMINAL_VALUE_DKK_PER_KWH,
     )
     try:
+        projection = load_projection or project_previous_utc_day_load(
+            snapshot, short_gap_model="linear_bracketed_unverified"
+        )
         inputs = build_planning_input(
             snapshot,
             pv_forecast_to_dc_multiplier=PV_FORECAST_TO_DC_MULTIPLIER,
             pv_export_enabled=pv_export_enabled,
             allow_prefix=True,
             pv_temporal_model="uniform_power_unverified",
-            load_projection=load_projection
-            or project_previous_utc_day_load(
-                snapshot, short_gap_model="linear_bracketed_unverified"
-            ),
+            load_projection=projection,
         )
         quarters = inputs.quarters
-        result = optimize_horizon(plant, quarters)
+        terminal_value, terminal_basis, unpriced_load = _terminal_proxy(
+            plant, quarters, projection, snapshot.forecast.periods
+        )
+        result = optimize_horizon(
+            plant, quarters, terminal_value_override=terminal_value
+        )
         candidate = result.candidate
         reference = result.reference
         dispatches = result.dispatches
@@ -201,6 +272,10 @@ def evaluate_preview(
         grid_charge_kwh=sum(d.grid_to_battery_ac_kwh for d in dispatches),
         pv_charge_dc_kwh=sum(d.pv_to_battery_dc_kwh for d in dispatches),
         discharge_dc_kwh=sum(d.battery_to_home_dc_kwh for d in dispatches),
+        purchase_cost_dkk=sum(q.purchase_dkk for q in candidate.quarters),
+        sales_revenue_dkk=sum(q.sales_dkk for q in candidate.quarters),
+        terminal_value_basis=terminal_basis,
+        post_horizon_load_kwh=unpriced_load,
         soc_resolution_dc_kwh=result.soc_resolution_dc_kwh,
         hourly_plan=_hourly_plan(quarters, dispatches, candidate.quarters),
     )

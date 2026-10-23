@@ -67,6 +67,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
                 load_forecast and load_forecast.source.startswith("derived_")
             ),
             "physical_accuracy_verified": False,
+            "holdout_accuracy": coordinator.load_backtest,
         },
         "planning_preview": {
             "status": preview.status,
@@ -93,6 +94,10 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "reference_cost_dkk": preview.reference_cost_dkk,
             "scenario_cost_dkk": preview.scenario_cost_dkk,
             "modeled_saving_dkk": preview.modeled_saving_dkk,
+            "purchase_cost_dkk": preview.purchase_cost_dkk,
+            "sales_revenue_dkk": preview.sales_revenue_dkk,
+            "terminal_value_basis": preview.terminal_value_basis,
+            "post_horizon_load_kwh": preview.post_horizon_load_kwh,
             "maximum_charging_current_a": preview.max_charge_current_a,
             "scenarios_evaluated": preview.evaluated_scenarios,
             "evaluated_transitions": preview.evaluated_transitions,
@@ -106,7 +111,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "tou_feasibility": "not_evaluated",
             "voltage_source": preview.voltage_source,
             "executable": False,
-            "scenario_selection": "single_cycle_bounded_search",
+            "scenario_selection": "whole_horizon_continuous_min_cost_flow",
             "real_deye_baseline": False,
             "efficiency_calibrated": False,
             "pv_forecast_dc_basis_verified": False,
@@ -138,6 +143,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "price_buy_tomorrow_valid": buy_attrs.get("tomorrow_valid"),
             "forecast_version": data.forecast.version if data.forecast else None,
             "forecast_coverage": coordinator.forecast_coverage,
+            "prospective_forecast_accuracy": coordinator.forecast_accuracy.summary,
             "forecast_first_start_utc": forecast_first,
             "forecast_raw_first_start_utc": data.forecast.source_start.isoformat()
             if data.forecast and data.forecast.source_start

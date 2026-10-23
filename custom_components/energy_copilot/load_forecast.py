@@ -200,3 +200,52 @@ def forecast_seven_days(
         training_hours=len(model.samples),
         training_days=model.distinct_days,
     )
+
+
+def backtest_recent_load(model: LoadModel, days: int = 7) -> dict:
+    """Out-of-sample hourly walk-forward check with no future training leakage.
+
+    Train as of the holdout start, then predict the held-out historical hours
+    using that frozen model. This is statistical accuracy, not independent
+    physical confirmation of the original home-energy measurement.
+    """
+    cutoff = model.trained_at - timedelta(days=days)
+    train = tuple(
+        row for row in model.samples if row.start + timedelta(hours=1) <= cutoff
+    )
+    test = tuple(row for row in model.samples if cutoff <= row.start < model.trained_at)
+    result = {
+        "method": "holdout_previous_7_days_train_only_older_data",
+        "source": model.source,
+        "physical_consumption_verified": False,
+        "hours_evaluated": 0,
+        "mae_kwh_per_hour": None,
+        "bias_kwh_per_hour": None,
+        "mape_percent_nonzero_hours": None,
+    }
+    if not test:
+        return result
+    try:
+        frozen = train_load_model(train, cutoff, model.source)
+    except PlanningInputError:
+        return result
+    residuals = []
+    relative = []
+    for row in test:
+        try:
+            predicted = _predict_hour(frozen, row.start, None)
+        except PlanningInputError:
+            continue
+        residuals.append(predicted - row.kwh)
+        if row.kwh >= 0.05:
+            relative.append(abs(predicted - row.kwh) / row.kwh)
+    if residuals:
+        result.update(
+            hours_evaluated=len(residuals),
+            mae_kwh_per_hour=sum(abs(v) for v in residuals) / len(residuals),
+            bias_kwh_per_hour=sum(residuals) / len(residuals),
+            mape_percent_nonzero_hours=(
+                100 * sum(relative) / len(relative) if relative else None
+            ),
+        )
+    return result

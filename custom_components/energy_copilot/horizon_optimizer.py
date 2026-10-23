@@ -1,8 +1,6 @@
-"""Bounded whole-horizon battery dispatch search for M3 dry-run only.
+"""Whole-horizon continuous HA dry-run dispatch and legacy discrete benchmark.
 
-Every quarter is considered jointly using a 0.10 kWh DC state lattice.
-The resulting complete dispatch is independently checked by simulate_candidate.
-This is a physical, not a Deye six-TOU executable, optimum.
+No inverter commands are issued; all candidates undergo independent validation.
 """
 
 from dataclasses import dataclass
@@ -96,7 +94,9 @@ def _dispatch(
     return d, cost
 
 
-def optimize_horizon(plant: Plant, quarters: tuple[Quarter, ...]) -> HorizonResult:
+def optimize_horizon_discrete(
+    plant: Plant, quarters: tuple[Quarter, ...]
+) -> HorizonResult:
     """Find minimum model cost over all available contiguous quarters.
 
     No max duration or single-charge/single-discharge restriction. End SOC may
@@ -196,4 +196,22 @@ def optimize_horizon(plant: Plant, quarters: tuple[Quarter, ...]) -> HorizonResu
         dispatches=dispatches,
         terminal_value_dkk_per_kwh_dc=terminal_value,
         evaluated_transitions=transitions,
+    )
+
+
+def optimize_horizon(
+    plant: Plant,
+    quarters: tuple[Quarter, ...],
+    *,
+    terminal_value_override: float | None = None,
+) -> HorizonResult:
+    """Primary HA dry-run optimizer: continuous flow, no 0.1 kWh SOC grid.
+
+    Keep optimize_horizon_discrete for comparison on identical inputs only.
+    The returned continuous dispatch is independently checked for every slot.
+    """
+    from .continuous_optimizer import optimize_continuous
+
+    return optimize_continuous(
+        plant, quarters, terminal_value_override=terminal_value_override
     )
