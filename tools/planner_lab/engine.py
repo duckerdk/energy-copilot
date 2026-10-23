@@ -1,7 +1,7 @@
-"""Pure scenario adapter shared by local and GitHub Pages Planner Lab.
+"""Browser-only GitHub Pages Planner Lab scenario engine.
 
-Uses original production optimizer modules and the same validated input schema.
-No Home Assistant, sockets or external Python packages required.
+Uses the original physical validator with a continuous solver.
+No local HTTP server, HA services or additional Python packages.
 """
 
 import importlib
@@ -11,6 +11,7 @@ import types
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+# Pyodide supplies /lab/core; repository tests import checked-in source directly.
 CORE_PATH = Path(__file__).resolve().parent / "core"
 if not CORE_PATH.is_dir():
     CORE_PATH = (
