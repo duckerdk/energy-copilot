@@ -53,7 +53,8 @@ def test_outage_does_not_invent_zero_pv_energy():
     tracker = ForecastAccuracyWindow()
     start = datetime(2026, 10, 23, 10, tzinfo=UTC)
     pv = ForecastSnapshot(
-        start - timedelta(minutes=1), "test",
+        start - timedelta(minutes=1),
+        "test",
         (ForecastPeriod(start, start + timedelta(minutes=15), 0.5),),
     )
     load = LoadProjection(
@@ -62,20 +63,15 @@ def test_outage_does_not_invent_zero_pv_energy():
         "test",
     )
     tracker.remember(start - timedelta(seconds=10), pv, load)
-    tracker.observe(
-        start - timedelta(seconds=10), {"pv": Sample(2, start)}
-    )
-    tracker.observe(
-        start + timedelta(minutes=20), {"pv": Sample(2, start)}
-    )
+    tracker.observe(start - timedelta(seconds=10), {"pv": Sample(2, start)})
+    tracker.observe(start + timedelta(minutes=20), {"pv": Sample(2, start)})
     assert tracker.summary["pv"]["verified_quarters"] == 0
 
 
 def test_holdout_load_model_is_frozen_before_evaluation_week():
     now = datetime(2026, 10, 23, 12, tzinfo=UTC)
     rows = tuple(
-        HourlyLoad(now - timedelta(hours=24 * 60 - i), 0.7)
-        for i in range(24 * 60)
+        HourlyLoad(now - timedelta(hours=24 * 60 - i), 0.7) for i in range(24 * 60)
     )
     model = train_load_model(rows, now, "historical_hourly")
     report = backtest_recent_load(model)
