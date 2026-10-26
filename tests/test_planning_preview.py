@@ -1,5 +1,6 @@
 """M3 Home Assistant dry-run preview acceptance and read-only behavior."""
 
+from copy import deepcopy
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
@@ -18,6 +19,7 @@ from custom_components.energy_copilot.models import (
     Sample,
 )
 from custom_components.energy_copilot.planning_preview import evaluate_preview
+from custom_components.energy_copilot.replay import simulate_replay
 
 BASE = datetime(2026, 10, 21, 10, tzinfo=UTC)
 STEP = timedelta(minutes=15)
@@ -329,6 +331,9 @@ async def test_ha_diagnostics_labels_unverified_pv_resolution_and_no_commands(
     assert state.attributes["load_modeled_quarters"] == 0
     assert state.attributes["executable"] is False
     diag = await async_get_config_entry_diagnostics(hass, entry)
+    assert diag["planner_replay"]["schema"] == "energy-copilot/ha-replay/v1"
+    assert simulate_replay(diag["planner_replay"])["identical"] is True
+    assert "replay_snapshot" not in state.attributes
     assert diag["planning_preview"]["pv_temporal_model"] == "uniform_power_unverified"
     assert diag["planning_preview"]["pv_temporal_modeled_quarters"] > 0
     assert diag["planning_preview"]["load_modeled_quarters"] == 0
@@ -453,3 +458,54 @@ async def test_preview_exception_does_not_turn_m2_input_quality_unavailable(
     assert coordinator.planning_preview.reason == "planner:internal_error"
     assert hass.states.get("sensor.energy_co_pilot_input_quality").state == "valid"
     assert hass.states.get("sensor.energy_co_pilot_planning_status").state == "blocked"
+
+
+def test_preview_replay_snapshot_uses_exact_frozen_quarters_and_same_solver():
+    preview = evaluate_preview(snapshot(hours=3, pv=0.12, soc=63.7, voltage=52.4), mode="dry_run")
+    assert preview.status == "preview"
+    frozen = preview.replay_snapshot
+    assert frozen["schema"] == "energy-copilot/ha-replay/v1"
+    assert frozen["executable"] is False
+    assert len(frozen["quarters"]) == preview.quarters == 12
+    assert frozen["plant"]["initial_soc_pct"] == 63.7
+    assert frozen["plant"]["battery_voltage_v"] == 52.4
+    assert frozen["terminal_value_override_dkk_per_kwh_dc"] == preview.terminal_value_dkk_per_kwh_dc
+    replayed = simulate_replay(frozen)
+    assert replayed["identical"] is True
+    assert replayed["mismatch_count"] == 0
+    assert replayed["summary_ha"] == replayed["summary_lab"]
+    assert replayed["read_only"] is True
+
+
+def test_replay_detects_changed_inputs_and_tampered_expected_output():
+    original = evaluate_preview(snapshot(hours=4, pv=0.05), mode="dry_run").replay_snapshot
+    altered = deepcopy(original)
+    altered["expected"]["quarters"][0]["soc_end_pct"] += 0.2
+    compared = simulate_replay(altered)
+    assert not compared["identical"]
+    assert any(x["field"] == "soc_end_pct" for x in compared["mismatches"])
+
+    changed_input = deepcopy(original)
+    changed_input["quarters"][0]["buy_dkk_per_kwh"] += 0.4
+    compared = simulate_replay(changed_input)
+    assert not compared["identical"]
+    assert compared["mismatch_count"] > 0
+
+
+def test_replay_rejects_missing_partial_or_wrong_version_snapshot():
+    import pytest
+
+    original = evaluate_preview(snapshot(), mode="dry_run").replay_snapshot
+    for altered in (
+        {},
+        {**original, "schema": "old-replay-v0"},
+        {**original, "expected": None},
+        {**original, "executable": True},
+    ):
+        with pytest.raises(ValueError):
+            simulate_replay(altered)
+    broken = deepcopy(original)
+    broken["quarters"][1]["start"] = broken["quarters"][0]["start"]
+    with pytest.raises(ValueError, match="non_contiguous"):
+        simulate_replay(broken)
+
