@@ -346,6 +346,98 @@ assert.equal(dst.end, "2026-10-25T23:00:00.000Z");
     assert completed.returncode == 0, completed.stderr
 
 
+def test_editable_ha_scenario_uses_exact_quarter_inputs_and_original_solver():
+    """Browser-side graph projection preserves inputs, partial hours and costs."""
+    if which("node") is None:
+        pytest.skip("Node.js unavailable")
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "tools"
+        / "planner_lab"
+        / "replay_scenario.js"
+    )
+    script = r"""
+const assert = require("node:assert/strict");
+const parser = require(process.argv[1]);
+const quarters = [
+  {start:"2026-10-26T07:30:00+00:00",end:"2026-10-26T07:45:00+00:00",
+   buy_dkk_per_kwh:1.2,sell_dkk_per_kwh:0.1,pv_dc_kwh:0.12,home_ac_kwh:0.3,
+   pv_export_enabled:false},
+  {start:"2026-10-26T07:45:00+00:00",end:"2026-10-26T08:00:00+00:00",
+   buy_dkk_per_kwh:1.3,sell_dkk_per_kwh:0.1,pv_dc_kwh:0.08,home_ac_kwh:0.2,
+   pv_export_enabled:true},
+];
+const original={schema:"energy-copilot/ha-replay/v1",plant:{initial_soc_pct:55},
+  quarters,expected:{summary:{},quarters:[{},{}]},
+  terminal_value_override_dkk_per_kwh_dc:1.1,executable:false};
+const edited=parser.makeEditable(original);
+edited.quarters[0].home_ac_kwh=0.9;
+assert.equal(original.quarters[0].home_ac_kwh,0.3);
+assert.equal(edited.quarters[0].home_ac_kwh,0.9);
+const actual=[
+ {soc_start_pct:55,soc_end_pct:54,
+  grid_to_battery_ac_kwh:0,pv_to_battery_dc_kwh:0,
+  battery_to_home_dc_kwh:0.10,pv_to_export_dc_kwh:0,
+  pv_curtailed_dc_kwh:0,grid_import_kwh:0.6,grid_export_kwh:0,
+  purchase_dkk:0.72,sales_dkk:0,degradation_dkk:0.04},
+ {soc_start_pct:54,soc_end_pct:52,
+  grid_to_battery_ac_kwh:0,pv_to_battery_dc_kwh:0,
+  battery_to_home_dc_kwh:0.18,pv_to_export_dc_kwh:0,
+  pv_curtailed_dc_kwh:0,grid_import_kwh:0.2,grid_export_kwh:0,
+  purchase_dkk:0.26,sales_dkk:0,degradation_dkk:0.072},
+];
+const result={summary_lab:{
+ final_soc_pct:52,objective_dkk:-3,reference_objective_dkk:-1,
+ purchase_cost_dkk:0.98,sales_revenue_dkk:0,
+ grid_charge_ac_kwh:0,pv_charge_dc_kwh:0,battery_discharge_dc_kwh:0.28,
+ pv_curtailed_dc_kwh:0
+},quarters:quarters.map((q,i)=>({start:q.start,lab:actual[i]}))};
+const display=parser.summarizeReplay(result,edited);
+assert.equal(display.hourly.length,1);
+assert.equal(display.hourly[0].start_utc,"2026-10-26T07:00:00.000Z");
+assert.equal(display.hourly[0].pv_kw,0.4);
+assert.equal(display.hourly[0].home_kw,2.2);
+assert.equal(display.hourly[0].quarter_count,2);
+assert.equal(display.hourly[0].discharge_dc_kwh,0.28);
+assert.equal(display.quarters.length,2);
+assert.equal(display.summary.final_soc_pct,52);
+assert.equal(display.summary.purchase_cost_dkk,0.98);
+assert.equal(display.summary.plan_objective_dkk,-3);
+assert.equal(display.summary.terminal_value_dkk,4.092);
+assert.throws(()=>parser.makeEditable({}),/snapshotu/);
+"""
+    result = run(["node", "-e", script, str(source)], text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+
+
+def test_imported_ha_data_drives_simulation_instead_of_manual_hourly_fields():
+    """The imported quarter mode must be wired through controls, worker and charts."""
+    root = Path(__file__).resolve().parents[1]
+    html = (root / "tools/planner_lab/index.html").read_text(encoding="utf-8")
+    worker = (root / "tools/planner_lab/worker.js").read_text(encoding="utf-8")
+    pages = (root / ".github/workflows/planner-lab-pages.yml").read_text()
+    assert "ha-scenario-panel" in html
+    assert "ha-input-rows" in html
+    assert "ha-eta-pv-battery" in html
+    assert "ha-terminal" in html
+    assert "activateHaScenario(edited)" in html
+    assert "if(workerReady)runHaScenario()" in html
+    assert 'type:"ha_scenario"' in html
+    assert 'msg.kind==="ha_scenario_result"' in html
+    assert "ReplayScenario.summarizeReplay(result,haScenario)" in html
+    assert 'renderOutput(display)' in html
+    assert "ha_scenario" in worker and "simulate_replay" in worker
+    assert "replay_scenario.js" in html and "replay_scenario.js" in pages
+    if which("node") is not None:
+        for filename in ("replay_scenario.js", "worker.js"):
+            result = run(
+                ["node", "--check", str(root / "tools/planner_lab" / filename)],
+                text=True,
+                capture_output=True,
+            )
+            assert result.returncode == 0, result.stderr
+
+
 def test_ha_import_parser_javascript_syntax():
     if which("node") is None:
         pytest.skip("Node.js unavailable")
