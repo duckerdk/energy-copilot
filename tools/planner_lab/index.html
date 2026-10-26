@@ -61,7 +61,7 @@ tbody tr:nth-child(2n){background:#1b2938}
 
 <div class="note">Strona GitHub Pages uruchamia <b>ciągły silnik scenariuszy w przeglądarce</b> (Pyodide/Python), a nie kopię algorytmu w JavaScript. Przy pierwszym otwarciu wymagany jest internet do załadowania środowiska Pyodide. Wprowadzone scenariusze nie są wysyłane na serwer. Wariant bazowy oznacza brak cykli baterii, <b>nie</b> rzeczywistą strategię Deye. Plan nie jest zweryfikowany dla sześciu okien TOU. Parametry godzinowe PV i domu są równomiernie rozłożone na cztery kwadranse.</div>
 
-<section class="panel">
+<section class="panel" id="manual-config-panel">
   <h2>Scenariusz i parametry instalacji</h2>
   <div class="controls">
     <label class="field">Scenariusz<select id="preset">
@@ -111,9 +111,41 @@ tbody tr:nth-child(2n){background:#1b2938}
   </div>
 </section>
 
+<section class="panel" id="ha-scenario-panel" hidden>
+  <h2>Scenariusz z Home Assistant — dane wejściowe do edycji</h2>
+  <p class="muted">Dane z diagnostyki HA zostały wczytane do symulacji. Edytuj SOC, napięcie, parametry baterii lub dowolny kwadrans. **„Oblicz plan na danych HA”** uruchamia produkcyjny solver ponownie, a wykresy poniżej pokazują nowy wynik. Porównanie Replay powyżej pozostaje niezależnym testem oryginalnego planu HA. Ceny zakupu/sprzedaży są dokładnie z HA — bez taryfy N1 z przykładów.</p>
+  <div class="controls">
+    <label class="field">Początkowy SOC (%)<input id="ha-soc" inputmode="decimal" type="number" min="20" max="100" step=".01"></label>
+    <label class="field">Pojemność baterii (kWh DC)<input id="ha-capacity" type="number" min=".1" step=".001"></label>
+    <label class="field">Napięcie baterii (V)<input id="ha-voltage" type="number" min="1" step=".01"></label>
+    <label class="field">Maks. prąd ładowania (A)<input id="ha-charge" type="number" min="0" step=".01"></label>
+    <label class="field">Maks. prąd ładowania sieciowego (A)<input id="ha-grid" type="number" min="0" step=".01"></label>
+    <label class="field">Maks. prąd rozładowania (A)<input id="ha-discharge" type="number" min="0" step=".01"></label>
+    <label class="field">Sprawność PV → AC<input id="ha-eta-pv-ac" type="number" min=".01" max="1" step=".001"></label>
+    <label class="field">Sprawność PV → bateria<input id="ha-eta-pv-battery" type="number" min=".01" max="1" step=".001"></label>
+    <label class="field">Sprawność sieć → bateria<input id="ha-eta-grid-battery" type="number" min=".01" max="1" step=".001"></label>
+    <label class="field">Sprawność bateria → AC<input id="ha-eta-battery-ac" type="number" min=".01" max="1" step=".001"></label>
+    <label class="field">Wycena końcowego SOC (DKK/kWh DC)<input id="ha-terminal" type="number" min="0" step=".000001"></label>
+  </div>
+  <div class="actions">
+    <button id="ha-simulate" class="primary" disabled>Oblicz plan na danych HA</button>
+    <button id="ha-reset">Przywróć oryginalne dane HA</button>
+    <button id="ha-save">Zapisz zmieniony scenariusz JSON</button>
+    <button id="ha-manual">Wróć do scenariusza godzinowego</button>
+    <span class="status" id="ha-status"></span>
+  </div>
+  <p class="plain" id="ha-horizon"></p>
+  <div class="table-wrap"><table class="hour-table"><thead><tr>
+    <th>Kwadrans (czas DK)</th><th>Zakup (DKK/kWh)</th><th>Sprzedaż (DKK/kWh)</th>
+    <th>PV (kWh DC)</th><th>Dom (kWh AC)</th><th>Solar Sell dozwolony</th>
+  </tr></thead><tbody id="ha-input-rows"></tbody></table></div>
+  <div class="plain">Dane kwadransowe (15 min) są zachowywane bez uśredniania przy optymalizacji. Edytujesz wyłącznie kopię scenariusza; oryginalny wynik z diagnostyki służy do porównania. Wykres grupuje przepływy godzinowo, a eksport wyników CSV zachowuje wszystkie kwadranse.</div>
+</section>
+
 <section id="output" hidden>
+  <div class="note" id="output-source-note" hidden></div>
   <div class="kpis" id="kpis"></div>
-  <div class="panel"><div class="chart-title"><h2>Przepływy baterii</h2><small>kWh na godzinę · słupki ujemne = rozładowanie</small></div>
+  <div class="panel"><div class="chart-title"><h2>Przepływy baterii</h2><small>kWh na godzinę (lub niepełną godzinę) · słupki ujemne = rozładowanie</small></div>
     <div class="legend"><span style="--c:#50aaff">Ładowanie z sieci (AC)</span><span style="--c:#55cc8a">Ładowanie PV (DC)</span><span style="--c:#ff6974">Rozładowanie (DC)</span></div>
     <div class="chartbox"><svg class="plot" id="energy-chart" viewBox="0 0 1100 300"></svg></div>
   </div>
@@ -131,7 +163,7 @@ tbody tr:nth-child(2n){background:#1b2938}
   </div>
 </section>
 
-<section class="panel">
+<section class="panel" id="manual-input-panel">
   <div class="chart-title"><h2>Ręczne dane godzinowe</h2>
     <div class="row"><button id="import-price-ha">Import cen HA (.txt)</button>
       <input id="price-ha-file" type="file" accept=".txt,.yaml,.yml,text/plain">
@@ -154,6 +186,7 @@ tbody tr:nth-child(2n){background:#1b2938}
 </section>
 
 <script src="./data_import.js"></script>
+<script src="./replay_scenario.js"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -172,6 +205,7 @@ const OBSERVED_HOME_KW = [
 const label = {charge_grid:"Ładowanie z sieci",charge_pv:"Ładowanie PV",discharge:"Rozładowanie",hold:"Bez cyklu"};
 let rows = [], latest = null;
 let replayData = null, replayResult = null, replayRequestId = 0;
+let haScenario = null, haScenarioResult = null, haRequestId = 0;
 let uploadedHa = {prices:null, solar:null};
 const nfmt = (v,n=2) => Number(v).toLocaleString("pl-PL",{minimumFractionDigits:n,maximumFractionDigits:n});
 const num = v => Number(String(v).trim().replace(",","."));
@@ -492,7 +526,7 @@ function renderOutput(data){
   $("result-rows").replaceChildren();
   data.hourly.forEach(d=>{
     const tr=document.createElement("tr");
-    [local(d.start_utc),nfmt(d.spot,3),nfmt(d.buy,3),nfmt(d.sell,3),nfmt(d.pv_kw),nfmt(d.home_kw)].forEach(v=>{
+    [local(d.start_utc),d.spot===null?"—":nfmt(d.spot,3),nfmt(d.buy,3),nfmt(d.sell,3),nfmt(d.pv_kw),nfmt(d.home_kw)].forEach(v=>{
       const td=document.createElement("td");td.textContent=v;tr.append(td);
     });
     const status=document.createElement("td");const b=document.createElement("span");b.className="mode "+d.mode;
