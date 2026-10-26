@@ -1,0 +1,72 @@
+name: Publish HACS release after version change
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - custom_components/energy_copilot/manifest.json
+      - .github/workflows/publish-version-on-main.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: energy-copilot-version-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Determine exact version and avoid republishing
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="$(python -c 'import json; print(json.load(open("custom_components/energy_copilot/manifest.json"))["version"])')"
+          TAG="v${VERSION}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Validate integration before tagging
+        if: steps.version.outputs.exists == 'false'
+        run: |
+          set -euo pipefail
+          pip install -r requirements-test.txt
+          ruff check custom_components tests scripts/build_release.py
+          ruff format --check custom_components tests scripts/build_release.py
+          pytest --cov=custom_components.energy_copilot --cov-report=term-missing
+          python scripts/check_docs.py
+      - name: Create immutable version tag and checked package
+        if: steps.version.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if git rev-parse --verify "refs/tags/${TAG}" >/dev/null 2>&1; then
+            test "$(git rev-parse "refs/tags/${TAG}^{commit}")" = "$GITHUB_SHA"
+          else
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f "ref=refs/tags/${TAG}" -f "sha=${GITHUB_SHA}"
+            git fetch origin "refs/tags/${TAG}:refs/tags/${TAG}"
+          fi
+          python scripts/build_release.py --tag "$TAG" --commit "$GITHUB_SHA" --output /tmp/energy-copilot-release
+          gh release create "$TAG" \
+            /tmp/energy-copilot-release/energy_copilot.zip \
+            /tmp/energy-copilot-release/SHA256SUMS \
+            /tmp/energy-copilot-release/BUILD_INFO.json \
+            --verify-tag --title "Energy Co-Pilot $TAG" \
+            --notes "Verified Energy Co-Pilot release from commit $GITHUB_SHA."
