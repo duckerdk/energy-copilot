@@ -188,7 +188,9 @@ def test_continuous_dispatch_covers_small_evening_deficit_after_pv():
     q18 = result["quarters"][18 * 4 : 19 * 4]
     q19 = result["quarters"][19 * 4 : 20 * 4]
     assert result["summary"]["soc_step_dc_kwh"] == 0.0
-    assert result["summary"]["solver"] == "continuous_min_cost_flow_risk_aware_pv_headroom"
+    assert (
+        result["summary"]["solver"] == "continuous_min_cost_flow_risk_aware_pv_headroom"
+    )
     assert result["hourly"][18]["grid_import_ac_kwh"] == pytest.approx(0.0, abs=0.0001)
     assert result["hourly"][19]["grid_import_ac_kwh"] == pytest.approx(0.0, abs=0.0001)
     assert [row["discharge_dc_kwh"] for row in q18] == pytest.approx(
