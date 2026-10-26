@@ -548,7 +548,9 @@ def test_terminal_proxy_scales_with_demand_before_next_pv():
     pv = (ForecastPeriod(next_pv, next_pv + STEP, 2.0),)
 
     def price_for(kwh):
-        load = SimpleNamespace(periods=(SimpleNamespace(start=end, end=end+STEP, kwh=kwh),))
+        load = SimpleNamespace(
+            periods=(SimpleNamespace(start=end, end=end + STEP, kwh=kwh),)
+        )
         return _terminal_proxy(plant, quarters, load, pv)[0]
 
     assert price_for(0) == 0
