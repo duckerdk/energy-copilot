@@ -69,6 +69,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "physical_accuracy_verified": False,
             "holdout_accuracy": coordinator.load_backtest,
         },
+        "planner_replay": preview.replay_snapshot,
         "planning_preview": {
             "status": preview.status,
             "reason": preview.reason,
