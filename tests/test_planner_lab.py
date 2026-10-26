@@ -273,10 +273,7 @@ def test_ha_price_and_forecast_text_import_node():
     if which("node") is None:
         pytest.skip("Node.js unavailable")
     parser = (
-        Path(__file__).resolve().parents[1]
-        / "tools"
-        / "planner_lab"
-        / "data_import.js"
+        Path(__file__).resolve().parents[1] / "tools" / "planner_lab" / "data_import.js"
     )
     script = r"""
 const assert = require("node:assert/strict");
@@ -348,10 +345,7 @@ def test_ha_import_parser_javascript_syntax():
     if which("node") is None:
         pytest.skip("Node.js unavailable")
     script = (
-        Path(__file__).resolve().parents[1]
-        / "tools"
-        / "planner_lab"
-        / "data_import.js"
+        Path(__file__).resolve().parents[1] / "tools" / "planner_lab" / "data_import.js"
     )
     checked = run(["node", "--check", str(script)], capture_output=True, text=True)
     assert checked.returncode == 0, checked.stderr
