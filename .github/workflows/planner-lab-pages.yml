@@ -33,7 +33,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p _site/planner-lab
-          cp tools/planner_lab/index.html tools/planner_lab/worker.js tools/planner_lab/engine.py _site/planner-lab/
+          cp tools/planner_lab/index.html tools/planner_lab/worker.js tools/planner_lab/engine.py tools/planner_lab/data_import.js _site/planner-lab/
           cp custom_components/energy_copilot/planner.py custom_components/energy_copilot/horizon_optimizer.py _site/planner-lab/
           touch _site/.nojekyll
           printf '%s\n' '<!doctype html><html lang="pl"><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=./planner-lab/"><title>Planner Lab</title><a href="./planner-lab/">Otwórz Planner Lab</a></html>' > _site/index.html

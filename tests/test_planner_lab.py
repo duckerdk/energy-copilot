@@ -263,3 +263,89 @@ def test_site_is_static_without_server_post_or_independent_optimizer():
     assert "custom_components/energy_copilot/planner.py" in workflow
     assert "custom_components/energy_copilot/horizon_optimizer.py" in workflow
     assert "payload:payload()" in html
+    assert "data_import.js" in html
+    assert "data_import.js" in workflow
+    assert "import-price-ha" in html and "import-pv-ha" in html
+
+
+def test_ha_price_and_forecast_text_import_node():
+    """Parse HA YAML-like exports without uploads, external packages or data leakage."""
+    if which("node") is None:
+        pytest.skip("Node.js unavailable")
+    parser = (
+        Path(__file__).resolve().parents[1] / "tools" / "planner_lab" / "data_import.js"
+    )
+    script = r"""
+const assert = require("node:assert/strict");
+const imp = require(process.argv[1]);
+const prices = imp.parsePriceFile(
+  "raw_today:\n- hour: '2026-10-26T00:00:00+01:00'\n  price: 0.43\n"
+  + "- hour: '2026-10-26T01:00:00+01:00'\n  price: 0.515\n"
+);
+assert.equal(prices.start, "2026-10-25T23:00:00.000Z");
+assert.equal(prices.end, "2026-10-26T01:00:00.000Z");
+assert.equal(prices.hours[1].spot, 0.515);
+assert.throws(
+  () => imp.parsePriceFile(
+    "raw_today:\n- hour: '2026-10-26T00:00:00+01:00'\n  price: 0.43\n"
+    + "- hour: '2026-10-26T02:00:00+01:00'\n  price: 0.515\n"
+  ), /kolejne/
+);
+assert.throws(
+  () => imp.parsePriceFile(
+    "raw_today:\n- hour: '2026-10-26T00:00:00+01:00'\n  price: 0.43\n"
+    + "- hour: '2026-10-26T00:00:00+01:00'\n  price: 0.515\n"
+  ), /kolejne/
+);
+const solar = imp.parseSolarFile(
+  "watts:\n"
+  + "  '2026-10-26T07:30:00+01:00': 0\n"
+  + "  '2026-10-26T08:30:00+01:00': 800\n"
+  + "  '2026-10-26T09:00:00+01:00': 0\n"
+  + "wh_period:\n"
+  + "  '2026-10-26T07:30:00+01:00': 0\n"
+  + "  '2026-10-26T08:30:00+01:00': 600\n"
+  + "  '2026-10-26T09:00:00+01:00': 300\n"
+);
+assert.equal(solar.hours.length, 24);
+assert.equal(solar.start, "2026-10-25T23:00:00.000Z");
+assert.equal(solar.end, "2026-10-26T23:00:00.000Z");
+assert.equal(solar.totalKwh, 0.9);
+assert.ok(Math.abs(solar.hours[7].pv_kw - 0.3) < 1e-9);
+assert.ok(Math.abs(solar.hours[8].pv_kw - 0.6) < 1e-9);
+assert.equal(solar.hours[5].pv_kw, 0);
+assert.equal(solar.hours[19].pv_kw, 0);
+assert.throws(
+  () => imp.parseSolarFile(
+    "watts:\n  '2026-10-26T07:30:00+01:00': 1\n"
+    + "  '2026-10-26T08:30:00+01:00': 0\n"
+    + "wh_period:\n  '2026-10-26T07:30:00+01:00': 0\n"
+    + "  '2026-10-26T08:30:00+01:00': 10\n"
+  ), /0 W/
+);
+const dst = imp.parseSolarFile(
+  "watts:\n  '2026-10-25T07:00:00+01:00': 0\n"
+  + "  '2026-10-25T08:00:00+01:00': 0\n"
+  + "wh_period:\n  '2026-10-25T07:00:00+01:00': 0\n"
+  + "  '2026-10-25T08:00:00+01:00': 0\n"
+);
+assert.equal(dst.hours.length, 25);
+assert.equal(dst.start, "2026-10-24T22:00:00.000Z");
+assert.equal(dst.end, "2026-10-25T23:00:00.000Z");
+"""
+    completed = run(
+        ["node", "-e", script, str(parser)],
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_ha_import_parser_javascript_syntax():
+    if which("node") is None:
+        pytest.skip("Node.js unavailable")
+    script = (
+        Path(__file__).resolve().parents[1] / "tools" / "planner_lab" / "data_import.js"
+    )
+    checked = run(["node", "--check", str(script)], capture_output=True, text=True)
+    assert checked.returncode == 0, checked.stderr
