@@ -20,8 +20,8 @@ class Headroom:
 def headroom_schedule(plant, quarters, observed_pv_upside_kwh=None):
     """Price a rolling 2-hour buffer based on PV upside and future home value.
 
-    PV positive forecast limits exposure to daylight and prevents hypothetical
-    night charging penalties. If 16 real observed quarters are available,
+    Only expected PV inside the NEXT eight quarters activates the buffer.
+    This also prices headroom before sunrise, influencing night charging. If 16 real observed quarters are available,
     their underprediction p75 supplements a forecast-relative 35% uncertainty
     band, rather than asserting that curtailed PV was physically observed.
     Opportunity costs are spread across eight 15-minute quarters so storing
@@ -32,11 +32,6 @@ def headroom_schedule(plant, quarters, observed_pv_upside_kwh=None):
     empirical = max(0.0, float(observed_pv_upside_kwh)) if verified else 0.0
     periods = []
     for i, q in enumerate(quarters):
-        if q.pv_dc_kwh <= 0.01 or (
-            q.pv_export_enabled and q.sell_dkk_per_kwh >= PV_EXPORT_MIN_DKK_PER_KWH
-        ):
-            periods.append(Headroom())
-            continue
         expected_extra = 0.0
         for ahead in quarters[i : i + 8]:
             if ahead.pv_dc_kwh <= 0.01 or (
