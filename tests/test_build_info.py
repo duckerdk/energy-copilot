@@ -64,7 +64,7 @@ async def test_native_diagnostics_identifies_installed_manifest_without_git_head
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     diagnostics = await async_get_config_entry_diagnostics(hass, entry)
-    assert diagnostics["integration_manifest"]["version"] == "1.13.0"
+    assert diagnostics["integration_manifest"]["version"] == "1.14.0"
     assert diagnostics["installed_build"]["integrity"] == "metadata_unavailable"
     assert diagnostics["installed_build"]["commit"] is None
     assert (
