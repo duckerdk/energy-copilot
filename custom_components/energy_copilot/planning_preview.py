@@ -16,6 +16,7 @@ from .planner import (
     InfeasibleCandidate,
     Plant,
 )
+from .replay import build_replay
 from .planning_inputs import (
     PlanningInputError,
     build_planning_input,
@@ -66,6 +67,7 @@ class Preview:
     evaluated_transitions: int = 0
     soc_resolution_dc_kwh: float | None = None
     hourly_plan: tuple[dict, ...] = ()
+    replay_snapshot: dict | None = None
 
 
 def _hourly_plan(quarters, dispatches, results) -> tuple[dict, ...]:
@@ -278,4 +280,17 @@ def evaluate_preview(
         post_horizon_load_kwh=unpriced_load,
         soc_resolution_dc_kwh=result.soc_resolution_dc_kwh,
         hourly_plan=_hourly_plan(quarters, dispatches, candidate.quarters),
+        replay_snapshot=build_replay(
+            plant,
+            quarters,
+            result,
+            metadata={
+                "forecast_version": inputs.pv_forecast_version,
+                "load_method": inputs.load_method,
+                "voltage_source": voltage_source,
+                "coverage": inputs.coverage_status,
+                "terminal_value_basis": terminal_basis,
+                "source_release": "1.14.0",
+            },
+        ),
     )
