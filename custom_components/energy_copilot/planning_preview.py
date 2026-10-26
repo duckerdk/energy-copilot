@@ -233,12 +233,16 @@ def evaluate_preview(
             plant, quarters, projection, snapshot.forecast.periods
         )
         result = optimize_horizon(
-            plant, quarters, terminal_value_override=terminal_value,
+            plant,
+            quarters,
+            terminal_value_override=terminal_value,
             pv_underprediction_kwh=pv_underprediction_kwh,
         )
         baseline = (
             optimize_horizon(
-                plant, quarters, terminal_value_override=terminal_value,
+                plant,
+                quarters,
+                terminal_value_override=terminal_value,
                 enable_pv_headroom=False,
             )
             if any(h.target_dc_kwh > 1e-8 for h in result.pv_headroom)
@@ -308,9 +312,9 @@ def evaluate_preview(
         pv_headroom_max_dc_kwh=max(
             (h.target_dc_kwh for h in result.pv_headroom), default=0.0
         ),
-        pv_headroom_max_pct=100.0 * max(
-            (h.target_dc_kwh for h in result.pv_headroom), default=0.0
-        ) / plant.battery_capacity_dc_kwh,
+        pv_headroom_max_pct=100.0
+        * max((h.target_dc_kwh for h in result.pv_headroom), default=0.0)
+        / plant.battery_capacity_dc_kwh,
         pv_headroom_source=(
             "measured_pv_underprediction_p75_bounded"
             if pv_underprediction_kwh is not None
