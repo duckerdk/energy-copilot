@@ -89,6 +89,28 @@ tbody tr:nth-child(2n){background:#1b2938}
   </div>
 </section>
 
+<section class="panel" id="replay-panel">
+  <h2>Replay HA — dokładne odtworzenie planu</h2>
+  <p class="muted">Wybierz pełną diagnostykę Energy Co-Pilot z HA v1.14.0 (Ustawienia → Urządzenia i usługi → Energy Co-Pilot → Pobierz diagnostykę). Plik musi zawierać <code>data.planner_replay</code>. Lab wykorzysta dokładne kwadranse, SOC, napięcie, ceny zakupu/sprzedaży, prognozę domu, PV i wartość końcową zapisane podczas jednego przebiegu HA. Niczego nie przelicza z taryf N1 lub eksportowanych godzinowych plików. Plik jest przetwarzany lokalnie w przeglądarce.</p>
+  <div class="actions">
+    <button id="import-replay">Wczytaj diagnostykę HA (.json)</button>
+    <input id="replay-file" type="file" accept=".json,application/json">
+    <button id="run-replay" class="primary" disabled>Porównaj HA i Lab</button>
+    <span class="status" id="replay-status">Wczytaj diagnostykę z wersji 1.14.0 lub nowszej.</span>
+  </div>
+  <div id="replay-output" hidden>
+    <div class="kpis" id="replay-kpis"></div>
+    <div class="chart-title"><h2>Porównanie kwadrans po kwadransie</h2>
+      <button id="replay-export-results">Eksport porównania CSV</button></div>
+    <div class="table-wrap"><table><thead><tr>
+      <th>Czas DK</th><th>Cena zakupu</th><th>PV (kWh)</th><th>Dom (kWh)</th>
+      <th>SOC HA / Lab (%)</th><th>Sieć→bat. HA / Lab</th><th>PV→bat. HA / Lab</th>
+      <th>Bat.→dom HA / Lab</th><th>Import HA / Lab</th><th>Eksport HA / Lab</th><th>Maks. różnica</th>
+    </tr></thead><tbody id="replay-rows"></tbody></table></div>
+    <p id="replay-details" class="plain"></p>
+  </div>
+</section>
+
 <section id="output" hidden>
   <div class="kpis" id="kpis"></div>
   <div class="panel"><div class="chart-title"><h2>Przepływy baterii</h2><small>kWh na godzinę · słupki ujemne = rozładowanie</small></div>
@@ -149,6 +171,7 @@ const OBSERVED_HOME_KW = [
 ];
 const label = {charge_grid:"Ładowanie z sieci",charge_pv:"Ładowanie PV",discharge:"Rozładowanie",hold:"Bez cyklu"};
 let rows = [], latest = null;
+let replayData = null, replayResult = null, replayRequestId = 0;
 let uploadedHa = {prices:null, solar:null};
 const nfmt = (v,n=2) => Number(v).toLocaleString("pl-PL",{minimumFractionDigits:n,maximumFractionDigits:n});
 const num = v => Number(String(v).trim().replace(",","."));
@@ -319,8 +342,17 @@ function initializeEngine(){
         workerReady=true;
         button.disabled=false;
         setStatus("Silnik Python gotowy. Można uruchomić symulację.");
+        $("run-replay").disabled = !replayData;
       }else if(msg.kind==="init_error"){
-        workerReady=false;button.disabled=true;setStatus(msg.error,true);
+        workerReady=false;button.disabled=true;$("run-replay").disabled=true;setStatus(msg.error,true);
+      }else if(msg.kind==="replay_result" && msg.id===replayRequestId){
+        replayResult=msg.data;
+        renderReplay(msg.data);
+        $("run-replay").disabled=false;
+      }else if(msg.kind==="replay_error" && msg.id===replayRequestId){
+        $("replay-status").textContent="Błąd Replay: "+msg.error;
+        $("replay-status").className="status error";
+        $("run-replay").disabled=false;
       }else if(msg.id===requestId && msg.kind==="result"){
         latest=msg.data;renderOutput(msg.data);
         setStatus("Plan policzony przez oryginalny optymalizator Python.");
@@ -331,7 +363,7 @@ function initializeEngine(){
       }
     };
     computeWorker.onerror=event=>{
-      workerReady=false;button.disabled=true;
+      workerReady=false;button.disabled=true;$("run-replay").disabled=true;
       setStatus("Błąd uruchamiania silnika w przeglądarce: "+(event.message||"Sprawdź połączenie z internetem"),true);
     };
   }catch(error){setStatus("Nie można uruchomić Web Worker: "+error.message,true);}
@@ -346,6 +378,88 @@ function simulate(){
     computeWorker.postMessage({type:"simulate",id:++requestId,payload:payload()});
   }catch(error){
     setStatus(String(error.message||error),true);b.disabled=false;
+  }
+}
+function showReplayStatus(message,error=false){
+  $("replay-status").textContent=message;
+  $("replay-status").className="status "+(error?"error":"success");
+}
+function replayMetric(label,value,unit){
+  const box=document.createElement("div");box.className="kpi";
+  const a=document.createElement("div");a.className="name";a.textContent=label;
+  const b=document.createElement("div");b.className="val";b.textContent=value;
+  const c=document.createElement("div");c.className="unit";c.textContent=unit;
+  box.append(a,b,c);return box;
+}
+function renderReplay(data){
+  $("replay-output").hidden=false;
+  const metrics=[
+    ["Zgodność",data.identical?"TAK":"NIE",data.mismatch_count+" różnic ponad tolerancję"],
+    ["Horyzont",data.quarter_count+" × 15 min","Pełne kwadranse, start "+local(data.start)],
+    ["SOC HA / Lab",nfmt(data.summary_ha.final_soc_pct,2)+" / "+nfmt(data.summary_lab.final_soc_pct,2)+" %","Różnica "+nfmt(data.summary_difference.final_soc_pct,6)+" p.p."],
+    ["Koszt HA / Lab",nfmt(data.summary_ha.objective_dkk,3)+" / "+nfmt(data.summary_lab.objective_dkk,3),"DKK · wspólny cel optymalizacji"],
+    ["Zakup HA / Lab",nfmt(data.summary_ha.purchase_cost_dkk,3)+" / "+nfmt(data.summary_lab.purchase_cost_dkk,3),"DKK · rzeczywista cena wejściowa HA"],
+    ["Ładowanie HA / Lab",nfmt(data.summary_ha.grid_charge_ac_kwh,3)+" / "+nfmt(data.summary_lab.grid_charge_ac_kwh,3),"kWh AC z sieci"],
+  ];
+  $("replay-kpis").replaceChildren(...metrics.map(m=>replayMetric(...m)));
+  const tbody=$("replay-rows");tbody.replaceChildren();
+  for(const item of data.quarters){
+    const tr=document.createElement("tr"), ref=item.ha, act=item.lab;
+    const joined=(field,precision=3)=>nfmt(ref[field],precision)+" / "+nfmt(act[field],precision);
+    const max=Math.max(...Object.values(item.difference).map(Math.abs));
+    [
+      local(item.start),nfmt(item.input.buy_dkk_per_kwh,3),
+      nfmt(item.input.pv_dc_kwh,3),nfmt(item.input.home_ac_kwh,3),
+      joined("soc_end_pct",2),joined("grid_to_battery_ac_kwh"),
+      joined("pv_to_battery_dc_kwh"),joined("battery_to_home_dc_kwh"),
+      joined("grid_import_kwh"),joined("grid_export_kwh"),nfmt(max,7),
+    ].forEach(value=>{
+      const td=document.createElement("td");td.textContent=value;tr.append(td);
+    });
+    if(max>0.00001)tr.style.background="#442a31";
+    tbody.append(tr);
+  }
+  const changes=Object.entries(data.max_absolute_difference_by_field)
+    .sort((a,b)=>b[1]-a[1]).slice(0,5)
+    .map(([field,value])=>field+"="+nfmt(value,8));
+  $("replay-details").textContent=
+    "Największe różnice bezwzględne: "+changes.join("; ")+
+    ". Pełne porównanie pozostaje niezależne od ręcznych scenariuszy.";
+  showReplayStatus(data.identical
+    ?"Replay HA identyczny w tolerancji numerycznej. Sprawdzono "+data.quarter_count+" kwadransów."
+    :"Replay wykrył "+data.mismatch_count+" różnic ponad tolerancję — sprawdź tabelę.",!data.identical);
+}
+async function loadReplayFile(input){
+  try{
+    const file=input.files?.[0];input.value="";
+    if(!file)return;
+    if(file.size>5*1024*1024)throw Error("Plik diagnostyki przekracza 5 MB.");
+    const raw=JSON.parse(await file.text());
+    const replay=raw?.data?.planner_replay??raw?.planner_replay??raw;
+    if(replay?.schema!=="energy-copilot/ha-replay/v1"||!Array.isArray(replay.quarters)){
+      throw Error("Brak zgodnego snapshotu. Pobierz nową diagnostykę HA po aktualizacji do v1.14.0 w trybie dry_run.");
+    }
+    replayData=replay;replayResult=null;
+    $("replay-output").hidden=true;
+    $("run-replay").disabled=!workerReady;
+    showReplayStatus("Wczytano "+replay.quarters.length+" kwadransów. Kliknij „Porównaj HA i Lab”.");
+  }catch(error){
+    replayData=null;replayResult=null;$("run-replay").disabled=true;
+    $("replay-output").hidden=true;
+    showReplayStatus(String(error.message||error),true);
+  }
+}
+function runReplay(){
+  if(!workerReady||!computeWorker||!replayData){
+    showReplayStatus("Załaduj prawidłowy plik i silnik Python.",true);return;
+  }
+  $("run-replay").disabled=true;
+  showReplayStatus("Obliczanie planu przez oryginalny solver HA…");
+  try{
+    computeWorker.postMessage({type:"replay",id:replayRequestId=++requestId,payload:replayData});
+  }catch(error){
+    showReplayStatus(String(error.message||error),true);
+    $("run-replay").disabled=false;
   }
 }
 function renderOutput(data){
@@ -455,6 +569,18 @@ function csvInput(){
 async function readFile(input){
   const file=input.files?.[0];input.value="";return file?await file.text():null;
 }
+$("import-replay").addEventListener("click",()=>$("replay-file").click());
+$("replay-file").addEventListener("change",e=>loadReplayFile(e.target));
+$("run-replay").addEventListener("click",runReplay);
+$("replay-export-results").addEventListener("click",()=>{
+  if(!replayResult)return;
+  const fields=["start","soc_end_pct","grid_to_battery_ac_kwh","pv_to_battery_dc_kwh","battery_to_home_dc_kwh","grid_import_kwh","grid_export_kwh","purchase_dkk","sales_dkk"];
+  const lines=[["time_utc",...fields.slice(1).flatMap(k=>[k+"_ha",k+"_lab",k+"_delta"])].join(";")];
+  for(const q of replayResult.quarters){
+    lines.push([q.start,...fields.slice(1).flatMap(k=>[q.ha[k],q.lab[k],q.difference[k]??(q.lab[k]-q.ha[k])])].join(";"));
+  }
+  download("planner_lab_ha_replay_comparison.csv",lines.join("\n")+"\n","text/csv");
+});
 $("load").addEventListener("click",()=>{clearHaImports();makePreset();});
 $("start").addEventListener("change",()=>{clearHaImports();renderInputs();});
 $("duration").addEventListener("change",()=>{clearHaImports();makePreset();});
