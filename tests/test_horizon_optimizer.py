@@ -234,7 +234,7 @@ def test_dynamic_headroom_can_change_full_soc_before_pv_window():
     without_buffer = optimize_horizon(p, qs, enable_pv_headroom=False)
     assert len(with_buffer.pv_headroom) == len(qs)
     assert max(h.target_dc_kwh for h in with_buffer.pv_headroom) > 0.1
-    assert with_buffer.pv_headroom[0].target_dc_kwh == 0
+    assert with_buffer.pv_headroom[0].target_dc_kwh > 0
     assert with_buffer.pv_headroom[7].target_dc_kwh > 0
     assert with_buffer.candidate.quarters[7].soc_end_pct < (
         without_buffer.candidate.quarters[7].soc_end_pct
@@ -243,11 +243,11 @@ def test_dynamic_headroom_can_change_full_soc_before_pv_window():
     assert with_buffer.executable is False
 
 
-def test_headroom_absent_when_no_pv_or_profitable_export():
+def test_headroom_is_not_penalized_when_export_is_more_profitable():
     p = plant(90)
     q = series([0.45] * 16, pv=[0.2] * 16, load=0.10, export=True)
     selling = optimize_horizon(p, q)
-    assert all(h.target_dc_kwh == 0 for h in selling.pv_headroom)
+    assert all(h.opportunity_dkk_per_kwh_dc_per_quarter == 0 for h in selling.pv_headroom)
     no_pv = optimize_horizon(p, series([0.45] * 16, pv=[0.0] * 16))
     assert all(h.target_dc_kwh == 0 for h in no_pv.pv_headroom)
 
