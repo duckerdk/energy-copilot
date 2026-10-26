@@ -461,7 +461,9 @@ async def test_preview_exception_does_not_turn_m2_input_quality_unavailable(
 
 
 def test_preview_replay_snapshot_uses_exact_frozen_quarters_and_same_solver():
-    preview = evaluate_preview(snapshot(hours=3, pv=0.12, soc=63.7, voltage=52.4), mode="dry_run")
+    preview = evaluate_preview(
+        snapshot(hours=3, pv=0.12, soc=63.7, voltage=52.4), mode="dry_run"
+    )
     assert preview.status == "preview"
     frozen = preview.replay_snapshot
     assert frozen["schema"] == "energy-copilot/ha-replay/v1"
@@ -469,7 +471,10 @@ def test_preview_replay_snapshot_uses_exact_frozen_quarters_and_same_solver():
     assert len(frozen["quarters"]) == preview.quarters == 12
     assert frozen["plant"]["initial_soc_pct"] == 63.7
     assert frozen["plant"]["battery_voltage_v"] == 52.4
-    assert frozen["terminal_value_override_dkk_per_kwh_dc"] == preview.terminal_value_dkk_per_kwh_dc
+    assert (
+        frozen["terminal_value_override_dkk_per_kwh_dc"]
+        == preview.terminal_value_dkk_per_kwh_dc
+    )
     replayed = simulate_replay(frozen)
     assert replayed["identical"] is True
     assert replayed["mismatch_count"] == 0
@@ -478,7 +483,9 @@ def test_preview_replay_snapshot_uses_exact_frozen_quarters_and_same_solver():
 
 
 def test_replay_detects_changed_inputs_and_tampered_expected_output():
-    original = evaluate_preview(snapshot(hours=4, pv=0.05), mode="dry_run").replay_snapshot
+    original = evaluate_preview(
+        snapshot(hours=4, pv=0.05), mode="dry_run"
+    ).replay_snapshot
     altered = deepcopy(original)
     altered["expected"]["quarters"][0]["soc_end_pct"] += 0.2
     compared = simulate_replay(altered)
@@ -508,4 +515,3 @@ def test_replay_rejects_missing_partial_or_wrong_version_snapshot():
     broken["quarters"][1]["start"] = broken["quarters"][0]["start"]
     with pytest.raises(ValueError, match="non_contiguous"):
         simulate_replay(broken)
-
