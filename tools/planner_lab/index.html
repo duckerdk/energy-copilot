@@ -414,6 +414,113 @@ function simulate(){
     setStatus(String(error.message||error),true);b.disabled=false;
   }
 }
+const haFields = [
+  ["ha-soc","initial_soc_pct"],["ha-capacity","battery_capacity_dc_kwh"],
+  ["ha-voltage","battery_voltage_v"],["ha-charge","charge_limit_a"],
+  ["ha-grid","grid_charge_limit_a"],["ha-discharge","discharge_limit_a"],
+  ["ha-eta-pv-ac","eta_pv_to_ac"],["ha-eta-pv-battery","eta_pv_to_battery"],
+  ["ha-eta-grid-battery","eta_grid_to_battery"],["ha-eta-battery-ac","eta_battery_to_ac"]
+];
+const haQuarterFields=["buy_dkk_per_kwh","sell_dkk_per_kwh","pv_dc_kwh","home_ac_kwh"];
+function haStatus(message,error=false){
+  $("ha-status").textContent=message;
+  $("ha-status").className="status "+(error?"error":"success");
+}
+function renderHaInputs(){
+  if(!haScenario)return;
+  haFields.forEach(([id,key])=>{$(id).value=String(haScenario.plant[key]);});
+  $("ha-terminal").value=String(haScenario.terminal_value_override_dkk_per_kwh_dc);
+  $("ha-horizon").textContent="Dane HA: "+haScenario.quarters.length+
+    " kwadransów od "+local(haScenario.quarters[0].start)+" do "+
+    local(haScenario.quarters[haScenario.quarters.length-1].end)+
+    ". Parametry i ceny pochodzą z jednego przebiegu HA.";
+  const tbody=$("ha-input-rows");tbody.replaceChildren();
+  haScenario.quarters.forEach((q,i)=>{
+    const tr=document.createElement("tr"),time=document.createElement("td");
+    time.textContent=local(q.start);tr.append(time);
+    haQuarterFields.forEach(key=>{
+      const td=document.createElement("td"),input=document.createElement("input");
+      input.type="text";input.inputMode="decimal";input.value=String(q[key]);
+      input.dataset.field=key;
+      input.setAttribute("aria-label",key+" kwadrans "+(i+1));
+      td.append(input);tr.append(td);
+    });
+    const td=document.createElement("td"),check=document.createElement("input");
+    check.type="checkbox";check.checked=q.pv_export_enabled;
+    check.dataset.field="pv_export_enabled";
+    check.setAttribute("aria-label","Solar Sell dozwolony kwadrans "+(i+1));
+    td.append(check);tr.append(td);tbody.append(tr);
+  });
+}
+function syncHaInputs(){
+  if(!haScenario)throw Error("Najpierw zaimportuj diagnostykę HA.");
+  haFields.forEach(([id,key])=>{haScenario.plant[key]=num($(id).value);});
+  haScenario.terminal_value_override_dkk_per_kwh_dc=num($("ha-terminal").value);
+  const trs=[...$("ha-input-rows").querySelectorAll("tr")];
+  if(trs.length!==haScenario.quarters.length)throw Error("Brak wierszy danych HA.");
+  trs.forEach((tr,i)=>{
+    tr.querySelectorAll("input").forEach(input=>{
+      const key=input.dataset.field;
+      haScenario.quarters[i][key]=input.type==="checkbox"?input.checked:num(input.value);
+    });
+  });
+}
+function activateHaScenario(imported){
+  haScenario=ReplayScenario.makeEditable(imported);
+  $("manual-config-panel").hidden=true;
+  $("manual-input-panel").hidden=true;
+  $("ha-scenario-panel").hidden=false;
+  $("ha-simulate").disabled=!workerReady;
+  renderHaInputs();
+  $("output").hidden=true;
+  latest=null;
+  haStatus("Dane HA załadowane do edytowalnego scenariusza. Obliczanie automatyczne…");
+  $("ha-scenario-panel").scrollIntoView({behavior:"smooth",block:"start"});
+  if(workerReady)runHaScenario();
+}
+function runHaScenario(){
+  if(!workerReady||!computeWorker||!haScenario){
+    haStatus("Brak silnika lub danych HA.",true);return;
+  }
+  try{
+    syncHaInputs();
+    $("ha-simulate").disabled=true;
+    haStatus("Obliczanie rzeczywistego planu na wczytanych danych HA…");
+    computeWorker.postMessage({
+      type:"ha_scenario",id:haRequestId=++requestId,
+      payload:haScenario
+    });
+  }catch(error){
+    haStatus(String(error.message||error),true);
+    $("ha-simulate").disabled=false;
+  }
+}
+function showHaScenarioResult(result){
+  haScenarioResult=result;
+  const edited=JSON.stringify(haScenario.plant)!==JSON.stringify(replayData.plant)||
+    JSON.stringify(haScenario.quarters)!==JSON.stringify(replayData.quarters)||
+    haScenario.terminal_value_override_dkk_per_kwh_dc!==
+      replayData.terminal_value_override_dkk_per_kwh_dc;
+  const display=ReplayScenario.summarizeReplay(result,haScenario);
+  renderOutput(display);
+  $("output-source-note").hidden=false;
+  $("output-source-note").textContent=edited
+    ?"Scenariusz HA ZMIENIONY: plan i wykresy poniżej zostały przeliczone z Twoich nowych danych. Dane wejściowe oryginalnego HA są punktem odniesienia; różnice w wynikach są oczekiwane."
+    :"Scenariusz HA: plan i wykresy poniżej są bezpośrednio wyliczone z oryginalnych danych kwadransowych HA (bez profilu przykładowego, bez doliczania taryfy N1).";
+  const status=edited?"Przeliczono zmieniony scenariusz HA.":"Przeliczono plan z niezmienionych danych HA.";
+  haStatus(status+" Kwadranse: "+result.quarter_count+
+    ", SOC na koniec: "+nfmt(result.summary_lab.final_soc_pct,2)+"%.");
+  $("ha-simulate").disabled=false;
+}
+function exitHaScenario(){
+  haScenario=null;haScenarioResult=null;
+  $("ha-scenario-panel").hidden=true;
+  $("manual-config-panel").hidden=false;
+  $("manual-input-panel").hidden=false;
+  $("output").hidden=true;
+  $("output-source-note").hidden=true;
+  setStatus("Przywrócono scenariusz godzinowy. Import HA pozostaje dostępny w Replay.");
+}
 function showReplayStatus(message,error=false){
   $("replay-status").textContent=message;
   $("replay-status").className="status "+(error?"error":"success");
