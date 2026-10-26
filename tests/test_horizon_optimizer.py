@@ -247,7 +247,9 @@ def test_headroom_is_not_penalized_when_export_is_more_profitable():
     p = plant(90)
     q = series([0.45] * 16, pv=[0.2] * 16, load=0.10, export=True)
     selling = optimize_horizon(p, q)
-    assert all(h.opportunity_dkk_per_kwh_dc_per_quarter == 0 for h in selling.pv_headroom)
+    assert all(
+        h.opportunity_dkk_per_kwh_dc_per_quarter == 0 for h in selling.pv_headroom
+    )
     no_pv = optimize_horizon(p, series([0.45] * 16, pv=[0.0] * 16))
     assert all(h.target_dc_kwh == 0 for h in no_pv.pv_headroom)
 
