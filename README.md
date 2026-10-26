@@ -1,6 +1,6 @@
 # Energy Co-Pilot
 
-Natywna integracja Home Assistant `custom_components/energy_copilot`. **Aktualna wydana wersja: [v1.14.0](https://github.com/duckerdk/energy-copilot/releases/tag/v1.14.0)**. Poprzednia: [v1.13.0](https://github.com/duckerdk/energy-copilot/releases/tag/v1.13.0).. Obecnie dostępne: odczyt pomiarów/cen, Forecast.Solar, Recorder, prognoza domu na 7 dni oraz **ciągła optymalizacja w trybie `dry_run`**. Integracja **nie zapisuje nastaw falownika**. Harmonogram fizyczny 15 minut nie jest jeszcze przetłumaczony na sześć rzeczywistych okien TOU Deye (`executable=false`).
+Natywna integracja Home Assistant `custom_components/energy_copilot`. **Wersja przygotowana do wydania: v1.15.0.** Poprzednia: [v1.14.0](https://github.com/duckerdk/energy-copilot/releases/tag/v1.14.0).. Obecnie dostępne: odczyt pomiarów/cen, Forecast.Solar, Recorder, prognoza domu na 7 dni oraz **ciągła optymalizacja w trybie `dry_run`**. Integracja **nie zapisuje nastaw falownika**. Harmonogram fizyczny 15 minut nie jest jeszcze przetłumaczony na sześć rzeczywistych okien TOU Deye (`executable=false`).
 
 Zatwierdzone reguły, cele i uprawnienia: [REQUIREMENTS.md](requirements/REQUIREMENTS.md). Jedynym źródłem produkcji w integracji jest `sensor.pv_sum`; nie stosuje się PV1/PV2.
 
@@ -109,3 +109,12 @@ python3.14 -m venv .venv
 ```
 
 `main` publikuje nowe wydanie HACS **tylko po zmianie wersji manifestu i udanym CI**. GitHub Release zawiera `energy_copilot.zip`, `BUILD_INFO.json` i `SHA256SUMS`. Scalenie zmian w samej dokumentacji **nie tworzy nowego wydania**.
+
+
+## v1.15.0 — dynamiczny bufor PV i poprawa jednostek prognozy
+
+- **Dynamiczny bufor SOC (#24):** produkcyjny optymalizator ciągły wycenia pozostawienie miejsca w baterii dla możliwej dodatkowej produkcji PV w najbliższych dwóch godzinach, gdy **Solar Sell OFF**. Jest to jawnie oznaczona, ograniczona hipoteza, a **nie** twarda granica SOC (100% pozostaje dozwolone, jeśli przemawia za tym rachunek ekonomiczny). Model korzysta z bazowego rozkładu PV, prognozy zużycia, cen późniejszego zakupu, sprawności i kosztu degradacji. Dopuszcza obserwowaną dodatnią rozbieżność prognozy PV po co najmniej 16 kompletnych kwadransach; pomiary PV mogą być ograniczone przez falownik, więc wartości nie potwierdzają nieograniczonej produkcji. Brak wiarygodnych danych uruchamia oznaczoną heurystykę względnej niepewności PV; wynik jest przedmiotem walidacji na rzeczywistym HA.
+- **Harmonogram i diagnostyka:** `pv_headroom_target_dc_kwh` / `pv_headroom_target_pct` są publikowane z godzinami planu. `pv_headroom_max_dc_kwh`, `pv_headroom_source` i `pv_headroom_cost_premium_dkk` pokazują maksymalny planowany bufor, źródło niepewności i modelowany **koszt pozostawienia miejsca względem wariantu bez bufora**. Ten koszt nie jest fakturą ani oszczędnością, a oczekiwana dodatkowa produkcja może się nie pojawić. Brak sztywnego limitu SOC.
+- **Poprawa #26:** prognoza PV i domu jest porównywana do całki chwilowej mocy **W × s / 3 600 000 = kWh**. MAE i bias w diagnostyce są odtąd kWh na kwadrans, nie Wh błędnie opisane jako kWh. Dane zbierane tylko w pamięci zostają wyzerowane po restarcie HA przy aktualizacji.
+- **Replay HA:** diagnostyka v1.15.0 przechowuje w eksporcie również wejściową statystykę niepewności i wersję polityki bufora. Planner Lab pobiera dokładnie ten sam moduł Python i odtwarza decyzje. Starsze pliki Replay z v1.14.0 są liczone bez bufora, ponieważ wówczas funkcja nie istniała.
+- Nie zmieniono `Load First`, blokady eksportu baterii, progu Solar Sell 0,40 DKK/kWh, ani trybu pracy `dry_run`. Nowa wycena wolnego miejsca dotyczy **symulowanego planu**, a nie zapisu nastaw Deye.

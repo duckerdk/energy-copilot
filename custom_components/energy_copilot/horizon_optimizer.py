@@ -34,6 +34,9 @@ class HorizonResult:
     soc_resolution_dc_kwh: float = SOC_STEP_DC_KWH
     method: str = "whole_horizon_soc_dynamic_programming_grid_0_10_kwh"
     executable: bool = False
+    pv_headroom: tuple = ()
+    pv_underprediction_kwh: float | None = None
+    pv_headroom_enabled: bool = False
 
 
 def _dispatch(
@@ -204,6 +207,8 @@ def optimize_horizon(
     quarters: tuple[Quarter, ...],
     *,
     terminal_value_override: float | None = None,
+    pv_underprediction_kwh: float | None = None,
+    enable_pv_headroom: bool = True,
 ) -> HorizonResult:
     """Primary HA dry-run optimizer: continuous flow, no 0.1 kWh SOC grid.
 
@@ -213,5 +218,9 @@ def optimize_horizon(
     from .continuous_optimizer import optimize_continuous
 
     return optimize_continuous(
-        plant, quarters, terminal_value_override=terminal_value_override
+        plant,
+        quarters,
+        terminal_value_override=terminal_value_override,
+        pv_underprediction_kwh=pv_underprediction_kwh,
+        enable_pv_headroom=enable_pv_headroom,
     )

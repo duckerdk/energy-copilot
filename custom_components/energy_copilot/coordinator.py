@@ -326,6 +326,9 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                             if self.load_forecast
                             else None
                         ),
+                        pv_underprediction_kwh=self.forecast_accuracy.summary["pv"][
+                            "positive_underprediction_p75_kwh_per_quarter"
+                        ],
                     )
                 )
         except Exception:  # Preview must never interrupt reliable M1/M2 polling.

@@ -71,7 +71,7 @@ class ForecastAccuracyWindow:
                             {"pv": [0.0, 0.0], "home": [0.0, 0.0]},
                         )
                         duration = (right - cursor).total_seconds()
-                        bucket[role][0] += prev[1] * duration / 3600
+                        bucket[role][0] += prev[1] * duration / 3_600_000
                         bucket[role][1] += duration
                     cursor = right
             self.previous[role] = (now, current) if current is not None else None
@@ -113,5 +113,19 @@ class ForecastAccuracyWindow:
                     else None
                 ),
                 "sample_complete": len(rows) >= 8,
+                "positive_underprediction_p75_kwh_per_quarter": (
+                    sorted(max(0.0, actual - predicted) for predicted, actual in rows)[
+                        min(len(rows) - 1, int(0.75 * len(rows)))
+                    ]
+                    if role == "pv" and len(rows) >= 16
+                    else None
+                ),
+                "pv_uncertainty_source": (
+                    "measured_pv_sum_may_be_curtailed"
+                    if role == "pv" and len(rows) >= 16
+                    else "insufficient_daylight_observations"
+                    if role == "pv"
+                    else None
+                ),
             }
         return result

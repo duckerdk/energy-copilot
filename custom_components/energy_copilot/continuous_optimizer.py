@@ -19,6 +19,7 @@ from .planner import (
     reference_no_battery,
     simulate_candidate,
 )
+from .pv_headroom import headroom_schedule
 
 
 class _FlowArc:
@@ -34,7 +35,14 @@ class _FlowArc:
         self.cost = cost
 
 
-def optimize_continuous(plant, quarters, *, terminal_value_override=None):
+def optimize_continuous(
+    plant,
+    quarters,
+    *,
+    terminal_value_override=None,
+    pv_underprediction_kwh=None,
+    enable_pv_headroom=True,
+):
     """Optimize continuous battery energy (kWh) without an SOC lattice.
 
     Formulate quarter-by-quarter grid/PV charging, carrying and house supply
@@ -97,6 +105,11 @@ def optimize_continuous(plant, quarters, *, terminal_value_override=None):
     initial_edge = add_edge(source, before(0), initial, -1_000_000.0)
     pv_edges = []
     grid_edges = []
+    headroom = (
+        headroom_schedule(plant, quarters, pv_underprediction_kwh)
+        if enable_pv_headroom
+        else ()
+    )
     discharge_edges = []
     for i, q in enumerate(quarters):
         eta_pv = plant.eta_pv_to_ac
@@ -129,7 +142,17 @@ def optimize_continuous(plant, quarters, *, terminal_value_override=None):
             max_grid = 0.0
         max_discharge = plant.battery_voltage_v * plant.discharge_limit_a / 4000.0
         # SOC gate limits carried + newly charged energy, not merely carry.
-        add_edge(before(i), after(i), usable, 0.0)
+        if headroom and headroom[i].target_dc_kwh > 1e-8:
+            safe_occupancy = max(0.0, usable - headroom[i].target_dc_kwh)
+            add_edge(before(i), after(i), safe_occupancy, 0.0)
+            add_edge(
+                before(i),
+                after(i),
+                usable - safe_occupancy,
+                headroom[i].opportunity_dkk_per_kwh_dc_per_quarter,
+            )
+        else:
+            add_edge(before(i), after(i), usable, 0.0)
         add_edge(after(i), before(i + 1), usable, 0.0)
         discharge_edges.append(
             add_edge(
@@ -274,5 +297,10 @@ def optimize_continuous(plant, quarters, *, terminal_value_override=None):
         terminal_value_dkk_per_kwh_dc=terminal_value,
         evaluated_transitions=iterations,
         soc_resolution_dc_kwh=0.0,
-        method="continuous_min_cost_flow_no_soc_lattice",
+        method="continuous_min_cost_flow_risk_aware_pv_headroom"
+        if enable_pv_headroom
+        else "continuous_min_cost_flow_no_soc_lattice",
+        pv_headroom=tuple(headroom),
+        pv_underprediction_kwh=pv_underprediction_kwh,
+        pv_headroom_enabled=enable_pv_headroom,
     )

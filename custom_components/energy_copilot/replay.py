@@ -116,6 +116,10 @@ def build_replay(plant, quarters, result, *, metadata=None):
             }
             for q in quarters
         ],
+        "pv_headroom_policy": (
+            "risk_aware_v1" if result.pv_headroom_enabled else "disabled"
+        ),
+        "pv_underprediction_kwh": result.pv_underprediction_kwh,
         "expected": _result_output(result),
         "executable": False,
     }
@@ -193,13 +197,24 @@ def _inputs(payload):
         or len(expected["quarters"]) != len(quarters)
     ):
         raise ValueError("replay:missing_expected_result")
-    return plant, tuple(quarters), terminal, expected
+    policy = payload.get("pv_headroom_policy", "disabled")
+    if policy not in ("risk_aware_v1", "disabled"):
+        raise ValueError("replay:unsupported_headroom_policy")
+    upside_raw = payload.get("pv_underprediction_kwh")
+    upside = None if upside_raw is None else _finite(upside_raw, "pv_upside")
+    return plant, tuple(quarters), terminal, expected, policy, upside
 
 
 def simulate_replay(payload):
     """Execute unchanged HA solver and compare against frozen matching result."""
-    plant, quarters, terminal, expected = _inputs(payload)
-    result = optimize_horizon(plant, quarters, terminal_value_override=terminal)
+    plant, quarters, terminal, expected, policy, upside = _inputs(payload)
+    result = optimize_horizon(
+        plant,
+        quarters,
+        terminal_value_override=terminal,
+        pv_underprediction_kwh=upside,
+        enable_pv_headroom=policy == "risk_aware_v1",
+    )
     actual = _result_output(result)
     errors = []
     maximum_by_field = {}

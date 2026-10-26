@@ -123,6 +123,10 @@ class PlanningStatusSensor(CoordinatorEntity, SensorEntity):
             "purchase_cost_dkk": preview.purchase_cost_dkk,
             "sales_revenue_dkk": preview.sales_revenue_dkk,
             "terminal_value_basis": preview.terminal_value_basis,
+            "pv_headroom_max_dc_kwh": preview.pv_headroom_max_dc_kwh,
+            "pv_headroom_max_pct": preview.pv_headroom_max_pct,
+            "pv_headroom_source": preview.pv_headroom_source,
+            "pv_headroom_cost_premium_dkk": preview.pv_headroom_cost_premium_dkk,
             "post_horizon_load_kwh": preview.post_horizon_load_kwh,
             "max_charge_current_a": preview.max_charge_current_a,
             "charge_start_utc": (
