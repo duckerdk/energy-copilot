@@ -37,8 +37,8 @@ def test_prospective_quarter_error_uses_only_previously_recorded_forecast():
         tracker.observe(
             when,
             {
-                "pv": Sample(2.0, when),
-                "home": Sample(1.0, when),
+                "pv": Sample(2000.0, when),
+                "home": Sample(1000.0, when),
             },
         )
     observed = tracker.summary
@@ -79,3 +79,59 @@ def test_holdout_load_model_is_frozen_before_evaluation_week():
     assert report["mae_kwh_per_hour"] == pytest.approx(0.0, abs=1e-8)
     assert report["bias_kwh_per_hour"] == pytest.approx(0.0, abs=1e-8)
     assert report["physical_consumption_verified"] is False
+
+
+def test_quarter_watts_to_kwh_and_signed_underprediction():
+    tracker = ForecastAccuracyWindow()
+    first = datetime(2026, 10, 23, 10, tzinfo=UTC)
+    pv = ForecastSnapshot(
+        first - timedelta(minutes=30),
+        "pv-forecast",
+        (
+            ForecastPeriod(first, first + timedelta(minutes=15), 0.25),
+            ForecastPeriod(
+                first + timedelta(minutes=15), first + timedelta(minutes=30), 0.75
+            ),
+        ),
+    )
+    projection = LoadProjection(
+        first - timedelta(minutes=30),
+        (
+            ForecastPeriod(first, first + timedelta(minutes=15), 0.50),
+            ForecastPeriod(
+                first + timedelta(minutes=15), first + timedelta(minutes=30), 0.20
+            ),
+        ),
+        "load-forecast",
+    )
+    tracker.remember(first - timedelta(seconds=15), pv, projection)
+    for k in range(62):
+        at = first - timedelta(seconds=15) + timedelta(seconds=k * 30)
+        if k == 31:
+            tracker.remember(at, pv, projection)
+        tracker.observe(at, {
+            "pv": Sample(2000.0, at),
+            "home": Sample(1000.0, at),
+        })
+    result = tracker.summary
+    assert result["pv"]["verified_quarters"] == 2
+    assert result["home"]["verified_quarters"] == 2
+    # 2000 W * 0.25 h = 0.5 kWh: +0.25 over first, -0.25 under second.
+    assert result["pv"]["mae_kwh_per_quarter"] == pytest.approx(0.25, abs=0.01)
+    assert result["pv"]["signed_bias_kwh_per_quarter"] == pytest.approx(0.0, abs=0.01)
+    # 1000 W * 0.25 h = 0.25 kWh; expected .5 then .2.
+    assert result["home"]["mae_kwh_per_quarter"] == pytest.approx(0.15, abs=0.01)
+    assert result["home"]["signed_bias_kwh_per_quarter"] == pytest.approx(0.10, abs=0.01)
+    assert result["pv"]["positive_underprediction_p75_kwh_per_quarter"] is None
+
+
+def test_pv_empirical_upside_available_only_after_sufficient_observed_quarters():
+    tracker = ForecastAccuracyWindow()
+    for i in range(16):
+        tracker.completed.append({"pv": (0.3, 0.5)})
+    assert tracker.summary["pv"]["positive_underprediction_p75_kwh_per_quarter"] == pytest.approx(0.2)
+    assert tracker.summary["pv"]["pv_uncertainty_source"] == "measured_pv_sum_may_be_curtailed"
+    tracker.completed.clear()
+    for i in range(15):
+        tracker.completed.append({"pv": (0.3, 0.5)})
+    assert tracker.summary["pv"]["positive_underprediction_p75_kwh_per_quarter"] is None
