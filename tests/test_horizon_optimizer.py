@@ -213,28 +213,31 @@ def test_continuous_solver_randomized_physical_feasibility_and_no_battery_sale()
             assert not (actual.grid_import_kwh > 1e-7 and actual.grid_export_kwh > 1e-7)
 
 
-def test_dynamic_headroom_is_economic_not_fixed_soc_ceiling():
-    p = plant(76)
+def test_dynamic_headroom_can_change_full_soc_before_pv_window():
+    # Low overnight purchase prices alone should not make the controller
+    # fully occupy the battery if forthcoming PV upside is economically useful.
+    p = plant(100)
     beginning = datetime(2026, 10, 26, 1, tzinfo=UTC)
     qs = tuple(
         Quarter(
             beginning + timedelta(minutes=15 * i),
             beginning + timedelta(minutes=15 * (i + 1)),
-            0.35 if i < 32 else 3.5,
+            0.35 if i < 8 else 1.0 if i < 16 else 3.5,
             0.20,
-            0.25 if 16 <= i < 32 else 0.0,
-            0.20 if i < 32 else 0.45,
+            0.42 if 8 <= i < 16 else 0.0,
+            0.25 if i < 16 else 0.45,
             False,
         )
-        for i in range(48)
+        for i in range(32)
     )
     with_buffer = optimize_horizon(p, qs)
     without_buffer = optimize_horizon(p, qs, enable_pv_headroom=False)
     assert len(with_buffer.pv_headroom) == len(qs)
     assert max(h.target_dc_kwh for h in with_buffer.pv_headroom) > 0.1
-    assert all(h.target_dc_kwh == 0 for h in with_buffer.pv_headroom[:16])
-    assert with_buffer.candidate.quarters[24].soc_end_pct < (
-        without_buffer.candidate.quarters[24].soc_end_pct
+    assert with_buffer.pv_headroom[0].target_dc_kwh == 0
+    assert with_buffer.pv_headroom[7].target_dc_kwh > 0
+    assert with_buffer.candidate.quarters[7].soc_end_pct < (
+        without_buffer.candidate.quarters[7].soc_end_pct
     )
     assert with_buffer.candidate.final_soc_pct >= 20 - 1e-7
     assert with_buffer.executable is False
