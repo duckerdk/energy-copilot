@@ -59,7 +59,7 @@ tbody tr:nth-child(2n){background:#1b2938}
   <span class="tag">GITHUB PAGES · BEZ HA · BEZ STEROWANIA</span>
 </header>
 
-<div class="note">Strona GitHub Pages wykonuje <b>oryginalny silnik v1.12 w przeglądarce</b> (Pyodide/Python), a nie kopię algorytmu w JavaScript. Przy pierwszym otwarciu wymagany jest internet do załadowania środowiska Pyodide. Wprowadzone scenariusze nie są wysyłane na serwer. Wariant bazowy oznacza brak cykli baterii, <b>nie</b> rzeczywistą strategię Deye. Plan nie jest zweryfikowany dla sześciu okien TOU. Parametry godzinowe PV i domu są równomiernie rozłożone na cztery kwadranse.</div>
+<div class="note">Strona GitHub Pages uruchamia <b>ciągły silnik scenariuszy w przeglądarce</b> (Pyodide/Python), a nie kopię algorytmu w JavaScript. Przy pierwszym otwarciu wymagany jest internet do załadowania środowiska Pyodide. Wprowadzone scenariusze nie są wysyłane na serwer. Wariant bazowy oznacza brak cykli baterii, <b>nie</b> rzeczywistą strategię Deye. Plan nie jest zweryfikowany dla sześciu okien TOU. Parametry godzinowe PV i domu są równomiernie rozłożone na cztery kwadranse.</div>
 
 <section class="panel">
   <h2>Scenariusz i parametry instalacji</h2>
@@ -111,7 +111,11 @@ tbody tr:nth-child(2n){background:#1b2938}
 
 <section class="panel">
   <div class="chart-title"><h2>Ręczne dane godzinowe</h2>
-    <div class="row"><button id="import-csv">Import CSV</button>
+    <div class="row"><button id="import-price-ha">Import cen HA (.txt)</button>
+      <input id="price-ha-file" type="file" accept=".txt,.yaml,.yml,text/plain">
+      <button id="import-pv-ha">Import Forecast.Solar (.txt)</button>
+      <input id="pv-ha-file" type="file" accept=".txt,.yaml,.yml,text/plain">
+      <button id="import-csv">Import CSV</button>
       <input id="file" type="file" accept=".csv,text/csv">
       <button id="export-csv">Eksport wejścia CSV</button>
       <button id="export-json">Zapisz scenariusz JSON</button>
@@ -119,6 +123,7 @@ tbody tr:nth-child(2n){background:#1b2938}
       <input id="json-file" type="file" accept=".json,application/json">
     </div>
   </div>
+  <p class="muted" id="ha-import-summary" style="font-size:12px;margin:8px 0">Import HA: ceny z <code>raw_today/raw_tomorrow</code> jako <b>spot</b> (DKK/kWh); prognoza z <code>wh_period</code> jako godzinowa energia PV (Wh → kW średnio). Oba pliki dopasowywane są po czasie UTC, z uwzględnieniem zmiany czasu w Danii. Pozostałe pola zachowują wartości przykładowe i są edytowalne. Pliki są przetwarzane wyłącznie w przeglądarce.</p>
   <p class="muted" style="font-size:12px;margin-top:0">Wpisz jedną cenę spot (DKK/kWh), produkcję PV (kW DC) i zużycie domu (kW AC). Ceny zakupu i sprzedaży są wyliczane automatycznie z potwierdzonych taryf N1 z eksportu HA 20.10.2026. Domyślne zużycie to profil godzinowy odtworzony z historii 19–20.10.2026 (24 godziny, powtarzane dla dłuższych scenariuszy). Możesz zmienić każdą godzinę.</p>
   <div class="table-wrap">
     <table class="hour-table"><thead><tr><th>Godzina (DK)</th><th>Spot DKK/kWh</th><th>PV kW DC</th><th>Dom kW AC</th></tr></thead><tbody id="input-rows"></tbody></table>
@@ -126,6 +131,7 @@ tbody tr:nth-child(2n){background:#1b2938}
   <div class="plain">CSV: kolumny spot;pv_kw;home_kw, z nagłówkiem lub bez. Jednostki PV i domu to średnia moc kW w danej godzinie, nie suma kWh. Dla dziennych cen godzinowych odpowiada to sposobowi wejścia obecnego M3. Obsługiwane są horyzonty 1–72 h. Plik scenariusza JSON zawiera również ustawienia baterii.</div>
 </section>
 
+<script src="./data_import.js"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -143,6 +149,7 @@ const OBSERVED_HOME_KW = [
 ];
 const label = {charge_grid:"Ładowanie z sieci",charge_pv:"Ładowanie PV",discharge:"Rozładowanie",hold:"Bez cyklu"};
 let rows = [], latest = null;
+let uploadedHa = {prices:null, solar:null};
 const nfmt = (v,n=2) => Number(v).toLocaleString("pl-PL",{minimumFractionDigits:n,maximumFractionDigits:n});
 const num = v => Number(String(v).trim().replace(",","."));
 const local = iso => new Date(iso).toLocaleString("pl-PL",{timeZone:"Europe/Copenhagen",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false});
@@ -193,6 +200,73 @@ function makePreset(){
   }
   rows=newRows;renderInputs();latest=null;$("output").hidden=true;
   setStatus("Wczytano scenariusz i godzinowy profil rzeczywistego zużycia domu.");
+}
+function clearHaImports(){
+  uploadedHa={prices:null,solar:null};
+  $("ha-import-summary").textContent="Import HA: brak wczytanych źródeł. Ceny wejściowe są ceną spot; zakup wylicza się z historycznych taryf N1.";
+}
+function setImportedDuration(count){
+  const select=$("duration");
+  [...select.options].filter(option=>option.dataset.fromImport).forEach(option=>option.remove());
+  if(![24,48,72].includes(count)){
+    const option=new Option(count+" godzin (z pliku)",String(count));
+    option.dataset.fromImport="1";select.add(option);
+  }
+  select.value=String(count);
+}
+function rebuildFromHaSources(sources){
+  const active=[sources.prices,sources.solar].filter(Boolean);
+  const begin=Math.max(...active.map(item=>Date.parse(item.start)));
+  const end=Math.min(...active.map(item=>Date.parse(item.end)));
+  const count=(end-begin)/3600000;
+  if(!Number.isInteger(count)||count<1||count>72){
+    throw Error("Pliki nie mają wspólnych, kolejnych godzin (maks. 72). Sprawdź daty.");
+  }
+  syncInputs();
+  const previous=Date.parse($("start").value);
+  const previousRows=new Map(rows.map((row,i)=>[previous+i*3600000,row]));
+  const prices=new Map((sources.prices?.hours||[]).map(h=>[Date.parse(h.utc),h.spot]));
+  const pv=new Map((sources.solar?.hours||[]).map(h=>[Date.parse(h.utc),h.pv_kw]));
+  const formatter=new Intl.DateTimeFormat("en-GB",{
+    timeZone:"Europe/Copenhagen",hour:"2-digit",hourCycle:"h23"
+  });
+  const next=[];
+  for(let i=0;i<count;i++){
+    const at=begin+i*3600000,existing=previousRows.get(at);
+    if(sources.prices&&!prices.has(at))throw Error("Brakuje ceny dla "+new Date(at).toISOString());
+    if(sources.solar&&!pv.has(at))throw Error("Brakuje PV dla "+new Date(at).toISOString());
+    const hour=Number(formatter.format(new Date(at)));
+    next.push({
+      spot:sources.prices?prices.get(at):(existing?.spot??1.15),
+      pv_kw:sources.solar?pv.get(at):(existing?.pv_kw??0),
+      home_kw:existing?.home_kw??OBSERVED_HOME_KW[hour],
+    });
+  }
+  $("start").value=new Date(begin).toISOString().replace(".000Z","Z");
+  setImportedDuration(count);
+  rows=next;renderInputs();latest=null;$("output").hidden=true;
+  const names=[
+    sources.prices?String(sources.prices.hours.length)+" cen spot":"ceny przykładowe",
+    sources.solar?("PV "+nfmt(sources.solar.totalKwh,3)+" kWh"):"PV przykładowe / 0 kW",
+  ];
+  $("ha-import-summary").textContent="Wczytane: "+names.join("; ")+
+    ". Horyzont wspólny: "+count+" h, od "+local(new Date(begin).toISOString())+
+    ". Zużycie domu nadal edytowalne; brak pliku zużycia.";
+  setStatus("Import zakończony. Sprawdź tabelę i kliknij „Oblicz plan”.");
+}
+async function importHaFile(kind,input){
+  try{
+    const content=await readFile(input);
+    if(content===null)return;
+    const parsed=kind==="prices"
+      ?PlannerDataImport.parsePriceFile(content)
+      :PlannerDataImport.parseSolarFile(content);
+    const tentative={...uploadedHa,[kind]:parsed};
+    rebuildFromHaSources(tentative);
+    uploadedHa=tentative;
+  }catch(error){
+    setStatus("Import HA: "+String(error.message||error),true);
+  }
 }
 function renderInputs(){
   const tbody=$("input-rows");tbody.replaceChildren();
@@ -381,10 +455,14 @@ function csvInput(){
 async function readFile(input){
   const file=input.files?.[0];input.value="";return file?await file.text():null;
 }
-$("load").addEventListener("click",makePreset);
-$("start").addEventListener("change",renderInputs);
-$("duration").addEventListener("change",makePreset);
+$("load").addEventListener("click",()=>{clearHaImports();makePreset();});
+$("start").addEventListener("change",()=>{clearHaImports();renderInputs();});
+$("duration").addEventListener("change",()=>{clearHaImports();makePreset();});
 $("simulate").addEventListener("click",simulate);
+$("import-price-ha").addEventListener("click",()=>$("price-ha-file").click());
+$("import-pv-ha").addEventListener("click",()=>$("pv-ha-file").click());
+$("price-ha-file").addEventListener("change",e=>importHaFile("prices",e.target));
+$("pv-ha-file").addEventListener("change",e=>importHaFile("solar",e.target));
 $("export-csv").addEventListener("click",()=>download("planner_lab_input.csv",csvInput(),"text/csv"));
 $("export-json").addEventListener("click",()=>download("planner_lab_scenario.json",JSON.stringify(payload(),null,2),"application/json"));
 $("import-csv").addEventListener("click",()=>$("file").click());
@@ -401,7 +479,7 @@ $("file").addEventListener("change",async e=>{
       if(parts.length!==3||parts.some(v=>!Number.isFinite(v)))throw Error("CSV: błędny wiersz "+(i+1));
       return Object.fromEntries(keys.map((key,j)=>[key,parts[j]]));
     });
-    rows=imported;$("duration").value=String([24,48,72].includes(rows.length)?rows.length:24);
+    clearHaImports();rows=imported;setImportedDuration(rows.length);
     renderInputs();latest=null;$("output").hidden=true;setStatus("CSV wczytany: "+rows.length+" godzin.");
   }catch(err){setStatus(err.message,true);}
 });
@@ -413,6 +491,7 @@ $("json-file").addEventListener("change",async e=>{
     $("start").value=d.start_utc;
     [["soc","initial_soc_pct"],["capacity","battery_capacity_kwh"],["voltage","battery_voltage_v"],["charge","charge_limit_a"],["grid","grid_charge_limit_a"],["discharge","discharge_limit_a"],["eta","efficiency"]].forEach(([id,key])=>{if(d[key]!==undefined)$(id).value=d[key];});
     $("export").checked=!!d.pv_export_enabled;
+    clearHaImports();setImportedDuration(d.hours.length);
     rows=d.hours.map(r=>({
       spot:r.spot===undefined?r.sell:r.spot,
       pv_kw:r.pv_kw,
