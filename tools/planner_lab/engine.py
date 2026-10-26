@@ -356,7 +356,7 @@ def simulate_scenario(payload):
     """Validate hand-entered hourly values; return real planner dispatch."""
     if not isinstance(payload, dict):
         raise ValueError("Przekaż obiekt JSON")
-    planner, _ = _core_modules()
+    planner, horizon = _core_modules()
     start = _timestamp(payload.get("start_utc"))
     hours = payload.get("hours")
     if not isinstance(hours, list) or not (1 <= len(hours) <= MAX_HOURS):
@@ -414,7 +414,7 @@ def simulate_scenario(payload):
             )
 
     try:
-        result = _continuous_horizon(plant, tuple(quarters), planner)
+        result = horizon.optimize_horizon(plant, tuple(quarters))
     except planner.InfeasibleCandidate as exc:
         raise ValueError(f"Planer: {exc}") from exc
 
