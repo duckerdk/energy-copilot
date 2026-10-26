@@ -96,6 +96,7 @@ tbody tr:nth-child(2n){background:#1b2938}
     <button id="import-replay">Wczytaj diagnostykę HA (.json)</button>
     <input id="replay-file" type="file" accept=".json,application/json">
     <button id="run-replay" class="primary" disabled>Porównaj HA i Lab</button>
+    <button id="edit-replay" disabled>Wczytaj dane HA do symulacji</button>
     <span class="status" id="replay-status">Wczytaj diagnostykę z wersji 1.14.0 lub nowszej.</span>
   </div>
   <div id="replay-output" hidden>
@@ -377,8 +378,16 @@ function initializeEngine(){
         button.disabled=false;
         setStatus("Silnik Python gotowy. Można uruchomić symulację.");
         $("run-replay").disabled = !replayData;
+        $("ha-simulate").disabled = !haScenario;
+        if(haScenario)runHaScenario();
       }else if(msg.kind==="init_error"){
-        workerReady=false;button.disabled=true;$("run-replay").disabled=true;setStatus(msg.error,true);
+        workerReady=false;button.disabled=true;$("run-replay").disabled=true;
+        $("ha-simulate").disabled=true;setStatus(msg.error,true);
+      }else if(msg.kind==="ha_scenario_result" && msg.id===haRequestId){
+        try{showHaScenarioResult(msg.data);}catch(error){haStatus(String(error.message||error),true);$("ha-simulate").disabled=false;}
+      }else if(msg.kind==="ha_scenario_error" && msg.id===haRequestId){
+        haStatus("Błąd symulacji HA: "+msg.error,true);
+        $("ha-simulate").disabled=false;
       }else if(msg.kind==="replay_result" && msg.id===replayRequestId){
         replayResult=msg.data;
         renderReplay(msg.data);
@@ -398,6 +407,7 @@ function initializeEngine(){
     };
     computeWorker.onerror=event=>{
       workerReady=false;button.disabled=true;$("run-replay").disabled=true;
+      $("ha-simulate").disabled=true;
       setStatus("Błąd uruchamiania silnika w przeglądarce: "+(event.message||"Sprawdź połączenie z internetem"),true);
     };
   }catch(error){setStatus("Nie można uruchomić Web Worker: "+error.message,true);}
@@ -576,16 +586,22 @@ async function loadReplayFile(input){
     if(!file)return;
     if(file.size>5*1024*1024)throw Error("Plik diagnostyki przekracza 5 MB.");
     const raw=JSON.parse(await file.text());
-    const replay=raw?.data?.planner_replay??raw?.planner_replay??raw;
+    const bundle=raw?.format==="energy-copilot/ha-scenario/v1"?raw:null;
+    const replay=bundle?.original??raw?.data?.planner_replay??raw?.planner_replay??raw;
     if(replay?.schema!=="energy-copilot/ha-replay/v1"||!Array.isArray(replay.quarters)){
       throw Error("Brak zgodnego snapshotu. Pobierz nową diagnostykę HA po aktualizacji do v1.14.0 w trybie dry_run.");
     }
-    replayData=replay;replayResult=null;
+    const original=ReplayScenario.makeEditable(replay);
+    const edited=bundle?ReplayScenario.makeEditable(bundle.scenario):original;
+    replayData=original;replayResult=null;
     $("replay-output").hidden=true;
     $("run-replay").disabled=!workerReady;
-    showReplayStatus("Wczytano "+replay.quarters.length+" kwadransów. Kliknij „Porównaj HA i Lab”.");
+    $("edit-replay").disabled=false;
+    activateHaScenario(edited);
+    showReplayStatus("Wczytano "+replay.quarters.length+" kwadransów do edytowalnej symulacji. Porównanie oryginalnego HA dostępne osobno.");
   }catch(error){
     replayData=null;replayResult=null;$("run-replay").disabled=true;
+    $("edit-replay").disabled=true;exitHaScenario();
     $("replay-output").hidden=true;
     showReplayStatus(String(error.message||error),true);
   }
@@ -713,6 +729,22 @@ async function readFile(input){
 $("import-replay").addEventListener("click",()=>$("replay-file").click());
 $("replay-file").addEventListener("change",e=>loadReplayFile(e.target));
 $("run-replay").addEventListener("click",runReplay);
+$("edit-replay").addEventListener("click",()=>{if(replayData)activateHaScenario(replayData);});
+$("ha-simulate").addEventListener("click",runHaScenario);
+$("ha-reset").addEventListener("click",()=>{if(replayData)activateHaScenario(replayData);});
+$("ha-manual").addEventListener("click",exitHaScenario);
+$("ha-save").addEventListener("click",()=>{
+  if(!haScenario||!replayData)return;
+  try{
+    syncHaInputs();
+    const content=JSON.stringify({
+      format:"energy-copilot/ha-scenario/v1",original:replayData,scenario:haScenario
+    },null,2);
+    download("planner_lab_ha_scenario.json",content,"application/json");
+    haStatus("Zapisano scenariusz z oryginalnym punktem odniesienia HA.");
+  }catch(error){haStatus(String(error.message||error),true);}
+});
+
 $("replay-export-results").addEventListener("click",()=>{
   if(!replayResult)return;
   const fields=["start","soc_end_pct","grid_to_battery_ac_kwh","pv_to_battery_dc_kwh","battery_to_home_dc_kwh","grid_import_kwh","grid_export_kwh","purchase_dkk","sales_dkk"];
