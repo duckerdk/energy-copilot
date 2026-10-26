@@ -17,12 +17,13 @@ async function fetchSource(filename) {
 async function initialize() {
   importScripts(PYODIDE_CDN + "pyodide.js");
   const py = await loadPyodide({ indexURL: PYODIDE_CDN });
-  const [engine, planner, optimizer, continuous, replay] = await Promise.all([
+  const [engine, planner, optimizer, continuous, replay, headroom] = await Promise.all([
     fetchSource("engine.py"),
     fetchSource("planner.py"),
     fetchSource("horizon_optimizer.py"),
     fetchSource("continuous_optimizer.py"),
     fetchSource("replay.py"),
+    fetchSource("pv_headroom.py"),
   ]);
   py.FS.mkdirTree("/lab/core");
   py.FS.writeFile("/lab/engine.py", engine);
@@ -31,6 +32,7 @@ async function initialize() {
   py.FS.writeFile("/lab/core/horizon_optimizer.py", optimizer);
   py.FS.writeFile("/lab/core/continuous_optimizer.py", continuous);
   py.FS.writeFile("/lab/core/replay.py", replay);
+  py.FS.writeFile("/lab/core/pv_headroom.py", headroom);
   py.runPython("import json\nimport sys\nsys.path.insert(0, '/lab')\nfrom engine import simulate_scenario, simulate_replay");
   self.postMessage({ kind: "ready" });
   return py;
