@@ -73,9 +73,7 @@ def _result_output(result):
             "grid_charge_ac_kwh": sum(
                 q.grid_to_battery_ac_kwh for q in result.dispatches
             ),
-            "pv_charge_dc_kwh": sum(
-                q.pv_to_battery_dc_kwh for q in result.dispatches
-            ),
+            "pv_charge_dc_kwh": sum(q.pv_to_battery_dc_kwh for q in result.dispatches),
             "battery_discharge_dc_kwh": sum(
                 q.battery_to_home_dc_kwh for q in result.dispatches
             ),
@@ -110,10 +108,14 @@ def build_replay(plant, quarters, result, *, metadata=None):
         "terminal_value_override_dkk_per_kwh_dc": (
             result.terminal_value_dkk_per_kwh_dc
         ),
-        "quarters": [asdict(q) | {
-            "start": q.start.isoformat(),
-            "end": q.end.isoformat(),
-        } for q in quarters],
+        "quarters": [
+            asdict(q)
+            | {
+                "start": q.start.isoformat(),
+                "end": q.end.isoformat(),
+            }
+            for q in quarters
+        ],
         "expected": _result_output(result),
         "executable": False,
     }
@@ -148,10 +150,9 @@ def _inputs(payload):
     plant_data = payload.get("plant")
     if not isinstance(plant_data, dict):
         raise ValueError("replay:missing_plant")
-    plant = Plant(**{
-        key: _finite(plant_data[key], key)
-        for key in Plant.__dataclass_fields__
-    })
+    plant = Plant(
+        **{key: _finite(plant_data[key], key) for key in Plant.__dataclass_fields__}
+    )
     raw_quarters = payload.get("quarters")
     if not isinstance(raw_quarters, list) or not 1 <= len(raw_quarters) <= MAX_QUARTERS:
         raise ValueError("replay:invalid_quarter_count")
@@ -198,9 +199,7 @@ def _inputs(payload):
 def simulate_replay(payload):
     """Execute unchanged HA solver and compare against frozen matching result."""
     plant, quarters, terminal, expected = _inputs(payload)
-    result = optimize_horizon(
-        plant, quarters, terminal_value_override=terminal
-    )
+    result = optimize_horizon(plant, quarters, terminal_value_override=terminal)
     actual = _result_output(result)
     errors = []
     maximum_by_field = {}
@@ -217,24 +216,28 @@ def simulate_replay(payload):
             differences[field] = delta
             maximum_by_field[field] = max(maximum_by_field.get(field, 0.0), abs(delta))
             if abs(delta) > tolerance:
-                errors.append({
-                    "quarter": index,
-                    "start": got["start"],
-                    "field": field,
-                    "difference": delta,
-                })
-        comparison.append({
-            "start": got["start"],
-            "input": {
-                "buy_dkk_per_kwh": quarters[index].buy_dkk_per_kwh,
-                "sell_dkk_per_kwh": quarters[index].sell_dkk_per_kwh,
-                "pv_dc_kwh": quarters[index].pv_dc_kwh,
-                "home_ac_kwh": quarters[index].home_ac_kwh,
-            },
-            "ha": ref,
-            "lab": got,
-            "difference": differences,
-        })
+                errors.append(
+                    {
+                        "quarter": index,
+                        "start": got["start"],
+                        "field": field,
+                        "difference": delta,
+                    }
+                )
+        comparison.append(
+            {
+                "start": got["start"],
+                "input": {
+                    "buy_dkk_per_kwh": quarters[index].buy_dkk_per_kwh,
+                    "sell_dkk_per_kwh": quarters[index].sell_dkk_per_kwh,
+                    "pv_dc_kwh": quarters[index].pv_dc_kwh,
+                    "home_ac_kwh": quarters[index].home_ac_kwh,
+                },
+                "ha": ref,
+                "lab": got,
+                "difference": differences,
+            }
+        )
 
     summary_delta = {}
     for field, got in actual["summary"].items():
