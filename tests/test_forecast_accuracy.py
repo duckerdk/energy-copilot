@@ -107,7 +107,7 @@ def test_quarter_watts_to_kwh_and_signed_underprediction():
     tracker.remember(first - timedelta(seconds=15), pv, projection)
     for k in range(62):
         at = first - timedelta(seconds=15) + timedelta(seconds=k * 30)
-        if k == 31:
+        if k == 30:
             tracker.remember(at, pv, projection)
         tracker.observe(at, {
             "pv": Sample(2000.0, at),
