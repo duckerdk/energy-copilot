@@ -515,3 +515,43 @@ def test_replay_rejects_missing_partial_or_wrong_version_snapshot():
     broken["quarters"][1]["start"] = broken["quarters"][0]["start"]
     with pytest.raises(ValueError, match="non_contiguous"):
         simulate_replay(broken)
+
+
+def test_terminal_proxy_does_not_reward_full_soc_without_pre_pv_load():
+    """No grid top-up is justified solely by a fictional terminal battery value."""
+    from types import SimpleNamespace
+
+    from custom_components.energy_copilot.planner import Plant, Quarter
+    from custom_components.energy_copilot.planning_preview import _terminal_proxy
+
+    plant = Plant(10.24, 50.0, 51.2, 50, 100, 50, 0.95, 0.95, 0.95, 0.95, 0)
+    end = BASE + STEP
+    quarters = (Quarter(BASE, end, 0.10, 0, 0, 0, False),)
+    pv = (ForecastPeriod(end, end + STEP, 1.0),)
+    projection = SimpleNamespace(periods=())
+    value, basis, demand = _terminal_proxy(plant, quarters, projection, pv)
+    assert value == 0
+    assert demand == 0
+    assert basis == "no_pre_pv_load_zero_terminal_incentive"
+
+
+def test_terminal_proxy_scales_with_demand_before_next_pv():
+    from types import SimpleNamespace
+
+    from custom_components.energy_copilot.planner import Plant, Quarter
+    from custom_components.energy_copilot.planning_preview import _terminal_proxy
+
+    plant = Plant(10.24, 50.0, 51.2, 50, 100, 50, 0.95, 0.95, 0.95, 0.95, 0)
+    end = BASE + STEP
+    quarters = (Quarter(BASE, end, 1.0, 0, 0, 0, False),)
+    next_pv = end + timedelta(hours=2)
+    pv = (ForecastPeriod(next_pv, next_pv + STEP, 2.0),)
+
+    def price_for(kwh):
+        load = SimpleNamespace(
+            periods=(SimpleNamespace(start=end, end=end + STEP, kwh=kwh),)
+        )
+        return _terminal_proxy(plant, quarters, load, pv)[0]
+
+    assert price_for(0) == 0
+    assert 0 < price_for(0.5) < price_for(10)
