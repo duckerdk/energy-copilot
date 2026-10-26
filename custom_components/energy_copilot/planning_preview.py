@@ -166,17 +166,26 @@ def _terminal_proxy(plant, quarters, projection, pv_periods):
         if end <= period.start and period.end <= until
     )
     published = [q.buy_dkk_per_kwh for q in quarters]
-    base = max(0.0, min(published) / plant.eta_grid_to_battery)
-    if demand <= 1e-6:
-        return base, "min_published_buy_price_no_confirmed_future_load", demand
+    # A terminal value applied to *every* remaining kWh rewards filling the
+    # entire battery, even if post-horizon demand before the next PV is tiny.
+    # Avoid that artificial incentive: only the share of usable battery energy
+    # supported by forecast demand can receive a replacement-value proxy.
+    # In particular, no confirmed pre-PV load => no incentive to grid-charge
+    # merely to finish the visible price horizon at 100% SOC.
+    usable = plant.battery_capacity_dc_kwh * (1.0 - 0.20)
+    supported_dc = demand / plant.eta_battery_to_ac
+    support_fraction = min(1.0, max(0.0, supported_dc / usable))
+    if support_fraction <= 1e-9:
+        return 0.0, "no_pre_pv_load_zero_terminal_incentive", demand
     recent = published[-min(32, len(published)) :]
-    conservative_proxy = max(
+    replacement_price = max(
         0.0,
+        min(published) / plant.eta_grid_to_battery,
         median(recent) * plant.eta_battery_to_ac - DEGRADATION_DKK_PER_KWH_DC,
     )
     return (
-        max(base, conservative_proxy),
-        "unpriced_overnight_demand_recent_published_price_proxy_unverified",
+        replacement_price * support_fraction,
+        "pre_pv_demand_scaled_terminal_proxy_unverified",
         demand,
     )
 
