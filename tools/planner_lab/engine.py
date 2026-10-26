@@ -515,3 +515,10 @@ def simulate_scenario(payload):
     }
 
 
+
+
+def simulate_replay(payload):
+    """Execute the same physical HA optimizer over frozen 15-minute inputs."""
+    _core_modules()
+    replay = importlib.import_module(f"{PACKAGE}.replay")
+    return replay.simulate_replay(payload)
