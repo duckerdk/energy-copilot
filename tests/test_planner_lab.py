@@ -7,7 +7,7 @@ from subprocess import run
 
 import pytest
 
-from tools.planner_lab.engine import _core_modules, simulate_scenario
+from tools.planner_lab.engine import _core_modules, simulate_replay, simulate_scenario
 
 
 def scenario(hours=None, soc=25, pv=0):
@@ -259,6 +259,11 @@ def test_site_is_static_without_server_post_or_independent_optimizer():
     assert 'new Worker("./worker.js")' in html
     assert "engine.py" in worker and "planner.py" in worker
     assert "horizon_optimizer.py" in worker
+    assert "continuous_optimizer.py" in worker
+    assert "replay.py" in worker
+    assert "replay.py" in workflow
+    assert "continuous_optimizer.py" in workflow
+    assert "replay-file" in html and "run-replay" in html
     assert "actions/deploy-pages@v4" in workflow
     assert "custom_components/energy_copilot/planner.py" in workflow
     assert "custom_components/energy_copilot/horizon_optimizer.py" in workflow
@@ -349,3 +354,45 @@ def test_ha_import_parser_javascript_syntax():
     )
     checked = run(["node", "--check", str(script)], capture_output=True, text=True)
     assert checked.returncode == 0, checked.stderr
+
+
+def test_browser_replay_uses_real_ha_solver_and_matches_frozen_output():
+    from datetime import UTC, datetime, timedelta
+
+    from custom_components.energy_copilot.horizon_optimizer import optimize_horizon
+    from custom_components.energy_copilot.planner import Plant, Quarter
+    from custom_components.energy_copilot.replay import build_replay
+
+    start = datetime(2026, 10, 26, 7, 30, tzinfo=UTC)
+    plant = Plant(
+        battery_capacity_dc_kwh=10.24,
+        initial_soc_pct=65,
+        battery_voltage_v=51.5,
+        charge_limit_a=50,
+        discharge_limit_a=100,
+        grid_charge_limit_a=50,
+        eta_pv_to_ac=0.95,
+        eta_pv_to_battery=0.95,
+        eta_grid_to_battery=0.95,
+        eta_battery_to_ac=0.95,
+        terminal_value_dkk_per_kwh_dc=0,
+    )
+    quarters = tuple(
+        Quarter(
+            start + timedelta(minutes=15 * i),
+            start + timedelta(minutes=15 * (i + 1)),
+            [0.7, 0.9, 2.6, 2.7][i],
+            [0.2, 0.3, 0.6, 0.7][i],
+            [0.1, 0.4, 0.05, 0.0][i],
+            [0.3, 0.35, 0.55, 0.5][i],
+            True,
+        )
+        for i in range(4)
+    )
+    target = optimize_horizon(plant, quarters, terminal_value_override=1.25)
+    frozen = build_replay(plant, quarters, target)
+    result = simulate_replay(frozen)
+    assert result["identical"] is True
+    assert result["quarter_count"] == 4
+    assert result["quarters"][0]["start"] == start.isoformat()
+    assert result["summary_difference"]["objective_dkk"] == 0
