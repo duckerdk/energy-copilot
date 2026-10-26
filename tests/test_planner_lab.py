@@ -491,3 +491,38 @@ def test_browser_replay_uses_real_ha_solver_and_matches_frozen_output():
     assert result["quarter_count"] == 4
     assert result["quarters"][0]["start"] == start.isoformat()
     assert result["summary_difference"]["objective_dkk"] == 0
+
+
+def test_export_enabled_still_prices_economically_useful_pv_headroom():
+    """Export eligibility alone must not disable buffer opportunity."""
+    from datetime import UTC, datetime, timedelta
+
+    from custom_components.energy_copilot.planner import Plant, Quarter
+    from custom_components.energy_copilot.pv_headroom import headroom_schedule
+
+    plant = Plant(10.24, 100, 51.2, 50, 100, 50, 0.95, 0.95, 0.95, 0.95, 0)
+    start = datetime(2026, 10, 27, tzinfo=UTC)
+    quarters = tuple(
+        Quarter(
+            start + timedelta(minutes=15 * i),
+            start + timedelta(minutes=15 * (i + 1)),
+            3.0,
+            0.6,
+            0.75 if 8 <= i <= 12 else 0.0,
+            0.125,
+            True,
+        )
+        for i in range(24)
+    )
+    schedule = headroom_schedule(plant, quarters)
+    assert schedule[0].target_dc_kwh > 0
+    assert schedule[0].opportunity_dkk_per_kwh_dc_per_quarter > 0
+    assert schedule[0].target_dc_kwh < plant.battery_capacity_dc_kwh
+    expensive_export = tuple(
+        Quarter(q.start, q.end, q.buy_dkk_per_kwh, 5.0,
+                q.pv_dc_kwh, q.home_ac_kwh, True)
+        for q in quarters
+    )
+    sell_schedule = headroom_schedule(plant, expensive_export)
+    assert sell_schedule[0].target_dc_kwh > 0
+    assert sell_schedule[0].opportunity_dkk_per_kwh_dc_per_quarter == 0
