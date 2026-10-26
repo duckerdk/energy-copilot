@@ -519,8 +519,9 @@ def test_export_enabled_still_prices_economically_useful_pv_headroom():
     assert schedule[0].opportunity_dkk_per_kwh_dc_per_quarter > 0
     assert schedule[0].target_dc_kwh < plant.battery_capacity_dc_kwh
     expensive_export = tuple(
-        Quarter(q.start, q.end, q.buy_dkk_per_kwh, 5.0,
-                q.pv_dc_kwh, q.home_ac_kwh, True)
+        Quarter(
+            q.start, q.end, q.buy_dkk_per_kwh, 5.0, q.pv_dc_kwh, q.home_ac_kwh, True
+        )
         for q in quarters
     )
     sell_schedule = headroom_schedule(plant, expensive_export)
