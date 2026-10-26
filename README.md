@@ -1,6 +1,6 @@
 # Energy Co-Pilot
 
-Natywna integracja Home Assistant `custom_components/energy_copilot`. **Aktualna wydana wersja: [v1.13.0](https://github.com/duckerdk/energy-copilot/releases/tag/v1.13.0)**. Obecnie dostępne: odczyt pomiarów/cen, Forecast.Solar, Recorder, prognoza domu na 7 dni oraz **ciągła optymalizacja w trybie `dry_run`**. Integracja **nie zapisuje nastaw falownika**. Harmonogram fizyczny 15 minut nie jest jeszcze przetłumaczony na sześć rzeczywistych okien TOU Deye (`executable=false`).
+Natywna integracja Home Assistant `custom_components/energy_copilot`. **Wersja przygotowana do wydania: v1.14.0** (poprzednia [v1.13.0](https://github.com/duckerdk/energy-copilot/releases/tag/v1.13.0)). Obecnie dostępne: odczyt pomiarów/cen, Forecast.Solar, Recorder, prognoza domu na 7 dni oraz **ciągła optymalizacja w trybie `dry_run`**. Integracja **nie zapisuje nastaw falownika**. Harmonogram fizyczny 15 minut nie jest jeszcze przetłumaczony na sześć rzeczywistych okien TOU Deye (`executable=false`).
 
 Zatwierdzone reguły, cele i uprawnienia: [REQUIREMENTS.md](requirements/REQUIREMENTS.md). Jedynym źródłem produkcji w integracji jest `sensor.pv_sum`; nie stosuje się PV1/PV2.
 
@@ -9,6 +9,17 @@ Zatwierdzone reguły, cele i uprawnienia: [REQUIREMENTS.md](requirements/REQUIRE
 **[Otwórz Planner Lab](https://duckerdk.github.io/energy-copilot/planner-lab/)**. Uruchamia się w przeglądarce (Pyodide i Web Worker), bez lokalnego serwera, instalacji Pythona ani Home Assistant. Dane scenariusza nie są wysyłane do serwera aplikacyjnego. Repozytorium publikuje stronę przez [planner-lab-pages.yml](.github/workflows/planner-lab-pages.yml); wymagana konfiguracja Pages: **Settings → Pages → Build and deployment → GitHub Actions**.
 
 W tabeli można zmienić godzinowe ceny spot, prognozę PV, pobór domu, SOC, pojemność, napięcie, ograniczenia prądowe i sprawność na 24–72 h. Obliczenia wykorzystują **ciągły solver scenariuszy z `engine.py` i oryginalny fizyczny walidator z `planner.py`**. Ceny zakupu: spot + migawka taryf N1 z 20.10.2026 (nie aktualizuje się automatycznie); sprzedaż: spot. Przykładowe dobowe zużycie bazuje na godzinowej historii HA 19–20.10.2026 i powtarza się w scenariuszach dłuższych. Możliwy import/eksport scenariuszy JSON/CSV oraz eksport wyników kwartalnych. **Import plików HA:** w Planner Lab użyj „Import cen HA (.txt)” dla eksportu `raw_today/raw_tomorrow` oraz „Import Forecast.Solar (.txt)” dla `watts`/`wh_period`. Ceny z pliku są interpretowane jako **spot** (zakup wyliczany oddzielnie z historycznych taryf N1). PV przeliczane jest z **Wh okresu zakończonego w podanym czasie** na godzinową średnią kW z zachowaniem energii, także przy niepełnych godzinach wschodu i zachodu. Zera przed wschodem/po zachodzie w obrębie doby są przyjmowane tylko przy potwierdzonych zerowych W na obu krańcach. Daty i DST są dopasowywane po UTC, po imporcie dwóch plików wykorzystywany jest ich **wspólny** horyzont. Zużycie domu pozostaje edytowalne (domyślnie archiwalny profil przykładowy). Pliki nie opuszczają przeglądarki. Strona nie steruje falownikiem ani nie udowadnia fizycznej wykonalności sześciu TOU.
+
+## Replay HA — dokładne odtworzenie obliczeń w przeglądarce (v1.14.0)
+
+1. Po zainstalowaniu Energy Co-Pilot v1.14.0 ustaw `dry_run` i upewnij się, że status planowania to `preview`.
+2. W HA otwórz **Ustawienia → Urządzenia i usługi → Energy Co-Pilot → Pobierz diagnostykę**. Nowa diagnostyka JSON zawiera `data.planner_replay` — dokładnie te wartości, które zostały podane do optymalizatora w jednym przebiegu: parametry baterii, początkowy SOC, wszystkie kwadranse PV/dom, **rzeczywiste ceny zakupu i sprzedaży**, zezwolenie na eksport PV, użyta wycena końcowego SOC oraz pełne wynikowe przepływy.
+3. Wejdź w [Planner Lab](https://duckerdk.github.io/energy-copilot/planner-lab/), sekcja **Replay HA**, kliknij **Wczytaj diagnostykę HA (.json)**, wybierz nowy plik i kliknij **Porównaj HA i Lab**.
+4. Otrzymasz wynik zgodności numerycznej i tabelę z różnicami kwadrans po kwadransie; możesz ją pobrać jako CSV.
+
+W trybie Replay HA **nie** dodaje się taryf N1 ani nie wyznacza ponownie prognoz: replay używa oryginalnych, już przygotowanych wejść kwadransowych. Nie wymaga pełnej godziny startu i zachowuje dokładne wartości SOC, napięcia, wydajności i wartości końcowej. Porównuje dwa przebiegi **tego samego** modułu `continuous_optimizer.py`, dołączonego do GitHub Pages razem z `replay.py`, `planner.py` i `horizon_optimizer.py`. Tryb zwykłego Scenariusza pozostaje niezależny.
+
+**Prywatność:** plik diagnostyki zawiera prognozowane zużycie domu z rozdzielczością 15 minut. Lab odczytuje go **lokalnie w przeglądarce**; nie zapisuje go do repo, serwera ani stanu sensora. Pełna diagnostyka HA może zawierać dodatkowe informacje systemowe: udostępniaj ją ostrożnie. Stare diagnostyki z v1.13.0 nie posiadają wymaganej migawki, więc nie można ich odtworzyć w ten sposób. Replay ma cel wyłącznie kontrolny i **nie wykonuje komend falownika**.
 
 ## Instalacja i aktualizacja HACS
 
