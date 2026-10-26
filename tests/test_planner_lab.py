@@ -261,6 +261,7 @@ def test_site_is_static_without_server_post_or_independent_optimizer():
     assert "horizon_optimizer.py" in worker
     assert "continuous_optimizer.py" in worker
     assert "replay.py" in worker
+    assert "pv_headroom.py" in worker
     assert "replay.py" in workflow
     assert "continuous_optimizer.py" in workflow
     assert "replay-file" in html and "run-replay" in html
