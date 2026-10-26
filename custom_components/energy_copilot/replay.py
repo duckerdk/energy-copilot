@@ -209,8 +209,11 @@ def simulate_replay(payload):
     """Execute unchanged HA solver and compare against frozen matching result."""
     plant, quarters, terminal, expected, policy, upside = _inputs(payload)
     result = optimize_horizon(
-        plant, quarters, terminal_value_override=terminal,
-        pv_underprediction_kwh=upside, enable_pv_headroom=policy == "risk_aware_v1",
+        plant,
+        quarters,
+        terminal_value_override=terminal,
+        pv_underprediction_kwh=upside,
+        enable_pv_headroom=policy == "risk_aware_v1",
     )
     actual = _result_output(result)
     errors = []
