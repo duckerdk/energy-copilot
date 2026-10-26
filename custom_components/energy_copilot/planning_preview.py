@@ -27,7 +27,7 @@ NOMINAL_BATTERY_CAPACITY_KWH = 10.24
 NOMINAL_BATTERY_VOLTAGE_V = 51.2
 MODEL_EFFICIENCY = 0.95
 PV_FORECAST_TO_DC_MULTIPLIER = 1.0
-# Each scenario returns to initial SOC, so terminal valuation cancels out.
+# Replacement energy value is set dynamically from published prices.
 TERMINAL_VALUE_DKK_PER_KWH = 0.0
 
 
@@ -66,16 +66,22 @@ class Preview:
     post_horizon_load_kwh: float | None = None
     evaluated_transitions: int = 0
     soc_resolution_dc_kwh: float | None = None
+    pv_headroom_max_dc_kwh: float = 0.0
+    pv_headroom_max_pct: float = 0.0
+    pv_headroom_source: str = "not_evaluated"
+    pv_headroom_cost_premium_dkk: float = 0.0
     hourly_plan: tuple[dict, ...] = ()
     replay_snapshot: dict | None = None
 
 
-def _hourly_plan(quarters, dispatches, results) -> tuple[dict, ...]:
+def _hourly_plan(quarters, dispatches, results, headroom=()) -> tuple[dict, ...]:
     """Expose a bounded display series; no private household history exported."""
     from datetime import UTC
 
     hours = {}
-    for q, d, outcome in zip(quarters, dispatches, results, strict=True):
+    for i, (q, d, outcome) in enumerate(
+        zip(quarters, dispatches, results, strict=True)
+    ):
         at = q.start.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
         row = hours.setdefault(
             at,
@@ -100,6 +106,8 @@ def _hourly_plan(quarters, dispatches, results) -> tuple[dict, ...]:
                 "pv_curtailed_dc_kwh": 0.0,
                 "charge_current_setpoint_a": 0.0,
                 "soc_end_pct": 0.0,
+                "pv_headroom_target_dc_kwh": 0.0,
+                "pv_headroom_target_pct": 0.0,
             },
         )
         row["home_kwh"] += q.home_ac_kwh
@@ -116,6 +124,14 @@ def _hourly_plan(quarters, dispatches, results) -> tuple[dict, ...]:
             row["charge_current_setpoint_a"], outcome.charge_current_a
         )
         row["soc_end_pct"] = outcome.soc_end_pct
+        if headroom:
+            row["pv_headroom_target_dc_kwh"] = max(
+                row["pv_headroom_target_dc_kwh"], headroom[i].target_dc_kwh
+            )
+            row["pv_headroom_target_pct"] = max(
+                row["pv_headroom_target_pct"],
+                headroom[i].target_dc_kwh / NOMINAL_BATTERY_CAPACITY_KWH * 100,
+            )
     return tuple(
         {
             key: round(value, 4) if isinstance(value, float) else value
@@ -171,6 +187,7 @@ def evaluate_preview(
     mode: str,
     pv_export_enabled: bool = False,
     load_projection=None,
+    pv_underprediction_kwh: float | None = None,
 ) -> Preview:
     """Optimize the complete published input horizon, but never actuate Deye."""
     if mode != "dry_run":
@@ -216,7 +233,16 @@ def evaluate_preview(
             plant, quarters, projection, snapshot.forecast.periods
         )
         result = optimize_horizon(
-            plant, quarters, terminal_value_override=terminal_value
+            plant, quarters, terminal_value_override=terminal_value,
+            pv_underprediction_kwh=pv_underprediction_kwh,
+        )
+        baseline = (
+            optimize_horizon(
+                plant, quarters, terminal_value_override=terminal_value,
+                enable_pv_headroom=False,
+            )
+            if any(h.target_dc_kwh > 1e-8 for h in result.pv_headroom)
+            else result
         )
         candidate = result.candidate
         reference = result.reference
@@ -279,7 +305,23 @@ def evaluate_preview(
         terminal_value_basis=terminal_basis,
         post_horizon_load_kwh=unpriced_load,
         soc_resolution_dc_kwh=result.soc_resolution_dc_kwh,
-        hourly_plan=_hourly_plan(quarters, dispatches, candidate.quarters),
+        pv_headroom_max_dc_kwh=max(
+            (h.target_dc_kwh for h in result.pv_headroom), default=0.0
+        ),
+        pv_headroom_max_pct=100.0 * max(
+            (h.target_dc_kwh for h in result.pv_headroom), default=0.0
+        ) / plant.battery_capacity_dc_kwh,
+        pv_headroom_source=(
+            "measured_pv_underprediction_p75_bounded"
+            if pv_underprediction_kwh is not None
+            else "forecast_relative_uncertainty_unverified"
+        ),
+        pv_headroom_cost_premium_dkk=(
+            candidate.objective_dkk - baseline.candidate.objective_dkk
+        ),
+        hourly_plan=_hourly_plan(
+            quarters, dispatches, candidate.quarters, result.pv_headroom
+        ),
         replay_snapshot=build_replay(
             plant,
             quarters,
@@ -290,7 +332,7 @@ def evaluate_preview(
                 "voltage_source": voltage_source,
                 "coverage": inputs.coverage_status,
                 "terminal_value_basis": terminal_basis,
-                "source_release": "1.14.0",
+                "source_release": "1.15.0",
             },
         ),
     )
