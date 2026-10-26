@@ -251,14 +251,17 @@ def test_headroom_absent_when_no_pv_or_profitable_export():
 
 def test_measured_pv_error_changes_valued_buffer_but_not_hard_maximum():
     p = plant(68)
-    qs = series([0.5] * 8 + [2.5] * 16,
-                pv=[0.35] * 12 + [0.0] * 12, load=0.25, export=False)
+    qs = series(
+        [0.5] * 8 + [2.5] * 16, pv=[0.35] * 12 + [0.0] * 12, load=0.25, export=False
+    )
     guessed = optimize_horizon(p, qs)
     measured = optimize_horizon(p, qs, pv_underprediction_kwh=0.35)
     assert max(h.target_dc_kwh for h in measured.pv_headroom) >= max(
         h.target_dc_kwh for h in guessed.pv_headroom
     )
-    assert all(h.target_dc_kwh <= 0.3 * p.battery_capacity_dc_kwh + 1e-7
-               for h in measured.pv_headroom)
+    assert all(
+        h.target_dc_kwh <= 0.3 * p.battery_capacity_dc_kwh + 1e-7
+        for h in measured.pv_headroom
+    )
     assert all(row.soc_end_pct <= 100 + 1e-6 for row in measured.candidate.quarters)
     assert all(row.grid_export_kwh == 0 for row in measured.candidate.quarters)
