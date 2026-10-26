@@ -46,17 +46,17 @@ const initialized = initialize().catch((error) => {
 
 self.onmessage = async (event) => {
   const { id, type, payload } = event.data || {};
-  if (!["simulate", "replay"].includes(type)) return;
+  if (!["simulate", "replay", "ha_scenario"].includes(type)) return;
   try {
     runtime = runtime || await initialized;
     runtime.globals.set("planner_lab_input_json", JSON.stringify(payload));
     const serialized = runtime.runPython(
-      type === "replay"
+      type === "replay" || type === "ha_scenario"
         ? "json.dumps(simulate_replay(json.loads(planner_lab_input_json)), ensure_ascii=False, allow_nan=False)"
         : "json.dumps(simulate_scenario(json.loads(planner_lab_input_json)), ensure_ascii=False, allow_nan=False)"
     );
-    self.postMessage({ kind: type === "replay" ? "replay_result" : "result", id, data: JSON.parse(serialized) });
+    self.postMessage({ kind: type === "ha_scenario" ? "ha_scenario_result" : type === "replay" ? "replay_result" : "result", id, data: JSON.parse(serialized) });
   } catch (error) {
-    self.postMessage({ kind: type === "replay" ? "replay_error" : "error", id, error: String(error.message || error) });
+    self.postMessage({ kind: type === "ha_scenario" ? "ha_scenario_error" : type === "replay" ? "replay_error" : "error", id, error: String(error.message || error) });
   }
 };
