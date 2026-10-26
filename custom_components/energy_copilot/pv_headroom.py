@@ -50,13 +50,9 @@ def headroom_schedule(plant, quarters, observed_pv_upside_kwh=None):
             )
             extra_dc = extra * plant.eta_pv_to_battery
             expected_extra += extra_dc
-            future_buy = max(
-                later.buy_dkk_per_kwh for later in quarters[i : i + 48]
-            )
+            future_buy = max(later.buy_dkk_per_kwh for later in quarters[i : i + 48])
             export_value = (
-                ahead.sell_dkk_per_kwh
-                * plant.eta_pv_to_ac
-                / plant.eta_pv_to_battery
+                ahead.sell_dkk_per_kwh * plant.eta_pv_to_ac / plant.eta_pv_to_battery
                 if ahead.pv_export_enabled
                 and ahead.sell_dkk_per_kwh >= PV_EXPORT_MIN_DKK_PER_KWH
                 else 0.0
