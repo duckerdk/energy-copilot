@@ -29,16 +29,11 @@ def headroom_schedule(plant, quarters, observed_pv_upside_kwh=None):
     """
     capacity = plant.battery_capacity_dc_kwh
     verified = observed_pv_upside_kwh is not None
-    empirical = (
-        max(0.0, float(observed_pv_upside_kwh))
-        if verified
-        else 0.0
-    )
+    empirical = max(0.0, float(observed_pv_upside_kwh)) if verified else 0.0
     periods = []
     for i, q in enumerate(quarters):
-        if (
-            q.pv_dc_kwh <= 0.01
-            or (q.pv_export_enabled and q.sell_dkk_per_kwh >= PV_EXPORT_MIN_DKK_PER_KWH)
+        if q.pv_dc_kwh <= 0.01 or (
+            q.pv_export_enabled and q.sell_dkk_per_kwh >= PV_EXPORT_MIN_DKK_PER_KWH
         ):
             periods.append(Headroom())
             continue
@@ -69,13 +64,10 @@ def headroom_schedule(plant, quarters, observed_pv_upside_kwh=None):
         # Future avoided purchase or unpriced demand is the economic upside.
         # The time window extends to evening (up to 12 hours), without
         # inventing next-day spot prices.
-        future_buy = max(
-            later.buy_dkk_per_kwh for later in quarters[i : i + 48]
-        )
+        future_buy = max(later.buy_dkk_per_kwh for later in quarters[i : i + 48])
         marginal_value = max(
             0.0,
-            future_buy * plant.eta_battery_to_ac
-            - DEGRADATION_DKK_PER_KWH_DC,
+            future_buy * plant.eta_battery_to_ac - DEGRADATION_DKK_PER_KWH_DC,
         )
         # Unverified upside has lower weight; measured p75 must remain a
         # bounded heuristic because inverter PV may have been curtailed.
