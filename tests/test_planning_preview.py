@@ -486,7 +486,7 @@ def test_replay_detects_changed_inputs_and_tampered_expected_output():
     assert any(x["field"] == "soc_end_pct" for x in compared["mismatches"])
 
     changed_input = deepcopy(original)
-    changed_input["quarters"][0]["buy_dkk_per_kwh"] += 0.4
+    changed_input["quarters"][0]["home_ac_kwh"] += 3.0
     compared = simulate_replay(changed_input)
     assert not compared["identical"]
     assert compared["mismatch_count"] > 0
