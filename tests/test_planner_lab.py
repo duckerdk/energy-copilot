@@ -403,7 +403,7 @@ assert.equal(display.quarters.length,2);
 assert.equal(display.summary.final_soc_pct,52);
 assert.equal(display.summary.purchase_cost_dkk,0.98);
 assert.equal(display.summary.plan_objective_dkk,-3);
-assert.equal(display.summary.terminal_value_dkk,4.092);
+assert.ok(Math.abs(display.summary.terminal_value_dkk-4.092)<1e-9);
 assert.throws(()=>parser.makeEditable({}),/snapshotu/);
 """
     result = run(["node", "-e", script, str(source)], text=True, capture_output=True)
@@ -425,7 +425,7 @@ def test_imported_ha_data_drives_simulation_instead_of_manual_hourly_fields():
     assert 'type:"ha_scenario"' in html
     assert 'msg.kind==="ha_scenario_result"' in html
     assert "ReplayScenario.summarizeReplay(result,haScenario)" in html
-    assert 'renderOutput(display)' in html
+    assert "renderOutput(display)" in html
     assert "ha_scenario" in worker and "simulate_replay" in worker
     assert "replay_scenario.js" in html and "replay_scenario.js" in pages
     if which("node") is not None:
