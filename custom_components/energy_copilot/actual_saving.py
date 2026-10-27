@@ -10,7 +10,6 @@ from datetime import UTC, datetime, timedelta
 from math import isfinite
 from zoneinfo import ZoneInfo
 
-
 EFFICIENCY = 0.95
 LOCAL = ZoneInfo("Europe/Copenhagen")
 ROLES = ("grid", "battery", "buy", "sell")
