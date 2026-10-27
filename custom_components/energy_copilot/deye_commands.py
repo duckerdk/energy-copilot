@@ -86,7 +86,10 @@ class DeyeCommandAdapter:
         if not device_low <= value <= device_high or step <= 0:
             raise CommandRejected("device:number_outside_device_range")
         device_base = device_low
-        if abs((value - device_base) / step - round((value - device_base) / step)) > 1e-7:
+        if (
+            abs((value - device_base) / step - round((value - device_base) / step))
+            > 1e-7
+        ):
             raise CommandRejected("device:number_step_invalid")
         await self.hass.services.async_call(
             "number",
