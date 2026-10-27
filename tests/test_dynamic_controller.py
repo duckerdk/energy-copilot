@@ -12,6 +12,7 @@ from custom_components.energy_copilot.deye_commands import (
     GRID_CURRENT,
     SOLAR_SELL,
     TIME_OF_USE,
+    tou_entities,
 )
 from custom_components.energy_copilot.dynamic_controller import DynamicDeyeController
 
@@ -31,6 +32,17 @@ class States:
                 (TIME_OF_USE, "on"),
             ]
         }
+        for index, start in enumerate((0, 400, 800, 1200, 1600, 2000), 1):
+            slot = tou_entities(index)
+            self.items[slot["start"]] = SimpleNamespace(
+                state=str(start), attributes={"min": 0, "max": 2359, "step": 1}
+            )
+            self.items[slot["soc"]] = SimpleNamespace(
+                state="20", attributes={"min": 20, "max": 100, "step": 1}
+            )
+            self.items[slot["grid_charge"]] = SimpleNamespace(
+                state="off", attributes={}
+            )
 
     def get(self, key):
         return self.items.get(key)
@@ -79,6 +91,7 @@ def preview(now, *, charge=0.2, discharge=0.0, grid_a=12.0):
                         "grid_to_battery_ac_kwh": charge,
                         "battery_to_home_dc_kwh": discharge,
                         "grid_charge_current_a": grid_a,
+                        "soc_end_pct": 65.0,
                     }
                 ]
             }
@@ -153,3 +166,55 @@ async def test_discharge_rejected_at_minimum_soc():
         == "recovery_required"
     )
     assert not service.calls
+
+
+@pytest.mark.asyncio
+async def test_tou_charge_uses_local_slot_and_soc():
+    # 12 UTC is 13:00 local in late October => fourth TOU slot.
+    now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    controller.arm()
+    assert await controller.apply(preview(now), now, soc_pct=50, voltage_v=51) == (
+        "applied"
+    )
+    slot = tou_entities(4)
+    assert service.states.get(slot["soc"]).state == "65"
+    assert service.states.get(slot["grid_charge"]).state == "on"
+    assert service.states.get(GRID_CHARGE).state == "on"
+    assert not any(
+        data["entity_id"] == tou_entities(3)["soc"]
+        for _, _, data in service.calls
+    )
+
+
+@pytest.mark.asyncio
+async def test_tou_discharge_sets_floor_without_grid_charging():
+    now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    controller.arm()
+    assert await controller.apply(
+        preview(now, charge=0.0, discharge=0.3, grid_a=0),
+        now,
+        soc_pct=80,
+        voltage_v=51,
+    ) == "applied"
+    slot = tou_entities(4)
+    assert service.states.get(slot["soc"]).state == "20"
+    assert service.states.get(slot["grid_charge"]).state == "off"
+    assert service.states.get(DISCHARGE_CURRENT).state != "0"
+
+
+@pytest.mark.asyncio
+async def test_mismatched_window_configuration_fails_before_any_writes():
+    now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    bad = tou_entities(4)["start"]
+    service.states.items[bad] = SimpleNamespace(
+        state="1230", attributes={"min": 0, "max": 2359, "step": 1}
+    )
+    controller.arm()
+    assert await controller.apply(preview(now), now, soc_pct=50, voltage_v=51) == (
+        "recovery_required"
+    )
+    assert not service.calls
+    assert "tou_schedule_mismatch" in controller.reason
