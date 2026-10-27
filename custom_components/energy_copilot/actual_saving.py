@@ -10,7 +10,6 @@ from datetime import UTC, datetime, timedelta
 from math import isfinite
 from zoneinfo import ZoneInfo
 
-from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.history import get_significant_states
 
 EFFICIENCY = 0.95
@@ -72,9 +71,6 @@ def compute_yesterday(rows, entities, start, end, date):
                     "DKK/kWh", "DKK/kwh"
                 }:
                     raise ValueError("price_unit")
-                if role in {"buy", "sell"} and value < 0:
-                    # Negative buy/sell prices are valid on power exchanges.
-                    pass
             except (ValueError, TypeError, AttributeError):
                 return YesterdaySaving(
                     date, None, None, None, duration / (end - start).total_seconds(),
