@@ -3,7 +3,9 @@ name: Publish HACS version from validated main
 on:
   push:
     branches: [main]
-    paths: [custom_components/energy_copilot/manifest.json]
+    paths:
+      - custom_components/energy_copilot/manifest.json
+      - .github/workflows/publish-hacs-from-main.yml
 
 permissions:
   contents: write
