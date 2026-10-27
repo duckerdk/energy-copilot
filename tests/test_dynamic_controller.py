@@ -335,3 +335,41 @@ async def test_tou_manual_override_reconciled_inside_same_quarter():
     assert service.states.get(slot["grid_charge"]).state == "off"
     assert controller.observed_tou_soc == 20
     assert controller.observed_tou_grid_charge == "off"
+
+
+@pytest.mark.asyncio
+async def test_next_quarter_is_latched_and_applied_after_planner_rolls_forward():
+    """Planner always returns a future quarter after its boundary passes."""
+    now = datetime(2026, 10, 27, 20, 44, 30, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    controller.arm()
+    plan = preview(now + timedelta(seconds=30), charge=0, discharge=0, grid_a=0)
+    assert await controller.apply(plan, now, soc_pct=65, voltage_v=52) == (
+        "waiting_for_quarter"
+    )
+    assert controller._pending_quarter is not None
+    # At 20:45 UTC the planner already omits the started quarter.
+    future = preview(now + timedelta(minutes=15, seconds=30), charge=0.2, discharge=0, grid_a=12)
+    result = await controller.apply(
+        future, now + timedelta(seconds=32), soc_pct=65, voltage_v=52
+    )
+    assert result == "applied"
+    assert controller.last_plan_start == "2026-10-27T20:45:00+00:00"
+    assert float(service.states.get(DISCHARGE_CURRENT).state) == 0.0
+
+
+@pytest.mark.asyncio
+async def test_next_quarter_cache_is_refreshed_before_boundary():
+    now = datetime(2026, 10, 27, 20, 40, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    controller.arm()
+    target = now.replace(minute=45)
+    first = preview(target, charge=0, discharge=0.1, grid_a=0)
+    second = preview(target, charge=0, discharge=0, grid_a=0)
+    await controller.apply(first, now, soc_pct=70, voltage_v=52)
+    await controller.apply(second, now + timedelta(minutes=2), soc_pct=70, voltage_v=52)
+    next_future = preview(target + timedelta(minutes=15), charge=0, discharge=0.2, grid_a=0)
+    assert await controller.apply(
+        next_future, target + timedelta(seconds=4), soc_pct=70, voltage_v=52
+    ) == "applied"
+    assert float(service.states.get(DISCHARGE_CURRENT).state) == 0.0
