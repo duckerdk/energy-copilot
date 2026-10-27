@@ -49,7 +49,10 @@ def test_charging_can_be_negative_saving():
     start = datetime(2026, 10, 26, tzinfo=UTC)
     result = compute_yesterday(
         dataset(start, grid=1000, battery=-950),
-        ENTITIES, start, start + timedelta(hours=24), "2026-10-26",
+        ENTITIES,
+        start,
+        start + timedelta(hours=24),
+        "2026-10-26",
     )
     assert result.value == -48.0
 
@@ -66,9 +69,7 @@ def test_missing_prices_never_make_up_saving():
 
 
 def test_danish_daylight_saving_uses_actual_day_length():
-    start, end, date = yesterday_bounds(
-        datetime(2026, 10, 26, 12, tzinfo=UTC)
-    )
+    start, end, date = yesterday_bounds(datetime(2026, 10, 26, 12, tzinfo=UTC))
     assert date == "2026-10-25"
     assert (end - start) == timedelta(hours=25)
 
