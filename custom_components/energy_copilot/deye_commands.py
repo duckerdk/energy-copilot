@@ -103,7 +103,9 @@ class DeyeCommandAdapter:
             maximum = float(state.attributes.get("max", high))
             step = float(state.attributes.get("step", 1))
         except (ValueError, TypeError) as exc:
-            raise CommandRejected(f"device:number_metadata_invalid:{entity_id}") from exc
+            raise CommandRejected(
+                f"device:number_metadata_invalid:{entity_id}"
+            ) from exc
         if not all(isfinite(x) for x in (minimum, maximum, step)) or step <= 0:
             raise CommandRejected(f"device:number_metadata_invalid:{entity_id}")
         low = max(low, minimum)
@@ -114,11 +116,7 @@ class DeyeCommandAdapter:
                 f"min={low}:max={high}"
             )
         steps = (value - minimum) / step
-        index = (
-            ceil(steps - 1e-8)
-            if direction == "up"
-            else floor(steps + 1e-8)
-        )
+        index = ceil(steps - 1e-8) if direction == "up" else floor(steps + 1e-8)
         result = minimum + index * step
         if result < low - 1e-7 or result > high + 1e-7:
             raise CommandRejected(
