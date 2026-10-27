@@ -23,9 +23,5 @@ def test_local_date_and_offset_in_summer():
 
 
 def test_local_offset_change_fall_dst():
-    assert local_timestamp("2026-10-25T00:30:00+00:00") == (
-        "2026-10-25T02:30:00+02:00"
-    )
-    assert local_timestamp("2026-10-25T01:30:00+00:00") == (
-        "2026-10-25T02:30:00+01:00"
-    )
+    assert local_timestamp("2026-10-25T00:30:00+00:00") == ("2026-10-25T02:30:00+02:00")
+    assert local_timestamp("2026-10-25T01:30:00+00:00") == ("2026-10-25T02:30:00+01:00")
