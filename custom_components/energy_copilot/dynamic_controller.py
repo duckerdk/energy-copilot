@@ -114,7 +114,11 @@ class DynamicDeyeController:
                     raise CommandRejected("controller:discharge_step_invalid")
                 discharge_limit = min(
                     100.0,
-                    max(0.0, floor(discharge * 4000 / voltage_v / discharge_step) * discharge_step),
+                    max(
+                        0.0,
+                        floor(discharge * 4000 / voltage_v / discharge_step)
+                        * discharge_step,
+                    ),
                 )
                 grid_state = self.adapter._present(GRID_CURRENT)
                 grid_step = float(grid_state.attributes.get("step", 1))
