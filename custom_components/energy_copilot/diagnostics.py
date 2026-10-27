@@ -6,7 +6,7 @@ from copy import deepcopy
 from homeassistant.util import dt as dt_util
 
 from .const import OPTIONAL_ENTITY_ROLES
-from .sensor import local_timestamp, local_hourly_plan
+from .sensor import local_hourly_plan, local_timestamp
 from .validation import DERIVED_SUM_TOLERANCE_W
 
 
