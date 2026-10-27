@@ -5,6 +5,7 @@ no automatic inverter writes until TOU feasibility and recovery are validated.
 """
 
 from dataclasses import dataclass
+from math import isfinite
 
 CHARGE_CURRENT = "number.sun12k_maximum_battery_charge_current"
 DISCHARGE_CURRENT = "number.sun12k_maximum_battery_discharge_current"
@@ -19,6 +20,7 @@ LIMITS = {
     GRID_CURRENT: (0.0, 50.0),
 }
 SWITCHES = frozenset({GRID_CHARGE, SOLAR_SELL, TIME_OF_USE})
+TOU_NUMBER_FIELDS = frozenset({"start", "power", "soc"})
 
 
 def tou_entities(point: int) -> dict[str, str]:
@@ -62,11 +64,17 @@ class DeyeCommandAdapter:
         return state
 
     async def set_number(self, entity_id: str, value: float) -> WriteResult:
-        if entity_id not in LIMITS:
+        limits = dict(LIMITS)
+        for point in range(1, 7):
+            window = tou_entities(point)
+            limits[window["start"]] = (0.0, 2359.0)
+            limits[window["power"]] = (0.0, 12000.0)
+            limits[window["soc"]] = (20.0, 100.0)
+        if entity_id not in limits:
             raise CommandRejected("device:number_not_allowlisted")
         if type(value) not in (float, int) or not float("-inf") < value < float("inf"):
             raise CommandRejected("device:number_invalid")
-        low, high = LIMITS[entity_id]
+        low, high = limits[entity_id]
         if not low <= value <= high:
             raise CommandRejected("device:number_outside_policy")
         before = self._present(entity_id)
@@ -79,7 +87,8 @@ class DeyeCommandAdapter:
             raise CommandRejected("device:number_metadata_invalid") from exc
         if not device_low <= value <= device_high or step <= 0:
             raise CommandRejected("device:number_outside_device_range")
-        if abs(value / step - round(value / step)) > 1e-7:
+        device_base = device_low
+        if abs((value - device_base) / step - round((value - device_base) / step)) > 1e-7:
             raise CommandRejected("device:number_step_invalid")
         await self.hass.services.async_call(
             "number",
