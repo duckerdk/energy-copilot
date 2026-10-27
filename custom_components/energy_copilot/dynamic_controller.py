@@ -47,14 +47,19 @@ class DynamicDeyeController:
             raise CommandRejected("controller:plan_missing")
         replay = preview.replay_snapshot
         expected = replay.get("expected", {}).get("quarters", ())
+        future = False
         for row in expected:
             at = datetime.fromisoformat(row["start"].replace("Z", "+00:00"))
             if at.tzinfo is None:
                 raise CommandRejected("controller:naive_timestamp")
+            if now < at:
+                future = True
             if at <= now < at + timedelta(minutes=15):
                 if (now - at).total_seconds() > 14 * 60:
                     raise CommandRejected("controller:stale_quarter")
                 return row
+        if future:
+            return None
         raise CommandRejected("controller:no_current_quarter")
 
     async def apply(self, preview, now, *, soc_pct, voltage_v):
@@ -69,6 +74,9 @@ class DynamicDeyeController:
                 if not 20 <= soc_pct <= 100 or voltage_v <= 0:
                     raise CommandRejected("controller:outside_policy")
                 row = self._current_quarter(preview, now)
+                if row is None:
+                    self.status = "waiting_for_quarter"
+                    return self.status
                 at = row["start"]
                 if at == self.last_plan_start:
                     return self.status
