@@ -102,8 +102,11 @@ class DynamicDeyeController:
                     raise CommandRejected("controller:simultaneous_flow")
                 if soc_pct <= 20.1 and discharge > 1e-7:
                     raise CommandRejected("controller:minimum_soc")
-                if self.adapter._present(TIME_OF_USE).state != "on":
-                    raise CommandRejected("controller:tou_not_enabled")
+                tou_state = self.adapter._present(TIME_OF_USE).state
+                if tou_state != "on":
+                    self.status = "blocked"
+                    self.reason = f"controller:tou_not_enabled:observed={tou_state}"
+                    return self.status
                 charge_enabled = charge > 1e-7
                 # Positive current allowance permits PV charging. Never
                 # set it to zero just to suppress grid charging.
