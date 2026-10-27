@@ -3,6 +3,7 @@
 Single-change supervised building block. Not wired to config flow or the planner:
 no automatic inverter writes until TOU feasibility and recovery are validated.
 """
+
 from dataclasses import dataclass
 
 CHARGE_CURRENT = "number.sun12k_maximum_battery_charge_current"
@@ -81,7 +82,9 @@ class DeyeCommandAdapter:
         if abs(value / step - round(value / step)) > 1e-7:
             raise CommandRejected("device:number_step_invalid")
         await self.hass.services.async_call(
-            "number", "set_value", {"entity_id": entity_id, "value": value},
+            "number",
+            "set_value",
+            {"entity_id": entity_id, "value": value},
             blocking=True,
         )
         after = self._present(entity_id)
@@ -102,8 +105,10 @@ class DeyeCommandAdapter:
             raise CommandRejected("device:switch_invalid")
         self._present(entity_id)
         await self.hass.services.async_call(
-            "switch", "turn_on" if value else "turn_off",
-            {"entity_id": entity_id}, blocking=True,
+            "switch",
+            "turn_on" if value else "turn_off",
+            {"entity_id": entity_id},
+            blocking=True,
         )
         if self._present(entity_id).state != ("on" if value else "off"):
             raise CommandRejected("device:write_unconfirmed")
