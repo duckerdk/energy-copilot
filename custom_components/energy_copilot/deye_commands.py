@@ -4,6 +4,7 @@ Single-change supervised building block. Not wired to config flow or the planner
 no automatic inverter writes until TOU feasibility and recovery are validated.
 """
 
+import asyncio
 from dataclasses import dataclass
 
 CHARGE_CURRENT = "number.sun12k_maximum_battery_charge_current"
@@ -61,6 +62,25 @@ class DeyeCommandAdapter:
             raise CommandRejected("device:entity_unavailable")
         return state
 
+    async def _confirm_number(self, entity_id: str, value: float):
+        for _ in range(40):
+            state = self._present(entity_id)
+            try:
+                if abs(float(state.state) - value) < 1e-6:
+                    return
+            except ValueError:
+                pass
+            await asyncio.sleep(0.25)
+        raise CommandRejected("device:write_unconfirmed")
+
+    async def _confirm_switch(self, entity_id: str, value: bool):
+        expected = "on" if value else "off"
+        for _ in range(40):
+            if self._present(entity_id).state == expected:
+                return
+            await asyncio.sleep(0.25)
+        raise CommandRejected("device:write_unconfirmed")
+
     async def set_number(self, entity_id: str, value: float) -> WriteResult:
         limits = dict(LIMITS)
         for point in range(1, 7):
@@ -97,13 +117,7 @@ class DeyeCommandAdapter:
             {"entity_id": entity_id, "value": value},
             blocking=True,
         )
-        after = self._present(entity_id)
-        try:
-            confirmed = abs(float(after.state) - value) < 1e-6
-        except ValueError:
-            confirmed = False
-        if not confirmed:
-            raise CommandRejected("device:write_unconfirmed")
+        await self._confirm_number(entity_id, value)
         return WriteResult(entity_id, value, True)
 
     async def set_switch(self, entity_id: str, value: bool) -> WriteResult:
@@ -120,6 +134,5 @@ class DeyeCommandAdapter:
             {"entity_id": entity_id},
             blocking=True,
         )
-        if self._present(entity_id).state != ("on" if value else "off"):
-            raise CommandRejected("device:write_unconfirmed")
+        await self._confirm_switch(entity_id, value)
         return WriteResult(entity_id, value, True)
