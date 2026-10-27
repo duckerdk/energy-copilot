@@ -6,6 +6,7 @@ from copy import deepcopy
 from homeassistant.util import dt as dt_util
 
 from .const import OPTIONAL_ENTITY_ROLES
+from .sensor import local_hourly_plan, local_timestamp
 from .validation import DERIVED_SUM_TOLERANCE_W
 
 
@@ -70,6 +71,8 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "holdout_accuracy": coordinator.load_backtest,
         },
         "planner_replay": preview.replay_snapshot,
+        "display_timezone": "Europe/Copenhagen",
+        "hourly_plan_local": local_hourly_plan(preview.hourly_plan),
         "planning_preview": {
             "status": preview.status,
             "reason": preview.reason,
@@ -135,6 +138,9 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "status": coordinator.dynamic_controller.status,
             "reason": coordinator.dynamic_controller.reason,
             "last_plan_start": coordinator.dynamic_controller.last_plan_start,
+            "last_plan_start_local": local_timestamp(
+                coordinator.dynamic_controller.last_plan_start
+            ),
             "halted": coordinator.dynamic_controller.halted,
             "active_tou_slot": coordinator.dynamic_controller.active_tou_slot,
             "target_tou_soc": coordinator.dynamic_controller.target_tou_soc,

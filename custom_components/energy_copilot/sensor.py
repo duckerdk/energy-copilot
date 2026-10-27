@@ -1,11 +1,27 @@
 """Quality and planning telemetry for the monitor, preview and control modes."""
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.const import EntityCategory
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+
+LOCAL_TIMEZONE = ZoneInfo("Europe/Copenhagen")
+
+
+def local_timestamp(value):
+    if value is None:
+        return None
+    moment = value if isinstance(value, datetime) else datetime.fromisoformat(value)
+    return moment.astimezone(LOCAL_TIMEZONE).isoformat()
+
+
+def local_hourly_plan(hourly):
+    return [{**row, "start": local_timestamp(row["start"])} for row in hourly]
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -144,7 +160,13 @@ class PlanningStatusSensor(CoordinatorEntity, SensorEntity):
             "grid_charge_kwh": preview.grid_charge_kwh,
             "pv_charge_dc_kwh": preview.pv_charge_dc_kwh,
             "discharge_dc_kwh": preview.discharge_dc_kwh,
-            "hourly_plan": list(preview.hourly_plan),
+            "hourly_plan": local_hourly_plan(preview.hourly_plan),
+            "hourly_plan_utc": list(preview.hourly_plan),
+            "display_timezone": "Europe/Copenhagen",
+            "charge_start_local": local_timestamp(preview.charge_start),
+            "discharge_start_local": local_timestamp(preview.discharge_start),
+            "start_local": local_timestamp(preview.start),
+            "end_local": local_timestamp(preview.end),
             "execution_state": self.coordinator.dynamic_controller.status,
             "execution_reason": self.coordinator.dynamic_controller.reason,
             "last_plan_applied": self.coordinator.dynamic_controller.last_plan_start,

@@ -6,6 +6,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .sensor import local_timestamp
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -39,7 +40,9 @@ class DynamicControlSwitch(CoordinatorEntity, SwitchEntity):
         return {
             "execution_state": control.status,
             "reason": control.reason,
-            "last_plan_start": control.last_plan_start,
+            "last_plan_start": local_timestamp(control.last_plan_start),
+            "last_plan_start_utc": control.last_plan_start,
+            "display_timezone": "Europe/Copenhagen",
             "halted": control.halted,
             "active_tou_slot": control.active_tou_slot,
             "target_tou_soc": control.target_tou_soc,
