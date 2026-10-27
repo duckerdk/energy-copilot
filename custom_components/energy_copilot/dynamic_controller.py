@@ -38,6 +38,7 @@ class DynamicDeyeController:
         self.observed_tou_soc = None
         self.observed_tou_grid_charge = None
         self._lock = asyncio.Lock()
+        self._pending_quarter = None
 
     TOU_STARTS = (0, 400, 800, 1200, 1600, 2000)
 
@@ -68,6 +69,7 @@ class DynamicDeyeController:
 
     def stop(self):
         self.armed = False
+        self._pending_quarter = None
         self.status = "stopped"
 
     def arm(self):
@@ -76,28 +78,42 @@ class DynamicDeyeController:
         self.armed = True
         self.status = "armed"
 
-    @staticmethod
-    def _current_quarter(preview, now):
+    def _current_quarter(self, preview, now):
+        """Cache next-quarter dispatch until its boundary, not just until poll end.
+
+        The planner intentionally starts at the next complete quarter. The
+        executor must retain that dispatch and apply it on subsequent polls.
+        """
         if preview.status != "preview" or not preview.replay_snapshot:
             raise CommandRejected("controller:plan_missing")
-        replay = preview.replay_snapshot
-        expected = replay.get("expected", {}).get("quarters", ())
-        future = False
+        expected = preview.replay_snapshot.get("expected", {}).get("quarters", ())
+        next_row = None
         for row in expected:
             at = datetime.fromisoformat(row["start"].replace("Z", "+00:00"))
             if at.tzinfo is None:
                 raise CommandRejected("controller:naive_timestamp")
-            if now < at:
-                future = True
-                if at - now <= timedelta(seconds=30):
-                    return row
             if at <= now < at + timedelta(minutes=15):
-                if (now - at).total_seconds() > 14 * 60:
-                    raise CommandRejected("controller:stale_quarter")
+                self._pending_quarter = None
                 return row
-        if future:
+            if at > now:
+                next_row = row
+                break
+        pending = self._pending_quarter
+        if pending is not None:
+            at = datetime.fromisoformat(pending["start"].replace("Z", "+00:00"))
+            if at <= now < at + timedelta(minutes=15):
+                self._pending_quarter = None
+                return pending
+            if now >= at + timedelta(minutes=15):
+                self._pending_quarter = None
+        if next_row is not None:
+            at = datetime.fromisoformat(next_row["start"].replace("Z", "+00:00"))
+            # Never cache a dispatch further out than the immediately next
+            # quarter; this must be refreshed every poll before the boundary.
+            if at - now <= timedelta(minutes=15):
+                self._pending_quarter = next_row
             return None
-        raise CommandRejected("controller:no_current_quarter")
+        raise CommandRejected("controller:no_current_or_next_quarter")
 
     async def apply(self, preview, now, *, soc_pct, voltage_v):
         if not self.armed or self.halted:
