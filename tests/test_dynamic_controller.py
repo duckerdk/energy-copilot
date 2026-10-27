@@ -153,3 +153,26 @@ async def test_discharge_rejected_at_minimum_soc():
         == "recovery_required"
     )
     assert not service.calls
+
+
+@pytest.mark.asyncio
+async def test_tou_off_blocks_without_latching_and_reports_observed_state():
+    now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    state = service.states.get(TIME_OF_USE)
+    service.states.items[TIME_OF_USE] = SimpleNamespace(
+        state="off", attributes=state.attributes
+    )
+    controller.arm()
+    assert await controller.apply(preview(now), now, soc_pct=50, voltage_v=51) == (
+        "blocked"
+    )
+    assert controller.reason == "controller:tou_not_enabled:observed=off"
+    assert not controller.halted
+    assert controller.armed
+    assert not service.calls
+
+    service.states.items[TIME_OF_USE] = state
+    assert await controller.apply(preview(now), now, soc_pct=50, voltage_v=51) == (
+        "applied"
+    )
