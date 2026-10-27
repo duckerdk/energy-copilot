@@ -6,7 +6,7 @@ The configured Deye TOU schedule remains the underlying inverter safeguard.
 
 import asyncio
 from datetime import datetime, timedelta
-from math import isfinite
+from math import floor, isfinite
 
 from .deye_commands import (
     CHARGE_CURRENT,
@@ -90,7 +90,11 @@ class DynamicDeyeController:
                 # set it to zero just to suppress grid charging.
                 total_charge_a = 50.0
                 discharge_limit = 100.0 if discharge > 1e-7 else 0.0
-                grid_limit = min(50.0, max(0.0, grid_a))
+                grid_state = self.adapter._present(GRID_CURRENT)
+                grid_step = float(grid_state.attributes.get("step", 1))
+                if not isfinite(grid_step) or grid_step <= 0:
+                    raise CommandRejected("controller:grid_step_invalid")
+                grid_limit = min(50.0, max(0.0, floor(grid_a / grid_step) * grid_step))
                 # Device steps are validated by the command adapter.
                 settings = (
                     (CHARGE_CURRENT, total_charge_a),
