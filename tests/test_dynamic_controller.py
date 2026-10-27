@@ -220,3 +220,53 @@ async def test_mismatched_window_configuration_fails_before_any_writes():
     )
     assert not service.calls
     assert "tou_schedule_mismatch" in controller.reason
+
+
+@pytest.mark.asyncio
+async def test_soc_target_rounds_up_to_entity_step_without_failure():
+    now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    target = tou_entities(4)["soc"]
+    service.states.items[target] = SimpleNamespace(
+        state="20", attributes={"min": 20, "max": 100, "step": 5}
+    )
+    controller.arm()
+    assert await controller.apply(preview(now), now, soc_pct=50, voltage_v=51) == (
+        "applied"
+    )
+    assert service.states.get(target).state == "65.0"
+
+
+@pytest.mark.asyncio
+async def test_discharge_current_rounds_down_using_entity_minimum_and_step():
+    now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    service.states.items[DISCHARGE_CURRENT] = SimpleNamespace(
+        state="100", attributes={"min": 0, "max": 100, "step": 5}
+    )
+    controller.arm()
+    assert (
+        await controller.apply(
+            preview(now, charge=0.0, discharge=0.3, grid_a=0),
+            now,
+            soc_pct=80,
+            voltage_v=51,
+        )
+        == "applied"
+    )
+    assert service.states.get(DISCHARGE_CURRENT).state == "20.0"
+
+
+@pytest.mark.asyncio
+async def test_soc_target_noninteger_step_is_rounded_up():
+    now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    target = tou_entities(4)["soc"]
+    service.states.items[target] = SimpleNamespace(
+        state="20", attributes={"min": 20, "max": 100, "step": 10}
+    )
+    controller.arm()
+    assert await controller.apply(preview(now), now, soc_pct=50, voltage_v=51) == (
+        "applied"
+    )
+    assert service.states.get(target).state == "70.0"
