@@ -14,6 +14,7 @@ from .deye_commands import (
     GRID_CHARGE,
     GRID_CURRENT,
     SOLAR_SELL,
+    TIME_OF_USE,
     CommandRejected,
     DeyeCommandAdapter,
 )
@@ -95,6 +96,8 @@ class DynamicDeyeController:
                     raise CommandRejected("controller:simultaneous_flow")
                 if soc_pct <= 20.1 and discharge > 1e-7:
                     raise CommandRejected("controller:minimum_soc")
+                if self.adapter._present(TIME_OF_USE).state != "on":
+                    raise CommandRejected("controller:tou_not_enabled")
                 charge_enabled = charge > 1e-7
                 # Positive current allowance permits PV charging. Never
                 # set it to zero just to suppress grid charging.
@@ -111,14 +114,15 @@ class DynamicDeyeController:
                     (DISCHARGE_CURRENT, discharge_limit),
                     (GRID_CURRENT, grid_limit),
                 )
+                # Disable grid charging before changing discharge policy.
+                if not charge_enabled and self.adapter._present(GRID_CHARGE).state != "off":
+                    await self.adapter.set_switch(GRID_CHARGE, False)
                 for entity, value in settings:
                     current = self.adapter._present(entity)
                     if abs(float(current.state) - value) > 1e-6:
                         await self.adapter.set_number(entity, value)
-                if self.adapter._present(GRID_CHARGE).state != (
-                    "on" if charge_enabled else "off"
-                ):
-                    await self.adapter.set_switch(GRID_CHARGE, charge_enabled)
+                if charge_enabled and self.adapter._present(GRID_CHARGE).state != "on":
+                    await self.adapter.set_switch(GRID_CHARGE, True)
                 # Solar Sell is price-controlled by the planner, not by the
                 # instantaneous inverter export measurement.
                 for entry in preview.hourly_plan:
