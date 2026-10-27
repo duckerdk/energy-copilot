@@ -345,7 +345,7 @@ def evaluate_preview(
                 "voltage_source": voltage_source,
                 "coverage": inputs.coverage_status,
                 "terminal_value_basis": terminal_basis,
-                "source_release": "1.15.2",
+                "source_release": "1.16.0",
             },
         ),
     )
