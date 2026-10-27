@@ -81,6 +81,12 @@ class DynamicDeyeController:
                     self.status = "waiting_for_quarter"
                     return self.status
                 at = row["start"]
+                boundary = datetime.fromisoformat(at.replace("Z", "+00:00"))
+                if boundary > now:
+                    await asyncio.sleep((boundary - now).total_seconds())
+                    if not self.armed or self.halted:
+                        return self.status
+                    now = boundary
                 if at == self.last_plan_start:
                     return self.status
                 charge = float(row["grid_to_battery_ac_kwh"])
