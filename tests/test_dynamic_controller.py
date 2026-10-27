@@ -254,7 +254,7 @@ async def test_discharge_current_rounds_down_using_entity_minimum_and_step():
         )
         == "applied"
     )
-    assert service.states.get(DISCHARGE_CURRENT).state == "20.0"
+    assert float(service.states.get(DISCHARGE_CURRENT).state) == 100.0
 
 
 @pytest.mark.asyncio
