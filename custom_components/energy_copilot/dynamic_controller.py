@@ -108,7 +108,14 @@ class DynamicDeyeController:
                 # Positive current allowance permits PV charging. Never
                 # set it to zero just to suppress grid charging.
                 total_charge_a = 50.0
-                discharge_limit = 100.0 if discharge > 1e-7 else 0.0
+                discharge_state = self.adapter._present(DISCHARGE_CURRENT)
+                discharge_step = float(discharge_state.attributes.get("step", 1))
+                if not isfinite(discharge_step) or discharge_step <= 0:
+                    raise CommandRejected("controller:discharge_step_invalid")
+                discharge_limit = min(
+                    100.0,
+                    max(0.0, floor(discharge * 4000 / voltage_v / discharge_step) * discharge_step),
+                )
                 grid_state = self.adapter._present(GRID_CURRENT)
                 grid_step = float(grid_state.attributes.get("step", 1))
                 if not isfinite(grid_step) or grid_step <= 0:
