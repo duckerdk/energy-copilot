@@ -10,7 +10,6 @@ from datetime import UTC, datetime, timedelta
 from math import isfinite
 from zoneinfo import ZoneInfo
 
-from homeassistant.components.recorder.history import get_significant_states
 
 EFFICIENCY = 0.95
 LOCAL = ZoneInfo("Europe/Copenhagen")
@@ -99,6 +98,8 @@ def read_yesterday(hass, entities, now):
     """One bounded synchronous Recorder query, called via executor once per local day."""
     start, end, date = yesterday_bounds(now)
     keys = {role: entities[role] for role in ROLES}
+    from homeassistant.components.recorder.history import get_significant_states
+
     rows = get_significant_states(
         hass, start, end, entity_ids=list(keys.values()),
         include_start_time_state=True,
