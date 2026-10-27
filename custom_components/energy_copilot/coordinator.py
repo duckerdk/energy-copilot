@@ -320,7 +320,9 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                     partial(
                         evaluate_preview,
                         snapshot,
-                        mode="dry_run" if self.settings.get("mode", "monitor") == "automatic" else self.settings.get("mode", "monitor"),
+                        mode="dry_run"
+                        if self.settings.get("mode", "monitor") == "automatic"
+                        else self.settings.get("mode", "monitor"),
                         pv_export_enabled=solar_sell is not None
                         and solar_sell.state in {"on", "off"},
                         load_projection=(
@@ -354,7 +356,9 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                 ):
                     self.dynamic_controller.stop()
                     self.dynamic_controller.status = "blocked"
-                    self.dynamic_controller.reason = "controller:input_or_plan_unavailable"
+                    self.dynamic_controller.reason = (
+                        "controller:input_or_plan_unavailable"
+                    )
                 else:
                     await self.dynamic_controller.apply(
                         self.planning_preview,
