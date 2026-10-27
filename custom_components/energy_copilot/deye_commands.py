@@ -5,7 +5,6 @@ no automatic inverter writes until TOU feasibility and recovery are validated.
 """
 
 from dataclasses import dataclass
-from math import isfinite
 
 CHARGE_CURRENT = "number.sun12k_maximum_battery_charge_current"
 DISCHARGE_CURRENT = "number.sun12k_maximum_battery_discharge_current"
@@ -20,7 +19,6 @@ LIMITS = {
     GRID_CURRENT: (0.0, 50.0),
 }
 SWITCHES = frozenset({GRID_CHARGE, SOLAR_SELL, TIME_OF_USE})
-TOU_NUMBER_FIELDS = frozenset({"start", "power", "soc"})
 
 
 def tou_entities(point: int) -> dict[str, str]:
