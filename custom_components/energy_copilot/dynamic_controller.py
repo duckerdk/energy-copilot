@@ -150,6 +150,9 @@ class DynamicDeyeController:
                         charge_enabled = False
                 else:
                     target_soc = 20
+                target_soc = self.adapter.quantize_number(
+                    slot["soc"], float(target_soc), direction="up"
+                )
                 # Positive current allowance permits PV charging. Never
                 # set it to zero just to suppress grid charging.
                 total_charge_a = 50.0
@@ -172,9 +175,20 @@ class DynamicDeyeController:
                 grid_limit = min(50.0, max(0.0, floor(grid_a / grid_step) * grid_step))
                 # Device steps are validated by the command adapter.
                 settings = (
-                    (CHARGE_CURRENT, total_charge_a),
-                    (DISCHARGE_CURRENT, discharge_limit),
-                    (GRID_CURRENT, grid_limit),
+                    (
+                        CHARGE_CURRENT,
+                        self.adapter.quantize_number(CHARGE_CURRENT, total_charge_a),
+                    ),
+                    (
+                        DISCHARGE_CURRENT,
+                        self.adapter.quantize_number(
+                            DISCHARGE_CURRENT, discharge_limit
+                        ),
+                    ),
+                    (
+                        GRID_CURRENT,
+                        self.adapter.quantize_number(GRID_CURRENT, grid_limit),
+                    ),
                 )
                 # Stop grid charging first, then update active TOU settings.
                 # Never alter window start/end times or non-active SOC settings.
