@@ -307,3 +307,31 @@ async def test_device_lower_discharge_cap_is_respected():
         == "applied"
     )
     assert float(service.states.get(DISCHARGE_CURRENT).state) == 80
+
+
+@pytest.mark.asyncio
+async def test_tou_manual_override_reconciled_inside_same_quarter():
+    now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    controller.arm()
+    plan = preview(now, charge=0.0, discharge=0.1, grid_a=0)
+    assert await controller.apply(plan, now, soc_pct=80, voltage_v=52) == "applied"
+    slot = tou_entities(4)
+    service.states.items[slot["soc"]] = SimpleNamespace(
+        state="90", attributes={"min": 20, "max": 100, "step": 1}
+    )
+    service.states.items[slot["grid_charge"]] = SimpleNamespace(
+        state="on", attributes={}
+    )
+    count = len(service.calls)
+    assert (
+        await controller.apply(
+            plan, now + timedelta(minutes=1), soc_pct=80, voltage_v=52
+        )
+        == "applied"
+    )
+    assert len(service.calls) > count
+    assert float(service.states.get(slot["soc"]).state) == 20
+    assert service.states.get(slot["grid_charge"]).state == "off"
+    assert controller.observed_tou_soc == 20
+    assert controller.observed_tou_grid_charge == "off"
