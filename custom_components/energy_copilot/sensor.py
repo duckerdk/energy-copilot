@@ -24,7 +24,6 @@ def local_hourly_plan(hourly):
     return [{**row, "start": local_timestamp(row["start"])} for row in hourly]
 
 
-
 async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(
         [
