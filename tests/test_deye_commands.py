@@ -1,4 +1,5 @@
 """Deye execution boundary: explicit allowlists and confirmed reads."""
+
 from types import SimpleNamespace
 
 import pytest
@@ -35,8 +36,10 @@ class FakeServices:
         self.calls.append((domain, service, data, blocking))
         if self.acknowledge:
             entity = self.states.values[data["entity_id"]]
-            value = str(data["value"]) if domain == "number" else (
-                "on" if service == "turn_on" else "off"
+            value = (
+                str(data["value"])
+                if domain == "number"
+                else ("on" if service == "turn_on" else "off")
             )
             self.states.values[data["entity_id"]] = SimpleNamespace(
                 state=value, attributes=entity.attributes
@@ -46,7 +49,9 @@ class FakeServices:
 def adapter(*, acknowledge=True):
     states = FakeStates()
     services = FakeServices(states, acknowledge=acknowledge)
-    return DeyeCommandAdapter(SimpleNamespace(states=states, services=services)), services
+    return DeyeCommandAdapter(
+        SimpleNamespace(states=states, services=services)
+    ), services
 
 
 def test_tou_mapping_all_six_and_invalid_numbers():
