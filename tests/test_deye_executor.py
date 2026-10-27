@@ -55,9 +55,7 @@ class Services:
 def executor(*, fail_after=None):
     states = States()
     services = Services(states, fail_after=fail_after)
-    result = SupervisedTOUExecutor(
-        SimpleNamespace(states=states, services=services)
-    )
+    result = SupervisedTOUExecutor(SimpleNamespace(states=states, services=services))
     return result, services
 
 
@@ -98,9 +96,7 @@ async def test_partial_write_never_blindly_retries():
 async def test_invalid_plan_never_writes():
     writer, services = executor()
     writer.arm()
-    malformed = TOUProgram(
-        tuple(TOUWindow(60, 2560, 20, False) for _ in range(6))
-    )
+    malformed = TOUProgram(tuple(TOUWindow(60, 2560, 20, False) for _ in range(6)))
     result = await writer.apply(malformed, plan_id="plan-1")
     assert result.state == "blocked"
     assert services.calls == []
