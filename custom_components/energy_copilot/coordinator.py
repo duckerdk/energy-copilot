@@ -11,6 +11,7 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
+from .actual_saving import YesterdaySaving, read_yesterday, yesterday_bounds
 from .const import (
     DEFAULT_ENTITIES,
     DEFAULT_FORECAST_MAX_VERSIONS,
@@ -87,6 +88,8 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self.quality = None
         self.planning_preview = None
         self.dynamic_controller = DynamicDeyeController(hass)
+        self.actual_yesterday = None
+        self._actual_yesterday_date = None
         self.live_context = LiveSourceContext()
         self.live_window = LiveMeasurementWindow()
 
@@ -233,6 +236,18 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             ):
                 await self._async_train_load(now)
             self._last_external = now
+        yesterday_date = yesterday_bounds(now)[2]
+        if self._actual_yesterday_date != yesterday_date:
+            try:
+                self.actual_yesterday = await self.hass.async_add_executor_job(
+                    read_yesterday, self.hass, self.entities, now
+                )
+            except Exception:
+                _LOGGER.exception("Previous-day saving calculation failed")
+                self.actual_yesterday = YesterdaySaving(
+                    yesterday_date, None, None, None, 0.0, "history:query_failed"
+                )
+            self._actual_yesterday_date = yesterday_date
         snapshot.forecast = self._forecast
         snapshot.history = self._history
         snapshot.issues.extend(self._external_issues)

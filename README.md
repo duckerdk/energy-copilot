@@ -136,3 +136,10 @@ W trybie `automatic` istniejące okna Deye mają stałe początki: 00:00, 04:00,
 W kwartale ładowania Grid Charge: aktywny cel SOC jest obliczany z końca kwadransa optymalizatora (co najmniej bieżący SOC, maksymalnie 100%), ładowanie slotu włączone, globalny Grid Charge włączany dopiero po zapisaniu limitów. W pozostałych kwadransach zezwolenie ładowania slotu jest wyłączane i jego SOC wraca do 20%; rozładowanie ogranicza planowany prąd. Rejestry/encje innych okien nie są modyfikowane.
 
 Przełączenie `automatic` nie włącza samoczynnie ARM. Niezgodny harmonogram TOU lub brak encji blokuje sterowanie przed wysłaniem komend. Wydanie wymaga uruchomienia przez użytkownika i sprawdzenia diagnostyki.
+
+
+### v1.16.5 — previous-day estimated savings and icon
+
+An **Actual Saving Yesterday** sensor estimates the previous full Europe/Copenhagen calendar day's energy cost difference in DKK from Home Assistant Recorder historical grid import/export, signed battery power and historical buy/sell price states. It compares the measured grid bill proxy with a counterfactual no-battery grid balance using an assumed 95% battery conversion efficiency. The value may be negative and is **not** an invoiced saving, a direct measurement of the no-battery scenario or evidence of savings attributable exclusively to Energy Co-Pilot. Missing or invalid historical data produces `unknown` with a reason instead of an invented amount. Requires Recorder retention for yesterday and valid DKK/kWh histories for both price entities.
+
+Brand asset: `custom_components/energy_copilot/brand/icon.png` (supported by Home Assistant 2026.3+). The HACS catalog may independently cache a placeholder logo.

@@ -14,6 +14,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             InputQualitySensor(entry),
             PlanningStatusSensor(entry),
             ModeledSavingSensor(entry),
+            ActualSavingYesterdaySensor(entry),
             SevenDayLoadSensor(entry),
         ]
     )
@@ -188,6 +189,45 @@ class ModeledSavingSensor(CoordinatorEntity, SensorEntity):
             "baseline": "no_battery_cycling_not_actual_deye",
             "not_actual_savings": True,
             "tou_verified": False,
+        }
+
+
+class ActualSavingYesterdaySensor(CoordinatorEntity, SensorEntity):
+    """Estimated previous Danish calendar day savings versus no battery."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Actual Saving Yesterday"
+    _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_native_unit_of_measurement = "DKK"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, entry):
+        super().__init__(entry.runtime_data.coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_actual_saving_yesterday"
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
+
+    @property
+    def native_value(self):
+        result = self.coordinator.actual_yesterday
+        return result.value if result is not None else None
+
+    @property
+    def extra_state_attributes(self):
+        result = self.coordinator.actual_yesterday
+        if result is None:
+            return {"status": "pending"}
+        return {
+            "date": result.date,
+            "status": "estimated" if result.value is not None else "unavailable",
+            "reason": result.reason,
+            "actual_cost_dkk": result.actual_cost,
+            "no_battery_baseline_cost_dkk": result.baseline_cost,
+            "coverage_fraction": result.coverage,
+            "baseline": "same_observed_grid_without_battery_flow",
+            "estimated_only": True,
+            "battery_to_ac_efficiency_assumed": 0.95,
+            "physical_meter_accuracy_verified": False,
+            "comparison_is_not_attributable_solely_to_energy_copilot": True,
         }
 
 
