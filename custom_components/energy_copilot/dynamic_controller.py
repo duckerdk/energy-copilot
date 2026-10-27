@@ -35,6 +35,8 @@ class DynamicDeyeController:
         self.active_tou_slot = None
         self.target_tou_soc = None
         self.target_tou_grid_charge = None
+        self.observed_tou_soc = None
+        self.observed_tou_grid_charge = None
         self._lock = asyncio.Lock()
 
     TOU_STARTS = (0, 400, 800, 1200, 1600, 2000)
@@ -119,8 +121,6 @@ class DynamicDeyeController:
                     if not self.armed or self.halted:
                         return self.status
                     now = boundary
-                if at == self.last_plan_start:
-                    return self.status
                 charge = float(row["grid_to_battery_ac_kwh"])
                 discharge = float(row["battery_to_home_dc_kwh"])
                 grid_a = float(row["grid_charge_current_a"])
@@ -161,6 +161,10 @@ class DynamicDeyeController:
                 )
                 self.target_tou_soc = target_soc
                 self.target_tou_grid_charge = charge_enabled
+                self.observed_tou_soc = float(self.adapter._present(slot["soc"]).state)
+                self.observed_tou_grid_charge = self.adapter._present(
+                    slot["grid_charge"]
+                ).state
                 # Positive current allowance permits PV charging. Never
                 # set it to zero just to suppress grid charging.
                 total_charge_a = 50.0
@@ -224,6 +228,10 @@ class DynamicDeyeController:
                         ):
                             await self.adapter.set_switch(SOLAR_SELL, planned_sell)
                         break
+                self.observed_tou_soc = float(self.adapter._present(slot["soc"]).state)
+                self.observed_tou_grid_charge = self.adapter._present(
+                    slot["grid_charge"]
+                ).state
                 self.last_plan_start = at
                 self.status = "applied"
                 self.reason = None

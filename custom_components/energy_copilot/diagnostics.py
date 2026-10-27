@@ -139,6 +139,8 @@ async def async_get_config_entry_diagnostics(hass, entry):
             "active_tou_slot": coordinator.dynamic_controller.active_tou_slot,
             "target_tou_soc": coordinator.dynamic_controller.target_tou_soc,
             "target_tou_grid_charge": coordinator.dynamic_controller.target_tou_grid_charge,
+            "observed_tou_soc": coordinator.dynamic_controller.observed_tou_soc,
+            "observed_tou_grid_charge": coordinator.dynamic_controller.observed_tou_grid_charge,
         },
         "quality": coordinator.quality,
         "observed": {

@@ -44,6 +44,8 @@ class DynamicControlSwitch(CoordinatorEntity, SwitchEntity):
             "active_tou_slot": control.active_tou_slot,
             "target_tou_soc": control.target_tou_soc,
             "target_tou_grid_charge": control.target_tou_grid_charge,
+            "observed_tou_soc": control.observed_tou_soc,
+            "observed_tou_grid_charge": control.observed_tou_grid_charge,
             "device_emergency_stop": False,
         }
 
