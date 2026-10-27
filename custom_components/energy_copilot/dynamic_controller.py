@@ -132,7 +132,10 @@ class DynamicDeyeController:
                     (GRID_CURRENT, grid_limit),
                 )
                 # Disable grid charging before changing discharge policy.
-                if not charge_enabled and self.adapter._present(GRID_CHARGE).state != "off":
+                if (
+                    not charge_enabled
+                    and self.adapter._present(GRID_CHARGE).state != "off"
+                ):
                     await self.adapter.set_switch(GRID_CHARGE, False)
                 for entity, value in settings:
                     current = self.adapter._present(entity)
