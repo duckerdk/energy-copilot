@@ -349,7 +349,9 @@ async def test_next_quarter_is_latched_and_applied_after_planner_rolls_forward()
     )
     assert controller._pending_quarter is not None
     # At 20:45 UTC the planner already omits the started quarter.
-    future = preview(now + timedelta(minutes=15, seconds=30), charge=0.2, discharge=0, grid_a=12)
+    future = preview(
+        now + timedelta(minutes=15, seconds=30), charge=0.2, discharge=0, grid_a=12
+    )
     result = await controller.apply(
         future, now + timedelta(seconds=32), soc_pct=65, voltage_v=52
     )
@@ -368,8 +370,13 @@ async def test_next_quarter_cache_is_refreshed_before_boundary():
     second = preview(target, charge=0, discharge=0, grid_a=0)
     await controller.apply(first, now, soc_pct=70, voltage_v=52)
     await controller.apply(second, now + timedelta(minutes=2), soc_pct=70, voltage_v=52)
-    next_future = preview(target + timedelta(minutes=15), charge=0, discharge=0.2, grid_a=0)
-    assert await controller.apply(
-        next_future, target + timedelta(seconds=4), soc_pct=70, voltage_v=52
-    ) == "applied"
+    next_future = preview(
+        target + timedelta(minutes=15), charge=0, discharge=0.2, grid_a=0
+    )
+    assert (
+        await controller.apply(
+            next_future, target + timedelta(seconds=4), soc_pct=70, voltage_v=52
+        )
+        == "applied"
+    )
     assert float(service.states.get(DISCHARGE_CURRENT).state) == 0.0
