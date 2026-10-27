@@ -127,3 +127,12 @@ python3.14 -m venv .venv
 - Zapis: limity ładowania/rozładowania, limit Grid Charge, przełącznik Grid Charge, Solar Sell. Stan po zapisie jest odczytywany i potwierdzany; po błędzie zapisów dalsza automatyka jest blokowana do ponownego uruchomienia integracji.
 - Algorytm nie ingeruje w Load First, ustawienia ochronne BMS ani okna TOU. Wymaga od użytkownika bezpiecznej wyjściowej konfiguracji TOU, a zachowanie fizyczne ustawień jest przedmiotem walidacji na falowniku.
 - **Uwaga:** plan 15-minutowy pozostaje prognozą; HA nie może dowieść, że falownik wykonał dokładnie oczekiwany przepływ na podstawie samego odczytu nastawy. Nie utożsamiać `applied` z fizycznie zmierzonym wynikiem.
+
+
+### v1.16.1 — aktywny slot TOU
+
+W trybie `automatic` istniejące okna Deye mają stałe początki: 00:00, 04:00, 08:00, 12:00, 16:00, 20:00 (format HA: 0, 400, 800, 1200, 1600, 2000). Energy Co-Pilot odczytuje i weryfikuje wszystkie sześć początków przed pierwszym zapisem. Zmienia **wyłącznie** `number.sun12k_time_point_N_capacity` i `switch.sun12k_time_point_N_charge_enable` aktywnego okna (czas `Europe/Copenhagen`) oraz wcześniej obsługiwane globalne limity prądu i przełączniki. Nie przesuwa czasów TOU i nie wysyła surowych ramek Modbus.
+
+W kwartale ładowania Grid Charge: aktywny cel SOC jest obliczany z końca kwadransa optymalizatora (co najmniej bieżący SOC, maksymalnie 100%), ładowanie slotu włączone, globalny Grid Charge włączany dopiero po zapisaniu limitów. W pozostałych kwadransach zezwolenie ładowania slotu jest wyłączane i jego SOC wraca do 20%; rozładowanie ogranicza planowany prąd. Rejestry/encje innych okien nie są modyfikowane.
+
+Przełączenie `automatic` nie włącza samoczynnie ARM. Niezgodny harmonogram TOU lub brak encji blokuje sterowanie przed wysłaniem komend. Wydanie wymaga uruchomienia przez użytkownika i sprawdzenia diagnostyki.
