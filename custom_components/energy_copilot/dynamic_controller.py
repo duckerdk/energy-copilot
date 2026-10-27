@@ -6,7 +6,8 @@ The configured Deye TOU schedule remains the underlying inverter safeguard.
 
 import asyncio
 from datetime import datetime, timedelta
-from math import floor, isfinite
+from math import ceil, floor, isfinite
+from zoneinfo import ZoneInfo
 
 from .deye_commands import (
     CHARGE_CURRENT,
@@ -17,6 +18,7 @@ from .deye_commands import (
     TIME_OF_USE,
     CommandRejected,
     DeyeCommandAdapter,
+    tou_entities,
 )
 
 
@@ -31,6 +33,33 @@ class DynamicDeyeController:
         self.reason = None
         self.last_plan_start = None
         self._lock = asyncio.Lock()
+
+    TOU_STARTS = (0, 400, 800, 1200, 1600, 2000)
+
+    def _active_tou(self, now):
+        """Identify fixed four-hour slots using the inverter's Copenhagen clock."""
+        local = now.astimezone(ZoneInfo("Europe/Copenhagen"))
+        point = local.hour // 4 + 1
+        for index, start in enumerate(self.TOU_STARTS, start=1):
+            state = self.adapter._present(tou_entities(index)["start"])
+            try:
+                observed = float(state.state)
+            except ValueError as exc:
+                raise CommandRejected("controller:tou_start_invalid") from exc
+            if not isfinite(observed) or abs(observed - start) > 0.01:
+                raise CommandRejected(
+                    f"controller:tou_schedule_mismatch:slot={index}:observed={state.state}"
+                )
+        return tou_entities(point)
+
+    async def _set_number_if_changed(self, entity, value):
+        state = self.adapter._present(entity)
+        if abs(float(state.state) - value) > 1e-6:
+            await self.adapter.set_number(entity, value)
+
+    async def _set_switch_if_changed(self, entity, enabled):
+        if self.adapter._present(entity).state != ("on" if enabled else "off"):
+            await self.adapter.set_switch(entity, enabled)
 
     def stop(self):
         self.armed = False
@@ -102,9 +131,25 @@ class DynamicDeyeController:
                     raise CommandRejected("controller:simultaneous_flow")
                 if soc_pct <= 20.1 and discharge > 1e-7:
                     raise CommandRejected("controller:minimum_soc")
-                if self.adapter._present(TIME_OF_USE).state != "on":
-                    raise CommandRejected("controller:tou_not_enabled")
-                charge_enabled = charge > 1e-7
+                tou_state = self.adapter._present(TIME_OF_USE).state
+                if tou_state != "on":
+                    self.status = "blocked"
+                    self.reason = f"controller:tou_not_enabled:observed={tou_state}"
+                    return self.status
+                slot = self._active_tou(now)
+                charge_enabled = charge > 1e-7 and grid_a > 1e-7
+                if charge > 1e-7 and not charge_enabled:
+                    raise CommandRejected("controller:charge_plan_without_grid_current")
+                if charge_enabled:
+                    projected_soc = float(row["soc_end_pct"])
+                    if not isfinite(projected_soc):
+                        raise CommandRejected("controller:target_soc_invalid")
+                    target_soc = max(ceil(soc_pct), ceil(projected_soc))
+                    target_soc = max(20, min(100, target_soc))
+                    if target_soc <= soc_pct:
+                        charge_enabled = False
+                else:
+                    target_soc = 20
                 # Positive current allowance permits PV charging. Never
                 # set it to zero just to suppress grid charging.
                 total_charge_a = 50.0
@@ -131,18 +176,25 @@ class DynamicDeyeController:
                     (DISCHARGE_CURRENT, discharge_limit),
                     (GRID_CURRENT, grid_limit),
                 )
-                # Disable grid charging before changing discharge policy.
+                # Stop grid charging first, then update active TOU settings.
+                # Never alter window start/end times or non-active SOC settings.
                 if (
                     not charge_enabled
                     and self.adapter._present(GRID_CHARGE).state != "off"
                 ):
                     await self.adapter.set_switch(GRID_CHARGE, False)
+                if charge_enabled:
+                    # Prepare target SOC and slot permission before global enable.
+                    await self._set_number_if_changed(slot["soc"], target_soc)
+                    await self._set_switch_if_changed(slot["grid_charge"], True)
+                else:
+                    # Disable slot permission before returning the TOU floor to 20%.
+                    await self._set_switch_if_changed(slot["grid_charge"], False)
+                    await self._set_number_if_changed(slot["soc"], target_soc)
                 for entity, value in settings:
-                    current = self.adapter._present(entity)
-                    if abs(float(current.state) - value) > 1e-6:
-                        await self.adapter.set_number(entity, value)
-                if charge_enabled and self.adapter._present(GRID_CHARGE).state != "on":
-                    await self.adapter.set_switch(GRID_CHARGE, True)
+                    await self._set_number_if_changed(entity, value)
+                if charge_enabled:
+                    await self._set_switch_if_changed(GRID_CHARGE, True)
                 # Solar Sell is price-controlled by the planner, not by the
                 # instantaneous inverter export measurement.
                 for entry in preview.hourly_plan:
