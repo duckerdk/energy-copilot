@@ -31,12 +31,8 @@ def day():
 
 def test_valid_six_windows_cover_whole_day():
     program = compile_tou(tuple(day()))
-    assert [w.start_minute for w in program.windows] == [
-        0, 240, 480, 720, 960, 1200
-    ]
-    assert [w.minimum_soc_pct for w in program.windows] == [
-        20, 30, 40, 50, 60, 70
-    ]
+    assert [w.start_minute for w in program.windows] == [0, 240, 480, 720, 960, 1200]
+    assert [w.minimum_soc_pct for w in program.windows] == [20, 30, 40, 50, 60, 70]
 
 
 def test_rejects_incomplete_replay_prefix():
