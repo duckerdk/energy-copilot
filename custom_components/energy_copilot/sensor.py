@@ -192,8 +192,6 @@ class ModeledSavingSensor(CoordinatorEntity, SensorEntity):
         }
 
 
-
-
 class ActualSavingYesterdaySensor(CoordinatorEntity, SensorEntity):
     """Estimated previous Danish calendar day savings versus no battery."""
 
