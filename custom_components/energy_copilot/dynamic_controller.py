@@ -5,7 +5,7 @@ The configured Deye TOU schedule remains the underlying inverter safeguard.
 """
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 from math import isfinite
 
 from .deye_commands import (
@@ -45,9 +45,7 @@ class DynamicDeyeController:
             at = datetime.fromisoformat(row["start"].replace("Z", "+00:00"))
             if at.tzinfo is None:
                 raise CommandRejected("controller:naive_timestamp")
-            if at <= now < at.replace(tzinfo=timezone.utc) + __import__(
-                "datetime"
-            ).timedelta(minutes=15):
+            if at <= now < at + timedelta(minutes=15):
                 if (now - at).total_seconds() > 14 * 60:
                     raise CommandRejected("controller:stale_quarter")
                 return row
@@ -87,9 +85,7 @@ class DynamicDeyeController:
                 total_charge_a = 50.0
                 discharge_limit = 100.0 if discharge > 1e-7 else 0.0
                 grid_limit = min(50.0, max(0.0, grid_a))
-                # Respect the integral number entity step rather than silently
-                # rounding up charging. Fractional device steps are checked
-                # by the adapter. Release remains blocked if unsupported.
+                # Device steps are validated by the command adapter.
                 settings = (
                     (CHARGE_CURRENT, total_charge_a),
                     (DISCHARGE_CURRENT, discharge_limit),
@@ -107,9 +103,7 @@ class DynamicDeyeController:
                 # instantaneous inverter export measurement.
                 for entry in preview.hourly_plan:
                     start = datetime.fromisoformat(entry["start"])
-                    if start <= now < start + __import__(
-                        "datetime"
-                    ).timedelta(hours=1):
+                    if start <= now < start + timedelta(hours=1):
                         planned_sell = bool(entry["solar_sell_planned_on"])
                         if self.adapter._present(SOLAR_SELL).state != (
                             "on" if planned_sell else "off"
