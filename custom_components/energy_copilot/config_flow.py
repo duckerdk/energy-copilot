@@ -1,4 +1,4 @@
-"""UI source mapping. Only monitor/dry_run are supported; neither can write."""
+"""UI source mapping. Monitor and dry_run are read-only; automatic requires explicit live arming."""
 
 from typing import Any
 
@@ -45,7 +45,7 @@ def schema(current):
         vol.Required(
             "mode", default=current.get("mode", "monitor")
         ): selector.SelectSelector(
-            selector.SelectSelectorConfig(options=["monitor", "dry_run"])
+            selector.SelectSelectorConfig(options=["monitor", "dry_run", "automatic"])
         ),
     }
     for role, entity_id in DEFAULT_ENTITIES.items():
@@ -96,7 +96,7 @@ def validate(hass, data):
     selected = [data[r] for r in DEFAULT_ENTITIES if data.get(r)]
     if len(set(selected)) != len(selected):
         errors["base"] = "duplicate_entity"
-    if data.get("mode") not in {"monitor", "dry_run"}:
+    if data.get("mode") not in {"monitor", "dry_run", "automatic"}:
         errors["mode"] = "read_only"
     if entry_id := data.get("forecast_entry"):
         entry = hass.config_entries.async_get_entry(entry_id)

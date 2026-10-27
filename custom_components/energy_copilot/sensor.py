@@ -1,4 +1,4 @@
-"""Diagnostic sensor; no actuator entities or services are registered."""
+"""Quality and planning telemetry for the monitor, preview and control modes."""
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.const import EntityCategory
@@ -34,7 +34,7 @@ class InputQualitySensor(CoordinatorEntity, SensorEntity):
             identifiers={(DOMAIN, entry.entry_id)},
             name="Energy Co-Pilot",
             manufacturer="Energy Co-Pilot",
-            model="Read-only M1/M2/M3 preview",
+            model="Energy Co-Pilot planner and guarded controller",
             sw_version=entry.runtime_data.installed_build["installed_version"],
         )
 
@@ -47,7 +47,7 @@ class InputQualitySensor(CoordinatorEntity, SensorEntity):
         data = self.coordinator.data
         return {
             "mode": self.coordinator.settings.get("mode", "monitor"),
-            "read_only": True,
+            "read_only": not self.coordinator.dynamic_controller.armed,
             "installed_version": self._installed_build["installed_version"],
             "release_tag": self._installed_build["tag"],
             "release_commit": self._installed_build["commit"],
@@ -96,7 +96,7 @@ class PlanningStatusSensor(CoordinatorEntity, SensorEntity):
         return {
             "reason": preview.reason,
             "read_only": True,
-            "executable": False,
+            "executable": self.coordinator.dynamic_controller.armed,
             "scenario_type": "whole_published_horizon_continuous_dispatch_unverified_tou",
             "start_utc": preview.start.isoformat() if preview.start else None,
             "end_utc": preview.end.isoformat() if preview.end else None,
@@ -144,9 +144,12 @@ class PlanningStatusSensor(CoordinatorEntity, SensorEntity):
             "pv_charge_dc_kwh": preview.pv_charge_dc_kwh,
             "discharge_dc_kwh": preview.discharge_dc_kwh,
             "hourly_plan": list(preview.hourly_plan),
+            "execution_state": self.coordinator.dynamic_controller.status,
+            "execution_reason": self.coordinator.dynamic_controller.reason,
+            "last_plan_applied": self.coordinator.dynamic_controller.last_plan_start,
             "planner_scope": "all_contiguous_known_prices_pv_and_load",
             "grid_import_baseline": "no_battery_cycling_not_actual_deye",
-            "tou_feasibility": "not_evaluated",
+            "tou_feasibility": "dynamic_control_bypasses_compilation",
             "voltage_source": preview.voltage_source,
             "nominal_capacity_kwh": 10.24,
             "pv_forecast_dc_multiplier_assumed": 1.0,
