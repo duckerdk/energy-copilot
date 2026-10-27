@@ -178,7 +178,7 @@ async def test_tou_charge_uses_local_slot_and_soc():
         "applied"
     )
     slot = tou_entities(4)
-    assert service.states.get(slot["soc"]).state == "65"
+    assert float(service.states.get(slot["soc"]).state) == 65
     assert service.states.get(slot["grid_charge"]).state == "on"
     assert service.states.get(GRID_CHARGE).state == "on"
     assert not any(
