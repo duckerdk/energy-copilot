@@ -54,6 +54,8 @@ class DynamicDeyeController:
                 raise CommandRejected("controller:naive_timestamp")
             if now < at:
                 future = True
+                if at - now <= timedelta(seconds=30):
+                    return row
             if at <= now < at + timedelta(minutes=15):
                 if (now - at).total_seconds() > 14 * 60:
                     raise CommandRejected("controller:stale_quarter")
