@@ -203,7 +203,7 @@ async def test_tou_discharge_sets_floor_without_grid_charging():
     slot = tou_entities(4)
     assert service.states.get(slot["soc"]).state == "20"
     assert service.states.get(slot["grid_charge"]).state == "off"
-    assert service.states.get(DISCHARGE_CURRENT).state != "0"
+    assert float(service.states.get(DISCHARGE_CURRENT).state) == 100
 
 
 @pytest.mark.asyncio
@@ -254,7 +254,7 @@ async def test_discharge_current_rounds_down_using_entity_minimum_and_step():
         )
         == "applied"
     )
-    assert service.states.get(DISCHARGE_CURRENT).state == "20.0"
+    assert float(service.states.get(DISCHARGE_CURRENT).state) == 100.0
 
 
 @pytest.mark.asyncio
@@ -270,3 +270,40 @@ async def test_soc_target_noninteger_step_is_rounded_up():
         "applied"
     )
     assert service.states.get(target).state == "70.0"
+
+
+@pytest.mark.asyncio
+async def test_discharge_is_not_throttled_to_forecast_household_load():
+    now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    controller.arm()
+    assert (
+        await controller.apply(
+            preview(now, charge=0.0, discharge=0.05, grid_a=0.0),
+            now,
+            soc_pct=80,
+            voltage_v=52.9,
+        )
+        == "applied"
+    )
+    assert float(service.states.get(DISCHARGE_CURRENT).state) == 100.0
+
+
+@pytest.mark.asyncio
+async def test_device_lower_discharge_cap_is_respected():
+    now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    service.states.items[DISCHARGE_CURRENT] = SimpleNamespace(
+        state="20", attributes={"min": 0, "max": 80, "step": 5}
+    )
+    controller.arm()
+    assert (
+        await controller.apply(
+            preview(now, charge=0.0, discharge=0.1, grid_a=0.0),
+            now,
+            soc_pct=75,
+            voltage_v=52,
+        )
+        == "applied"
+    )
+    assert float(service.states.get(DISCHARGE_CURRENT).state) == 80
