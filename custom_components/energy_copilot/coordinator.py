@@ -20,6 +20,7 @@ from .const import (
     OPTIONAL_ENTITY_ROLES,
     UPDATE_INTERVAL,
 )
+from .dynamic_controller import DynamicDeyeController
 from .forecast_accuracy import ForecastAccuracyWindow
 from .forecast_history import ForecastHistory
 from .forecast_quality import forecast_coverage
@@ -85,6 +86,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self.measurement_source_timing = {}
         self.quality = None
         self.planning_preview = None
+        self.dynamic_controller = DynamicDeyeController(hass)
         self.live_context = LiveSourceContext()
         self.live_window = LiveMeasurementWindow()
 
@@ -306,7 +308,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self.forecast_accuracy.observe(snapshot.at, snapshot.measurements)
         try:
             if (
-                self.settings.get("mode", "monitor") == "dry_run"
+                self.settings.get("mode", "monitor") in {"dry_run", "automatic"}
                 and self.load_forecast is None
                 and snapshot.forecast is not None
             ):
@@ -318,7 +320,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                     partial(
                         evaluate_preview,
                         snapshot,
-                        mode=self.settings.get("mode", "monitor"),
+                        mode="dry_run" if self.settings.get("mode", "monitor") == "automatic" else self.settings.get("mode", "monitor"),
                         pv_export_enabled=solar_sell is not None
                         and solar_sell.state in {"on", "off"},
                         load_projection=(
@@ -342,6 +344,26 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         else:
             readiness = "not_evaluated_m2"
         self.quality["planning_readiness"] = readiness
+        if self.settings.get("mode", "monitor") == "automatic":
+            if self.dynamic_controller.armed:
+                required = {"soc", "voltage", "grid", "battery", "pv"}
+                if (
+                    not required.issubset(snapshot.measurements)
+                    or self.quality["input_state"] != "valid"
+                    or self.planning_preview.status != "preview"
+                ):
+                    self.dynamic_controller.stop()
+                    self.dynamic_controller.status = "blocked"
+                    self.dynamic_controller.reason = "controller:input_or_plan_unavailable"
+                else:
+                    await self.dynamic_controller.apply(
+                        self.planning_preview,
+                        now,
+                        soc_pct=snapshot.measurements["soc"].value,
+                        voltage_v=snapshot.measurements["voltage"].value,
+                    )
+        else:
+            self.dynamic_controller.stop()
         return snapshot
 
     async def _async_forecast(self, now):
