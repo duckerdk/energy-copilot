@@ -182,8 +182,7 @@ async def test_tou_charge_uses_local_slot_and_soc():
     assert service.states.get(slot["grid_charge"]).state == "on"
     assert service.states.get(GRID_CHARGE).state == "on"
     assert not any(
-        data["entity_id"] == tou_entities(3)["soc"]
-        for _, _, data in service.calls
+        data["entity_id"] == tou_entities(3)["soc"] for _, _, data in service.calls
     )
 
 
@@ -192,12 +191,15 @@ async def test_tou_discharge_sets_floor_without_grid_charging():
     now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
     controller, service = setup_controller()
     controller.arm()
-    assert await controller.apply(
-        preview(now, charge=0.0, discharge=0.3, grid_a=0),
-        now,
-        soc_pct=80,
-        voltage_v=51,
-    ) == "applied"
+    assert (
+        await controller.apply(
+            preview(now, charge=0.0, discharge=0.3, grid_a=0),
+            now,
+            soc_pct=80,
+            voltage_v=51,
+        )
+        == "applied"
+    )
     slot = tou_entities(4)
     assert service.states.get(slot["soc"]).state == "20"
     assert service.states.get(slot["grid_charge"]).state == "off"
