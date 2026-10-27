@@ -41,6 +41,9 @@ class DynamicControlSwitch(CoordinatorEntity, SwitchEntity):
             "reason": control.reason,
             "last_plan_start": control.last_plan_start,
             "halted": control.halted,
+            "active_tou_slot": control.active_tou_slot,
+            "target_tou_soc": control.target_tou_soc,
+            "target_tou_grid_charge": control.target_tou_grid_charge,
             "device_emergency_stop": False,
         }
 
