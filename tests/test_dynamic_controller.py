@@ -11,6 +11,7 @@ from custom_components.energy_copilot.deye_commands import (
     GRID_CHARGE,
     GRID_CURRENT,
     SOLAR_SELL,
+    TIME_OF_USE,
 )
 from custom_components.energy_copilot.dynamic_controller import DynamicDeyeController
 
@@ -27,6 +28,7 @@ class States:
                 (GRID_CURRENT, "0"),
                 (GRID_CHARGE, "off"),
                 (SOLAR_SELL, "off"),
+                (TIME_OF_USE, "on"),
             ]
         }
 
