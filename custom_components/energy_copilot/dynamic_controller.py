@@ -140,9 +140,9 @@ class DynamicDeyeController:
                     self.reason = f"controller:tou_not_enabled:observed={tou_state}"
                     return self.status
                 slot = self._active_tou(now)
-                self.active_tou_slot = now.astimezone(
-                    ZoneInfo("Europe/Copenhagen")
-                ).hour // 4 + 1
+                self.active_tou_slot = (
+                    now.astimezone(ZoneInfo("Europe/Copenhagen")).hour // 4 + 1
+                )
                 charge_enabled = charge > 1e-7 and grid_a > 1e-7
                 if charge > 1e-7 and not charge_enabled:
                     raise CommandRejected("controller:charge_plan_without_grid_current")
@@ -171,9 +171,7 @@ class DynamicDeyeController:
                 discharge_max = float(discharge_state.attributes.get("max", 100))
                 if not isfinite(discharge_max) or discharge_max < 0:
                     raise CommandRejected("controller:discharge_max_invalid")
-                discharge_limit = (
-                    min(100.0, discharge_max) if discharge > 1e-7 else 0.0
-                )
+                discharge_limit = min(100.0, discharge_max) if discharge > 1e-7 else 0.0
                 grid_state = self.adapter._present(GRID_CURRENT)
                 grid_step = float(grid_state.attributes.get("step", 1))
                 if not isfinite(grid_step) or grid_step <= 0:
