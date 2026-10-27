@@ -101,7 +101,9 @@ def compile_tou(
             raise TOUCompilationError("tou:mixed_hour")
         # A zero target cannot be assumed to disable Deye TOU power limits;
         # encode only configured safe upper limit (not a forced charge).
-        power = round(voltage_v * (charge_limit_a if charge > 1e-8 else discharge_limit_a))
+        power = round(
+            voltage_v * (charge_limit_a if charge > 1e-8 else discharge_limit_a)
+        )
         hourly.append((power, socs[0], charge > 1e-8))
     runs = []
     for hour, (power, soc, grid_charge) in enumerate(hourly):
