@@ -141,10 +141,13 @@ async def test_discharge_rejected_at_minimum_soc():
     now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
     controller, service = setup_controller()
     controller.arm()
-    assert await controller.apply(
-        preview(now, charge=0.0, discharge=0.1, grid_a=0.0),
-        now,
-        soc_pct=20.0,
-        voltage_v=51.0,
-    ) == "recovery_required"
+    assert (
+        await controller.apply(
+            preview(now, charge=0.0, discharge=0.1, grid_a=0.0),
+            now,
+            soc_pct=20.0,
+            voltage_v=51.0,
+        )
+        == "recovery_required"
+    )
     assert not service.calls
