@@ -46,8 +46,7 @@ def compute_yesterday(rows, entities, start, end, date):
     if any(t[0] > start for t in timestamps):
         return YesterdaySaving(date, None, None, None, 0.0, "history:missing_start")
     cuts = sorted(
-        {start, end}
-        | {t for times in timestamps for t in times if start < t < end}
+        {start, end} | {t for times in timestamps for t in times if start < t < end}
     )
     actual, baseline = 0.0, 0.0
     duration = 0.0
@@ -56,7 +55,9 @@ def compute_yesterday(rows, entities, start, end, date):
         for stream, times, role in zip(streams, timestamps, ROLES, strict=True):
             index = bisect_right(times, left) - 1
             if index < 0:
-                return YesterdaySaving(date, None, None, None, 0.0, "history:missing_interval")
+                return YesterdaySaving(
+                    date, None, None, None, 0.0, "history:missing_interval"
+                )
             state = stream[index]
             try:
                 value = float(state.state)
@@ -66,31 +67,46 @@ def compute_yesterday(rows, entities, start, end, date):
                     if state.attributes.get("unit_of_measurement") != "W":
                         raise ValueError("power_unit")
                 elif state.attributes.get("unit_of_measurement") not in {
-                    "DKK/kWh", "DKK/kwh"
+                    "DKK/kWh",
+                    "DKK/kwh",
                 }:
                     raise ValueError("price_unit")
-            except (ValueError, TypeError, AttributeError):
+            except ValueError, TypeError, AttributeError:
                 return YesterdaySaving(
-                    date, None, None, None, duration / (end - start).total_seconds(),
+                    date,
+                    None,
+                    None,
+                    None,
+                    duration / (end - start).total_seconds(),
                     f"history:invalid_{role}",
                 )
             values.append(value)
         grid_w, battery_w, buy, sell = values
         # Positive grid = import; positive battery = discharging to the home.
         # Remove battery from the measured grid balance at modeled AC efficiency.
-        battery_ac_w = battery_w * EFFICIENCY if battery_w >= 0 else battery_w / EFFICIENCY
+        battery_ac_w = (
+            battery_w * EFFICIENCY if battery_w >= 0 else battery_w / EFFICIENCY
+        )
         baseline_grid_w = grid_w + battery_ac_w
         hours = (right - left).total_seconds() / 3600
         actual += (max(grid_w, 0) * buy - max(-grid_w, 0) * sell) / 1000 * hours
         baseline += (
-            max(baseline_grid_w, 0) * buy - max(-baseline_grid_w, 0) * sell
-        ) / 1000 * hours
+            (max(baseline_grid_w, 0) * buy - max(-baseline_grid_w, 0) * sell)
+            / 1000
+            * hours
+        )
         duration += (right - left).total_seconds()
     coverage = duration / (end - start).total_seconds()
     if coverage < 1 - 1e-8:
         return YesterdaySaving(date, None, None, None, coverage, "history:incomplete")
-    return YesterdaySaving(date, round(baseline - actual, 3), round(actual, 3),
-                           round(baseline, 3), coverage, None)
+    return YesterdaySaving(
+        date,
+        round(baseline - actual, 3),
+        round(actual, 3),
+        round(baseline, 3),
+        coverage,
+        None,
+    )
 
 
 def read_yesterday(hass, entities, now):
@@ -100,8 +116,13 @@ def read_yesterday(hass, entities, now):
     from homeassistant.components.recorder.history import get_significant_states
 
     rows = get_significant_states(
-        hass, start, end, entity_ids=list(keys.values()),
+        hass,
+        start,
+        end,
+        entity_ids=list(keys.values()),
         include_start_time_state=True,
-        significant_changes_only=False, minimal_response=False, no_attributes=False,
+        significant_changes_only=False,
+        minimal_response=False,
+        no_attributes=False,
     )
     return compute_yesterday(rows, keys, start, end, date)
