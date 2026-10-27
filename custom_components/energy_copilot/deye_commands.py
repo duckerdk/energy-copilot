@@ -5,6 +5,7 @@ no automatic inverter writes until TOU feasibility and recovery are validated.
 """
 
 import asyncio
+from math import ceil, floor, isfinite
 from dataclasses import dataclass
 
 CHARGE_CURRENT = "number.sun12k_maximum_battery_charge_current"
@@ -81,6 +82,51 @@ class DeyeCommandAdapter:
             await asyncio.sleep(0.25)
         raise CommandRejected("device:write_unconfirmed")
 
+    def quantize_number(self, entity_id: str, value: float, *, direction="down"):
+        """Select a legal HA value without widening inverter current limits.
+
+        SOC charge targets are rounded upward; currents are rounded downward.
+        Never silently clamp outside the documented policy.
+        """
+        policy = dict(LIMITS)
+        for point in range(1, 7):
+            slot = tou_entities(point)
+            policy[slot["soc"]] = (20.0, 100.0)
+        if entity_id not in policy:
+            raise CommandRejected(f"device:number_not_allowlisted:{entity_id}")
+        if not isfinite(value):
+            raise CommandRejected(f"device:number_invalid:{entity_id}")
+        low, high = policy[entity_id]
+        state = self._present(entity_id)
+        try:
+            minimum = float(state.attributes.get("min", low))
+            maximum = float(state.attributes.get("max", high))
+            step = float(state.attributes.get("step", 1))
+        except (ValueError, TypeError) as exc:
+            raise CommandRejected(f"device:number_metadata_invalid:{entity_id}") from exc
+        if not all(isfinite(x) for x in (minimum, maximum, step)) or step <= 0:
+            raise CommandRejected(f"device:number_metadata_invalid:{entity_id}")
+        low = max(low, minimum)
+        high = min(high, maximum)
+        if not low <= value <= high:
+            raise CommandRejected(
+                f"device:number_outside_range:{entity_id}:requested={value}:"
+                f"min={low}:max={high}"
+            )
+        steps = (value - minimum) / step
+        index = (
+            ceil(steps - 1e-8)
+            if direction == "up"
+            else floor(steps + 1e-8)
+        )
+        result = minimum + index * step
+        if result < low - 1e-7 or result > high + 1e-7:
+            raise CommandRejected(
+                f"device:number_unrepresentable:{entity_id}:requested={value}:"
+                f"min={minimum}:max={maximum}:step={step}"
+            )
+        return round(result, 7)
+
     async def set_number(self, entity_id: str, value: float) -> WriteResult:
         limits = dict(LIMITS)
         for point in range(1, 7):
@@ -110,7 +156,10 @@ class DeyeCommandAdapter:
             abs((value - device_base) / step - round((value - device_base) / step))
             > 1e-7
         ):
-            raise CommandRejected("device:number_step_invalid")
+            raise CommandRejected(
+                f"device:number_step_invalid:{entity_id}:requested={value}:"
+                f"min={device_low}:step={step}"
+            )
         await self.hass.services.async_call(
             "number",
             "set_value",
