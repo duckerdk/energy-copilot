@@ -46,6 +46,7 @@ class DynamicDeyeController:
         self._command_changes = []
         self._attempted_command = None
         self._last_tou_block_quarter = None
+        self._pv_throttle_previous_a = None
 
     def _audit(self, event, **details):
         if self.journal is not None:
@@ -415,55 +416,96 @@ class DynamicDeyeController:
                 if planned_sell is None:
                     planned_sell = self.adapter._present(SOLAR_SELL).state == "on"
 
+                # Global battery charging current stays untouched by default.
+                # A PV forecast or high SOC is not a reason to write a new cap.
+                source_quarters = (preview.replay_snapshot or {}).get("quarters", ())
+                expected_quarters = (preview.replay_snapshot or {}).get(
+                    "expected", {}
+                ).get("quarters", ())
                 pv_charge = float(row.get("pv_to_battery_dc_kwh") or 0)
                 if not isfinite(pv_charge) or pv_charge < -1e-9:
                     raise CommandRejected("controller:invalid_pv_charge")
-                charge_state = self.adapter._present(CHARGE_CURRENT)
-                charge_max = min(50.0, float(charge_state.attributes.get("max", 50)))
-                if not isfinite(charge_max) or charge_max < 1:
-                    raise CommandRejected("controller:charge_current_range_invalid")
-                if pv_charge > 1e-7 or charge_enabled:
-                    # A 15-minute DC energy budget translates to an A limit at
-                    # measured voltage. Grid energy becomes DC after efficiency.
-                    total_dc_kwh = pv_charge + (
-                        charge * grid_efficiency if charge_enabled else 0
+                future_charge = any(
+                    float(q.get("grid_to_battery_ac_kwh") or 0) > 1e-7
+                    or float(q.get("pv_to_battery_dc_kwh") or 0) > 1e-7
+                    for q in expected_quarters
+                    if q.get("start", "") > at
+                )
+                export_now = float(row.get("pv_to_export_dc_kwh") or 0) > 0.01
+                defer_pv = (
+                    soc_pct < 99.0
+                    and planned_sell
+                    and export_now
+                    and pv_charge <= 1e-7
+                    and future_charge
+                )
+                # A grid-charge campaign intentionally spread over several
+                # similarly cheap quarters is the other valid current policy.
+                current_input = next(
+                    (q for q in source_quarters if q.get("start") == at), {}
+                )
+                spreading_grid = charge_enabled and any(
+                    float(q.get("grid_to_battery_ac_kwh") or 0) > 1e-7
+                    and any(
+                        src.get("start") == q.get("start")
+                        and abs(
+                            float(src["buy_dkk_per_kwh"])
+                            - float(current_input["buy_dkk_per_kwh"])
+                        ) <= 0.01
+                        for src in source_quarters
+                        if current_input
                     )
-                    target_charge_a = max(
-                        1.0, min(charge_max, ceil(total_dc_kwh * 4000 / voltage_v))
-                    )
-                else:
-                    # With export prioritized, slow battery charging to the
-                    # allowed minimum; otherwise keep PV charging available.
-                    target_charge_a = 1.0 if planned_sell else charge_max
-                total_charge_a = self.adapter.quantize_number(
-                    CHARGE_CURRENT, target_charge_a, direction="up"
+                    for q in expected_quarters
+                    if q.get("start", "") > at
                 )
 
+                charge_state = self.adapter._present(CHARGE_CURRENT)
                 grid_state = self.adapter._present(GRID_CURRENT)
-                grid_max = min(50.0, float(grid_state.attributes.get("max", 50)))
-                if not isfinite(grid_max) or grid_max < 1:
-                    raise CommandRejected("controller:grid_current_range_invalid")
-                if charge_enabled:
-                    grid_limit = self.adapter.quantize_number(
-                        GRID_CURRENT,
-                        max(1.0, min(grid_max, ceil(grid_a))),
+                current_charge_a = float(charge_state.state)
+                current_grid_a = float(grid_state.state)
+                settings = []
+                charge_policy = "unchanged_no_rate_control_needed"
+                if defer_pv:
+                    if current_charge_a > 1.0 + 1e-6:
+                        # Remember the original cap for restoration when
+                        # the deliberate PV deferral ends.
+                        if self._pv_throttle_previous_a is None:
+                            self._pv_throttle_previous_a = current_charge_a
+                        settings.append((CHARGE_CURRENT, 1.0))
+                    charge_policy = "defer_pv_storage_for_export_then_charge_later"
+                elif self._pv_throttle_previous_a is not None and soc_pct < 99.0:
+                    restore = self._pv_throttle_previous_a
+                    if abs(current_charge_a - 1.0) < 1e-6:
+                        settings.append((CHARGE_CURRENT, restore))
+                    # A manual override must not be overwritten.
+                    self._pv_throttle_previous_a = None
+                    charge_policy = "restore_after_pv_deferral"
+
+                if spreading_grid:
+                    # Restrict grid current to the planned per-quarter rate
+                    # only when deliberately using a longer cheap window.
+                    desired_grid_a = self.adapter.quantize_number(
+                        GRID_CURRENT, max(1.0, min(50.0, ceil(grid_a))),
                         direction="up",
                     )
-                    # The global charge limit must not be smaller than the
-                    # current needed for the planned grid portion.
-                    total_charge_a = self.adapter.quantize_number(
-                        CHARGE_CURRENT,
-                        min(charge_max, max(total_charge_a, grid_limit)),
-                        direction="up",
+                    if abs(current_grid_a - desired_grid_a) > 1e-6:
+                        settings.append((GRID_CURRENT, desired_grid_a))
+                    # Raise the shared cap only if it would prevent the
+                    # specifically planned controlled charging rate.
+                    effective_charge_a = next(
+                        (v for entity, v in reversed(settings) if entity == CHARGE_CURRENT),
+                        current_charge_a,
                     )
-                elif float(grid_state.state) < 1:
-                    # Repair legacy 0 A from previous releases. Off is governed
-                    # by Grid Charge and TOU permission, not by 0 A current.
-                    grid_limit = self.adapter.quantize_number(
-                        GRID_CURRENT, 1.0, direction="up"
-                    )
-                else:
-                    grid_limit = None
+                    if effective_charge_a < desired_grid_a - 1e-6:
+                        settings.append(
+                            (
+                                CHARGE_CURRENT,
+                                self.adapter.quantize_number(
+                                    CHARGE_CURRENT, desired_grid_a, direction="up"
+                                ),
+                            )
+                        )
+                    charge_policy = "spread_grid_charge_over_low_price_window"
                 # The existing inverter/BMS discharge-current cap is preserved.
                 # Read-only preflight above detects 0 A; no write is permitted.
                 settings = [(CHARGE_CURRENT, total_charge_a)]
@@ -504,8 +546,8 @@ class DynamicDeyeController:
                     at,
                     target_soc,
                     charge_enabled,
-                    grid_limit,
-                    total_charge_a,
+                    tuple(settings),
+                    charge_policy,
                     planned_sell,
                 )
                 if (
@@ -528,7 +570,8 @@ class DynamicDeyeController:
                         observed_tou_grid_charge=self.observed_tou_grid_charge,
                         grid_limit_a=float(self.adapter._present(GRID_CURRENT).state),
                         discharge_limit_a=None,
-                        charge_limit_a=total_charge_a,
+                        charge_limit_a=float(self.adapter._present(CHARGE_CURRENT).state),
+                        charging_current_policy=charge_policy,
                         discharge_control="tou_soc_floor",
                         active_tou_slot=self.active_tou_slot,
                         command_changes=list(self._command_changes),
