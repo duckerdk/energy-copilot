@@ -6,6 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
+from homeassistant.helpers import entity_registry as er
+
 from custom_components.energy_copilot.decision_journal import (
     MAX_EVENTS,
     RETENTION_DAYS,
@@ -84,10 +86,10 @@ async def test_activity_event_is_human_readable_and_explains_plan(hass):
     assert len(events) == 1
     assert events[0]["name"] == "Energy Co-Pilot"
     assert events[0]["domain"] == "energy_copilot"
-    assert "entity_id" not in events[0]
+    assert events[0]["entity_id"] == "sensor.energy_co_pilot_decision_journal"
     assert "2,73 DKK/kWh" in events[0]["message"]
     assert "08:00" in events[0]["message"]
-    assert "Wyjaśnienie:" in events[0]["message"]
+    assert "Podstawa decyzji:" in events[0]["message"]
     assert "optimizer_selected_" not in events[0]["message"]
     await journal.async_close()
 
@@ -107,8 +109,8 @@ async def test_activity_blocked_and_recovered_are_visible(hass):
     journal.record("recovered", reason="fresh_valid_measurements_and_plan")
     await hass.async_block_till_done()
     assert len(events) == 2
-    assert "Brak pomiarów: soc" in events[0]["message"]
-    assert "ARM pozostaje aktywny" in events[0]["message"]
+    assert "brak pomiarów: soc" in events[0]["message"]
+    assert "ARM zachowany" in events[0]["message"]
     assert "Wznowiono" in events[1]["message"]
     await journal.async_close()
 
@@ -126,10 +128,21 @@ async def test_applied_does_not_claim_physical_confirmation(hass):
         discharge_limit_a=0,
         target_tou_soc=60,
         target_tou_grid_charge=True,
+        observed_tou_grid_charge="on",
+        commands_sent=1,
+        command_changes=[
+            {
+                "entity_id": "number.sun12k_maximum_battery_grid_charge_current",
+                "before": "0",
+                "after": 25,
+            }
+        ],
     )
     await hass.async_block_till_done()
     assert "25 A" in events[0]["message"]
-    assert "nie potwierdza jeszcze rzeczywistego przepływu" in events[0]["message"]
+    assert "Limit ładowania z sieci 0 A → 25 A" in events[0]["message"]
+    assert "potwierdzone odczytem" in events[0]["message"]
+    assert "przepływu energii" not in events[0]["message"]
     await journal.async_close()
 
 
@@ -153,7 +166,7 @@ def test_grid_import_has_evidence_not_tautological_justification():
     assert "08:45" in message
     assert "0,09 kWh AC" in message
     assert "Cena późniejszego rozładowania jest taka sama" in message
-    assert "dokładna przyczyna" in message
+    assert "Brak obliczonego kosztu wariantu" in message
     assert "minimalizując modelowany koszt" not in message
 
 
@@ -193,7 +206,7 @@ def test_charge_with_future_discharge_shows_price_comparison():
     )
     assert "2,50 DKK/kWh" in message
     assert "17:00" in message
-    assert "nie obliczony koszt alternatywnego planu" in message
+    assert "przed stratami i degradacją" in message
 
 
 def test_blocked_event_shows_real_planner_reason_not_historical_noise():
@@ -266,3 +279,127 @@ def test_journal_sensor_does_not_create_state_change_activity(hass):
     assert DecisionJournalSensor.native_value.fget(sensor) == "ready"
     journal.available = False
     assert DecisionJournalSensor.native_value.fget(sensor) == "unavailable"
+
+
+@pytest.mark.asyncio
+async def test_activity_uses_custom_entity_registry_id(hass):
+    registry = er.async_get(hass)
+    record = registry.async_get_or_create(
+        "sensor",
+        "energy_copilot",
+        "renamed-activity_decision_journal",
+        suggested_object_id="copilot_custom_audit",
+    )
+    journal = DecisionJournal(hass, "renamed-activity")
+    events = []
+    hass.bus.async_listen("logbook_entry", lambda event: events.append(event.data))
+    await journal.async_load()
+    journal.record("armed", reason="automatic_mode_or_user_arm")
+    await hass.async_block_till_done()
+    assert events[0]["entity_id"] == record.entity_id
+    await journal.async_close()
+
+
+@pytest.mark.asyncio
+async def test_activity_planner_state_transition_explains_block(hass):
+    journal = DecisionJournal(hass, "plan-transition")
+    events = []
+    hass.bus.async_listen("logbook_entry", lambda event: events.append(event.data))
+    await journal.async_load()
+    journal.record(
+        "plan_status",
+        planning_status="blocked",
+        previous_planning_status="preview",
+        reason="price:published_gap",
+    )
+    journal.record(
+        "blocked",
+        reason="controller:input_or_plan_unavailable",
+        quarter_start_utc="2026-10-28T08:00:00+00:00",
+        planning_status="blocked",
+        planning_reason="price:published_gap",
+        quality="valid",
+        categorized_issues=[
+            {"code": "historical_quality_unverifiable", "source": "recorder", "category": "historical"},
+        ],
+    )
+    await hass.async_block_till_done()
+    assert len(events) == 2
+    assert "preview → blocked" in events[0]["message"]
+    assert "Luka w opublikowanych cenach" in events[0]["message"]
+    assert "planer: Luka w opublikowanych cenach" in events[1]["message"]
+    assert "historycznych" not in events[1]["message"]
+    await journal.async_close()
+
+
+@pytest.mark.asyncio
+async def test_activity_same_settings_reports_no_commands(hass):
+    journal = DecisionJournal(hass, "noop-apply")
+    events = []
+    hass.bus.async_listen("logbook_entry", lambda event: events.append(event.data))
+    await journal.async_load()
+    journal.record(
+        "applied",
+        quarter_start_utc="2026-10-28T08:15:00+00:00",
+        commands_sent=0,
+        command_changes=[],
+        observed_tou_soc=20,
+        grid_limit_a=0,
+        discharge_limit_a=100,
+        observed_tou_grid_charge="off",
+        active_tou_slot=3,
+    )
+    await hass.async_block_till_done()
+    msg = events[0]["message"]
+    assert "09:15" in msg
+    assert "nie wysłano poleceń" in msg
+    assert "TOU 3" in msg
+    assert "wysłane i odczytane" not in msg
+    assert "przepływu energii" not in msg
+    await journal.async_close()
+
+
+@pytest.mark.asyncio
+async def test_activity_failed_write_has_requested_setting_and_safety_state(hass):
+    journal = DecisionJournal(hass, "write-failure")
+    events = []
+    hass.bus.async_listen("logbook_entry", lambda event: events.append(event.data))
+    await journal.async_load()
+    journal.record(
+        "halted",
+        reason="CommandRejected:device:write_unconfirmed",
+        phase="device_write_result_uncertain",
+        attempted_command={
+            "entity_id": "number.sun12k_maximum_battery_discharge_current",
+            "before": "0",
+            "after": 100,
+        },
+        completed_commands=[
+            {"entity_id": "switch.sun12k_grid_charge", "before": "on", "after": "off"},
+        ],
+    )
+    await hass.async_block_till_done()
+    msg = events[0]["message"]
+    assert "Falownik nie potwierdził zmiany nastawy" in msg
+    assert "Limit rozładowania 0 A → 100 A" in msg
+    assert "Wcześniejsze potwierdzone zmiany: 1" in msg
+    assert "ARM wyłączony" in msg
+    await journal.async_close()
+
+
+@pytest.mark.asyncio
+async def test_same_valid_quality_with_only_historical_issue_does_not_spam_activity(hass):
+    journal = DecisionJournal(hass, "valid-history")
+    events = []
+    hass.bus.async_listen("logbook_entry", lambda event: events.append(event.data))
+    await journal.async_load()
+    journal.record(
+        "input_quality",
+        previous_quality="valid",
+        quality="valid",
+        categorized_issues=[{"code": "home_profile_unverified", "category": "historical"}],
+    )
+    await hass.async_block_till_done()
+    assert not events
+    assert journal.entries[-1]["event"] == "input_quality"
+    await journal.async_close()
