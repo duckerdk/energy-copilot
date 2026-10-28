@@ -116,3 +116,13 @@ Otwarte punkty: [OPEN_ITEMS](OPEN_ITEMS.md).
 - Zestawić `grid_charge` z najlepszą alternatywą bez ładowania teraz. Dla zerowej różnicy kosztu nie wolno deklarować oszczędności, a przy nieudanym audycie nie wolno zgadywać przyczyny.
 - Dla dwukrotnego przeliczenia kwadransa z małą zmianą PV (0,30 → 0,31 kWh) pokazać `Korekta planu` i zmiany SOC/energii; po przejściu granicy kwadransa ponownie `Plan` dla następnego kwadransa.
 - Diagnostyczne przeliczenie porównawcze musi być odseparowane od zapisów falownika i mieć ograniczony czas. Dopiero użytkownik może odebrać wynik w rzeczywistej Aktywności HA.
+
+
+## Regresje sterowania TOU i prądami — v1.16.13
+
+- Dla `grid_import`, `pv_charge`, `battery_discharge`, `grid_charge` **żadnego zapisu** `number.sun12k_maximum_battery_discharge_current` (nawet jeśli aktualna nastawa wynosi np. 2 A). Adapter ma odrzucać zapis tego rejestru w każdej wartości, w tym 0 i 100 A.
+- Zastane 0 A discharge powinno zatrzymać wszystkie nowe komendy przed pierwszym zapisem i wskazać kod `controller:discharge_current_zero`. Przy ręcznej korekcie odczytanej na następnym cyklu wykonawca wraca do obsługi planu; sam nie zmienia rejestru.
+- Przy SOC 99%, braku ładowania z sieci, TOU SOC = 99% i Grid Charge OFF, bez limitowania discharge. Przy wzroście SOC o 3 pp w tym samym kwadransie próg TOU podąża za SOC; przy rozładowaniu planowany końcowy SOC staje się progiem.
+- Gdy plan zawiera ładowanie z sieci oraz wzrost SOC wskutek PV, cel Grid Charge odpowiada tylko energii z sieci, nie całemu planowanemu końcowemu SOC.
+- Prądy ładowania PV i z sieci zawsze legalne 1–50 A, wyliczane z kwadransowej energii i zmierzonego napięcia. Przy pierwszym przejściu z 0 A grid (starsza wersja) przywrócić 1 A. Przy Grid Charge OFF i istniejącym legalnym limicie, nie wysyłać zbędnych poleceń.
+- Wszystkie inne testy sterowania, blokad, recovery, TOU rollover i logbook bez regresji. Odbiór rzeczywistego zachowania falownika musi wykonać użytkownik na HA, gdyż CI nie ma dostępu do instalacji.
