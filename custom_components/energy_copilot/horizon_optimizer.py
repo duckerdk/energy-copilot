@@ -3,7 +3,7 @@
 No inverter commands are issued; all candidates undergo independent validation.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import ceil, floor
 
 from .planner import (
@@ -37,6 +37,8 @@ class HorizonResult:
     pv_headroom: tuple = ()
     pv_underprediction_kwh: float | None = None
     pv_headroom_enabled: bool = False
+    economic_policy_reason: str | None = None
+    economic_policy_benefit_dkk: float | None = None
 
 
 def _dispatch(
@@ -211,6 +213,8 @@ def optimize_horizon(
     enable_pv_headroom: bool = True,
     audit_forbid_first_action: str | None = None,
     audit_force_first_pv_curtail: bool = False,
+    audit_forbid_grid_charge_prefix: int = 0,
+    grid_charge_already_active: bool = False,
 ) -> HorizonResult:
     """Primary HA dry-run optimizer: continuous flow, no 0.1 kWh SOC grid.
 
@@ -219,7 +223,7 @@ def optimize_horizon(
     """
     from .continuous_optimizer import optimize_continuous
 
-    return optimize_continuous(
+    result = optimize_continuous(
         plant,
         quarters,
         terminal_value_override=terminal_value_override,
@@ -227,4 +231,54 @@ def optimize_horizon(
         enable_pv_headroom=enable_pv_headroom,
         audit_forbid_first_action=audit_forbid_first_action,
         audit_force_first_pv_curtail=audit_force_first_pv_curtail,
+        audit_forbid_grid_charge_prefix=audit_forbid_grid_charge_prefix,
     )
+    if audit_forbid_first_action is not None or audit_forbid_grid_charge_prefix:
+        return result
+    from .economic_policy import (
+        CHEAP_WINDOW_PRICE_TOLERANCE_DKK_PER_KWH,
+        MAX_SPREAD_QUARTERS,
+        material_grid_charge,
+        spread_grid_charge_over_cheap_window,
+    )
+
+    if result.dispatches and result.dispatches[0].grid_to_battery_ac_kwh > 1e-7:
+        # Compare the entire inexpensive window, not the first quarter only.
+        # A first-quarter veto alone would keep postponing charging forever.
+        price = quarters[0].buy_dkk_per_kwh
+        window = 0
+        for quarter in quarters[:MAX_SPREAD_QUARTERS]:
+            if (
+                abs(quarter.buy_dkk_per_kwh - price)
+                > CHEAP_WINDOW_PRICE_TOLERANCE_DKK_PER_KWH
+            ):
+                break
+            window += 1
+        no_cheap_charge = optimize_continuous(
+            plant,
+            quarters,
+            terminal_value_override=terminal_value_override,
+            pv_underprediction_kwh=pv_underprediction_kwh,
+            enable_pv_headroom=enable_pv_headroom,
+            audit_forbid_grid_charge_prefix=window,
+        )
+        if not material_grid_charge(
+            result,
+            no_cheap_charge,
+            soc_pct=plant.initial_soc_pct,
+            already_charging=grid_charge_already_active,
+        ):
+            return replace(
+                no_cheap_charge,
+                economic_policy_reason=(
+                    "soc_99_satisfies_grid_charge_target"
+                    if plant.initial_soc_pct >= 99.0
+                    else "grid_charge_below_materiality_threshold"
+                ),
+                economic_policy_benefit_dkk=(
+                    no_cheap_charge.candidate.objective_dkk
+                    - result.candidate.objective_dkk
+                ),
+            )
+        return spread_grid_charge_over_cheap_window(plant, quarters, result)
+    return result

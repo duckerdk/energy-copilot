@@ -411,6 +411,22 @@ def readable_event(entry):
             parts.append(f"Degradacja w kwadransie: {wear}.")
         if event == "planned":
             parts.append("Uzasadnienie: " + _economic_evidence(entry))
+            policy_reason = entry.get("economic_policy_reason")
+            if policy_reason == "soc_99_satisfies_grid_charge_target":
+                parts.append(
+                    "Nie doładowujemy z sieci: SOC 99% uznano za osiągnięty cel 100%."
+                )
+            elif policy_reason == "grid_charge_below_materiality_threshold":
+                saved = entry.get("economic_policy_benefit_dkk")
+                advantage = (
+                    "poniżej 0,01 DKK (pomijalna)"
+                    if saved is not None and saved < 0.01
+                    else _number(saved, "DKK", 2)
+                )
+                parts.append(
+                    f"Nie uruchamiamy ładowania z sieci: korzyść całego taniego "
+                    f"okna {advantage} jest poniżej progu 0,10 DKK."
+                )
         elif entry.get("action") in {"battery_discharge", "grid_charge", "grid_import"}:
             parts.append("Kontekst: " + _decision_evidence(entry))
         return " ".join(parts)
@@ -430,6 +446,33 @@ def readable_event(entry):
             parts.append(
                 "; ".join(_setting_change(change) for change in changes or []) + "."
             )
+        if commands and changes:
+            rate_changes = any(
+                change.get("entity_id")
+                in {
+                    "number.sun12k_maximum_battery_charge_current",
+                    "number.sun12k_maximum_battery_grid_charge_current",
+                }
+                for change in changes
+            )
+            if rate_changes:
+                explanations = {
+                    "defer_pv_storage_for_export_then_charge_later": (
+                        "Przesunięcie ładowania PV: eksport teraz, magazynowanie później."
+                    ),
+                    "restore_after_pv_deferral": (
+                        "Przywrócono wcześniejszy limit po zakończeniu odroczenia PV."
+                    ),
+                    "spread_grid_charge_over_low_price_window": (
+                        "Rozłożenie ładowania z sieci na podobnie tanie kwadranse."
+                    ),
+                    "enable_planned_grid_charge_from_zero": (
+                        "Umożliwienie zaplanowanego ładowania przy zastanym limicie 0 A."
+                    ),
+                }
+                explanation = explanations.get(entry.get("charging_current_policy"))
+                if explanation:
+                    parts.append(explanation)
         if slot is not None:
             parts.append(f"Okno TOU {slot}.")
         soc = _number(entry.get("observed_tou_soc"), "%", 0)

@@ -44,6 +44,7 @@ def optimize_continuous(
     enable_pv_headroom=True,
     audit_forbid_first_action=None,
     audit_force_first_pv_curtail=False,
+    audit_forbid_grid_charge_prefix=0,
 ):
     """Optimize continuous battery energy (kWh) without an SOC lattice.
 
@@ -67,6 +68,11 @@ def optimize_continuous(
         raise InfeasibleCandidate("audit:unsupported_alternative")
     if audit_force_first_pv_curtail and audit_forbid_first_action != "pv_charge":
         raise InfeasibleCandidate("audit:invalid_curtail_option")
+    if (
+        not isinstance(audit_forbid_grid_charge_prefix, int)
+        or audit_forbid_grid_charge_prefix < 0
+    ):
+        raise InfeasibleCandidate("audit:invalid_grid_charge_prefix")
     if not quarters:
         raise InfeasibleCandidate("horizon:empty")
     if plant.initial_soc_pct < MIN_SOC:
@@ -198,7 +204,10 @@ def optimize_continuous(
                 source,
                 charge(i),
                 0.0
-                if i == 0 and audit_forbid_first_action == "grid_charge"
+                if (
+                    (i == 0 and audit_forbid_first_action == "grid_charge")
+                    or i < audit_forbid_grid_charge_prefix
+                )
                 else max_grid,
                 q.buy_dkk_per_kwh / plant.eta_grid_to_battery,
             )

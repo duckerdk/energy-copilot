@@ -208,9 +208,15 @@ def _inputs(payload):
 def simulate_replay(payload):
     """Execute unchanged HA solver and compare against frozen matching result."""
     plant, quarters, terminal, expected, policy, upside = _inputs(payload)
+    metadata = payload.get("metadata") or {}
+    if not isinstance(metadata, dict) or not isinstance(
+        metadata.get("grid_charge_already_active", False), bool
+    ):
+        raise ValueError("replay:invalid_grid_charge_active")
     result = optimize_horizon(
         plant,
         quarters,
+        grid_charge_already_active=metadata.get("grid_charge_already_active", False),
         terminal_value_override=terminal,
         pv_underprediction_kwh=upside,
         enable_pv_headroom=policy == "risk_aware_v1",

@@ -513,3 +513,49 @@ def test_audit_timeout_never_invents_economic_reason():
     )
     assert "Brak policzonego porównania" in message
     assert "obniża koszt" not in message
+
+
+def test_sub_cent_grid_charge_benefit_is_logged_as_immaterial():
+    message = readable_event(
+        {
+            "event": "planned",
+            "action": "grid_import",
+            "quarter_start_utc": "2026-10-28T12:45:00+00:00",
+            "soc_observed_pct": 98.5,
+            "economic_policy_reason": "grid_charge_below_materiality_threshold",
+            "economic_policy_benefit_dkk": 0.0096,
+        }
+    )
+    assert "poniżej 0,01 DKK (pomijalna)" in message
+    assert "progu 0,10 DKK" in message
+
+
+def test_soc99_grid_charge_rejection_is_explicit_in_plan():
+    message = readable_event(
+        {
+            "event": "planned",
+            "action": "grid_import",
+            "soc_observed_pct": 99,
+            "quarter_start_utc": "2026-10-28T12:45:00+00:00",
+            "economic_policy_reason": "soc_99_satisfies_grid_charge_target",
+        }
+    )
+    assert "SOC 99% uznano za osiągnięty cel 100%" in message
+
+
+def test_charge_current_change_explains_why_not_just_values():
+    message = readable_event(
+        {
+            "event": "applied",
+            "commands_sent": 1,
+            "command_changes": [
+                {
+                    "entity_id": "number.sun12k_maximum_battery_charge_current",
+                    "before": "50",
+                    "after": 1,
+                }
+            ],
+            "charging_current_policy": "defer_pv_storage_for_export_then_charge_later",
+        }
+    )
+    assert "eksport teraz, magazynowanie później" in message
