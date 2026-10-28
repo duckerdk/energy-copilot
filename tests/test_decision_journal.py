@@ -88,7 +88,7 @@ async def test_activity_event_is_human_readable_and_explains_plan(hass):
     assert events[0]["entity_id"] == "sensor.energy_co_pilot_decision_journal"
     assert "2,73 DKK/kWh" in events[0]["message"]
     assert "08:00" in events[0]["message"]
-    assert "Podstawa decyzji:" in events[0]["message"]
+    assert "Uzasadnienie:" in events[0]["message"]
     assert "optimizer_selected_" not in events[0]["message"]
     await journal.async_close()
 
@@ -410,3 +410,106 @@ async def test_same_valid_quality_with_only_historical_issue_does_not_spam_activ
     assert not events
     assert journal.entries[-1]["event"] == "input_quality"
     await journal.async_close()
+
+
+def test_pv_economic_reason_gives_conclusion_without_repeating_input_values():
+    message = readable_event(
+        {
+            "event": "planned",
+            "action": "pv_charge",
+            "quarter_start_utc": "2026-10-28T10:00:00+00:00",
+            "soc_observed_pct": 73.0,
+            "soc_planned_end_pct": 74.1,
+            "buy_dkk_per_kwh": 2.27,
+            "sell_dkk_per_kwh": 1.79,
+            "pv_forecast_dc_kwh": 0.31,
+            "home_forecast_ac_kwh": 0.18,
+            "pv_charge_dc_kwh": 0.12,
+            "economic_comparison_status": "evaluated",
+            "economic_saving_dkk": 0.073,
+            "economic_alternative_first_sale_dkk": 0.198,
+            "economic_selected_first_sale_dkk": 0.0,
+            "pv_export_enabled": True,
+        }
+    )
+    assert "Uzasadnienie: Ta akcja obniża koszt całego planu o 0,073 DKK" in message
+    assert "najlepszego wariantu bez magazynowania PV teraz" in message
+    assert "dodatkowo 0,198 DKK" in message
+    assert "Dane kwadransa" not in message
+    assert "Koszt zakupu w kwadransie: 0,00" not in message
+
+
+def test_same_quarter_revision_is_delta_not_duplicate_plan():
+    previous = {
+        "quarter_start_utc": "2026-10-28T10:00:00+00:00",
+        "action": "pv_charge",
+        "pv_forecast_dc_kwh": 0.30,
+        "home_forecast_ac_kwh": 0.18,
+        "pv_charge_dc_kwh": 0.11,
+        "soc_planned_end_pct": 74.0,
+        "buy_dkk_per_kwh": 2.27,
+        "sell_dkk_per_kwh": 1.79,
+    }
+    message = readable_event(
+        {
+            **previous,
+            "event": "revised",
+            "previous_plan": previous,
+            "pv_forecast_dc_kwh": 0.31,
+            "pv_charge_dc_kwh": 0.12,
+            "soc_planned_end_pct": 74.1,
+        }
+    )
+    assert message.startswith("Korekta planu na 11:00:")
+    assert "PV 0,30 kWh → 0,31 kWh" in message
+    assert "ładowanie PV 0,11 kWh → 0,12 kWh" in message
+    assert "SOC końcowy 74,0 % → 74,1 %" in message
+    assert "(po aktualizacji danych)" in message
+    assert "Sprzedaż:" not in message
+    assert "Uzasadnienie:" not in message
+
+
+def test_change_of_action_in_revision_includes_new_compared_cost():
+    previous = {
+        "action": "grid_import",
+        "quarter_start_utc": "2026-10-28T10:00:00+00:00",
+    }
+    message = readable_event(
+        {
+            "event": "revised",
+            "quarter_start_utc": previous["quarter_start_utc"],
+            "action": "pv_charge",
+            "previous_plan": previous,
+            "economic_comparison_status": "evaluated",
+            "economic_saving_dkk": 0.041,
+        }
+    )
+    assert "akcja zasilanie domu z sieci" in message
+    assert "ładowanie baterii z instalacji PV" in message
+    assert "0,041 DKK" in message
+
+
+def test_equal_cost_comparison_does_not_claim_unproved_benefit():
+    message = readable_event(
+        {
+            "event": "planned",
+            "action": "pv_charge",
+            "quarter_start_utc": "2026-10-28T10:00:00+00:00",
+            "economic_comparison_status": "evaluated",
+            "economic_saving_dkk": 0.0,
+        }
+    )
+    assert "praktycznie taki sam koszt" in message
+    assert "nie wykazuje istotnej przewagi" in message
+
+
+def test_audit_timeout_never_invents_economic_reason():
+    message = readable_event(
+        {
+            "event": "planned",
+            "action": "pv_charge",
+            "economic_comparison_status": "unavailable",
+        }
+    )
+    assert "Brak policzonego porównania" in message
+    assert "obniża koszt" not in message
