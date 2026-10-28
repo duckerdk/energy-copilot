@@ -90,3 +90,12 @@ Otwarte punkty: [OPEN_ITEMS](OPEN_ITEMS.md).
 - Po `applied` komunikat musi wskazywać, że nastawy zostały odczytane, ale przepływ energii nie został potwierdzony.
 - W **Logach systemowych → Core** ostrzeżenia/błędy trafiają na WARNING/ERROR, pozostałe informacje na INFO w surowym logu; widok skrócony HA pokazuje przede wszystkim ostrzeżenia i błędy.
 - Awaria publikacji do Aktywności nie może zatrzymać sterowania ani uniemożliwić archiwizacji technicznej.
+
+## Regresja czytelności — v1.16.10
+
+- W **Aktywności** zdarzenie planowania posiada domenę `energy_copilot` i tekst uzasadniający akcję; bez przypięcia `entity_id` sensora diagnostycznego.
+- `Decision journal` nie przechodzi pomiędzy stanami `planned` i `blocked` (pozostaje `ready`); nie tworzy wtórnych, pozbawionych przyczyny wpisów.
+- Dla kupowania energii z sieci zamiast rozładowania pokazać rzeczywisty planowany import, cenę i pierwszy późniejszy kwadrans rozładowania, jeśli istnieje; gdy późniejsza cena jest identyczna, nie twierdzić, że rozładowanie odłożono przez wzrost cen.
+- Rozładowanie pokazuje wartość unikniętego zakupu, koszt degradacji i różnicę, o ile dostępne są odpowiednie dane wejściowe. Nigdy nie nazywać tego pełnym kontrfaktycznym wynikiem.
+- Blokada pokazuje kod planera przetłumaczony na komunikat i tylko problemy istotne dla sterowania — historyczne ostrzeżenia nie mogą zagłuszyć realnego błędu.
+- Zdanie o minimalizacji kosztu horyzontu nie może być jedynym uzasadnieniem decyzji.
