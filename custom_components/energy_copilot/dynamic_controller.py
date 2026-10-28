@@ -45,6 +45,7 @@ class DynamicDeyeController:
         self._last_application_key = None
         self._command_changes = []
         self._attempted_command = None
+        self._last_tou_block_quarter = None
 
     def _audit(self, event, **details):
         if self.journal is not None:
@@ -277,6 +278,11 @@ class DynamicDeyeController:
                             "waiting",
                             reason="next_complete_quarter_not_started",
                             state="waiting_for_quarter",
+                            next_quarter_utc=(
+                                self._pending_quarter["start"]
+                                if self._pending_quarter
+                                else None
+                            ),
                         )
                     self.status = "waiting_for_quarter"
                     self.reason = "controller:waiting_for_next_quarter"
@@ -304,8 +310,23 @@ class DynamicDeyeController:
                 tou_state = self.adapter._present(TIME_OF_USE).state
                 if tou_state != "on":
                     reason = f"controller:tou_not_enabled:observed={tou_state}"
-                    if self.status != "blocked" or self.reason != reason:
-                        self._audit("blocked", reason=reason, state="blocked")
+                    current_quarter = now.replace(
+                        minute=now.minute // 15 * 15,
+                        second=0,
+                        microsecond=0,
+                    ).isoformat()
+                    if (
+                        self.status != "blocked"
+                        or self.reason != reason
+                        or self._last_tou_block_quarter != current_quarter
+                    ):
+                        self._audit(
+                            "blocked",
+                            reason=reason,
+                            state="blocked",
+                            quarter_start_utc=current_quarter,
+                        )
+                        self._last_tou_block_quarter = current_quarter
                     self.status = "blocked"
                     self.reason = reason
                     return self.status
@@ -442,6 +463,7 @@ class DynamicDeyeController:
                         observed_tou_grid_charge=self.observed_tou_grid_charge,
                         grid_limit_a=grid_limit,
                         discharge_limit_a=discharge_limit,
+                        active_tou_slot=self.active_tou_slot,
                         command_changes=list(self._command_changes),
                         commands_sent=len(self._command_changes),
                     )
@@ -459,17 +481,23 @@ class DynamicDeyeController:
                     self.status = "blocked"
                     event = "blocked"
                     phase = "pre_write_validation"
-                if event == "halted" or self.reason != getattr(
+                quarter = now.replace(
+                    minute=now.minute // 15 * 15,
+                    second=0,
+                    microsecond=0,
+                ).isoformat()
+                block_fingerprint = (self.reason, quarter)
+                if event == "halted" or block_fingerprint != getattr(
                     self, "_last_block_reason", None
                 ):
                     self._audit(
                         event,
                         reason=self.reason,
                         state=self.status,
-                        quarter_start_utc=at,
+                        quarter_start_utc=at or quarter,
                         phase=phase,
                         completed_commands=list(self._command_changes),
                         attempted_command=self._attempted_command,
                     )
-                self._last_block_reason = self.reason
+                self._last_block_reason = block_fingerprint
             return self.status
