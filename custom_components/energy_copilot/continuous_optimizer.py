@@ -57,7 +57,12 @@ def optimize_continuous(
     This implementation is used by the HA dry-run planner.
     """
 
-    if audit_forbid_first_action not in (None, "pv_charge", "grid_charge", "battery_discharge"):
+    if audit_forbid_first_action not in (
+        None,
+        "pv_charge",
+        "grid_charge",
+        "battery_discharge",
+    ):
         raise InfeasibleCandidate("audit:unsupported_alternative")
     if not quarters:
         raise InfeasibleCandidate("horizon:empty")
@@ -174,15 +179,19 @@ def optimize_continuous(
             add_edge(
                 source,
                 charge(i),
-                0.0 if i == 0 and audit_forbid_first_action == "pv_charge" else surplus * plant.eta_pv_to_battery,
-                pv_charge_cost
+                0.0
+                if i == 0 and audit_forbid_first_action == "pv_charge"
+                else surplus * plant.eta_pv_to_battery,
+                pv_charge_cost,
             )
         )
         grid_edges.append(
             add_edge(
                 source,
                 charge(i),
-                0.0 if i == 0 and audit_forbid_first_action == "grid_charge" else max_grid,
+                0.0
+                if i == 0 and audit_forbid_first_action == "grid_charge"
+                else max_grid,
                 q.buy_dkk_per_kwh / plant.eta_grid_to_battery,
             )
         )
