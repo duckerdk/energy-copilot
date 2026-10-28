@@ -216,6 +216,8 @@ def _economic_evidence(entry):
     status = entry.get("economic_comparison_status")
     if action not in {"pv_charge", "grid_charge", "battery_discharge"}:
         return _decision_evidence(entry)
+    if status is None:
+        return _decision_evidence(entry)
     if status != "evaluated":
         return "Brak policzonego porównania z wariantem bez tej operacji."
     saving = entry.get("economic_saving_dkk")
@@ -407,6 +409,8 @@ def readable_event(entry):
             parts.append(f"Degradacja w kwadransie: {wear}.")
         if event == "planned":
             parts.append("Uzasadnienie: " + _economic_evidence(entry))
+        elif entry.get("action") in {"battery_discharge", "grid_charge", "grid_import"}:
+            parts.append("Kontekst: " + _decision_evidence(entry))
         return " ".join(parts)
     if event == "applied":
         changes = entry.get("command_changes")
