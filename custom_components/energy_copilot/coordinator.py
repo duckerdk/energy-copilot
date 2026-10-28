@@ -468,9 +468,9 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                     details["economic_policy_reason"] = replay.get("metadata", {}).get(
                         "economic_policy_reason"
                     )
-                    details["economic_policy_benefit_dkk"] = replay.get("metadata", {}).get(
-                        "economic_policy_benefit_dkk"
-                    )
+                    details["economic_policy_benefit_dkk"] = replay.get(
+                        "metadata", {}
+                    ).get("economic_policy_benefit_dkk")
                     self._last_preview_decision_details = details
                     pending_plan_audit = (
                         event,
