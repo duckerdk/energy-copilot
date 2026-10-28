@@ -458,7 +458,9 @@ async def test_applied_reports_real_changes_and_next_quarter_noop():
     initial_calls = list(service.calls)
     later = now + timedelta(minutes=15)
     next_plan = preview(later, charge=0, discharge=0.1, grid_a=0)
-    assert await controller.apply(next_plan, later, soc_pct=70, voltage_v=51) == "applied"
+    assert (
+        await controller.apply(next_plan, later, soc_pct=70, voltage_v=51) == "applied"
+    )
     applied = [event for event in events if event["event"] == "applied"]
     assert len(applied) == 2
     assert applied[1]["quarter_start_utc"] == later.isoformat()
@@ -506,7 +508,9 @@ async def test_persistent_tou_block_logged_at_next_quarter_not_every_poll():
 
     controller.journal = Journal()
     controller.arm()
-    assert await controller.apply(preview(now), now, soc_pct=50, voltage_v=51) == "blocked"
+    assert (
+        await controller.apply(preview(now), now, soc_pct=50, voltage_v=51) == "blocked"
+    )
     assert (
         await controller.apply(
             preview(now), now + timedelta(seconds=20), soc_pct=50, voltage_v=51
