@@ -55,8 +55,40 @@ class DynamicDeyeController:
             (item for item in replay.get("quarters", ()) if item.get("start") == at),
             {},
         )
+        expected = replay.get("expected", {}).get("quarters", ())
         summary = replay.get("expected", {}).get("summary", {})
         metadata = replay.get("metadata", {})
+        source_by_time = {
+            item.get("start"): item for item in replay.get("quarters", ())
+        }
+        later_discharge = next(
+            (
+                candidate
+                for candidate in expected
+                if candidate.get("start", "") > at
+                and float(candidate.get("battery_to_home_dc_kwh") or 0) > 1e-7
+            ),
+            None,
+        )
+        later_discharge_source = (
+            source_by_time.get(later_discharge["start"], {})
+            if later_discharge
+            else {}
+        )
+        later_grid_charge = next(
+            (
+                candidate
+                for candidate in expected
+                if candidate.get("start", "") > at
+                and float(candidate.get("grid_to_battery_ac_kwh") or 0) > 1e-7
+            ),
+            None,
+        )
+        later_grid_charge_source = (
+            source_by_time.get(later_grid_charge["start"], {})
+            if later_grid_charge
+            else {}
+        )
         charge = float(row["grid_to_battery_ac_kwh"])
         discharge = float(row["battery_to_home_dc_kwh"])
         pv_charge = float(row.get("pv_to_battery_dc_kwh", 0))
@@ -98,6 +130,26 @@ class DynamicDeyeController:
             "whole_horizon_objective_dkk": summary.get("objective_dkk"),
             "reference_objective_dkk": summary.get("reference_objective_dkk"),
             "cost_basis": "whole_horizon_not_per_quarter_counterfactual",
+            "battery_to_ac_efficiency": replay.get("plant", {}).get(
+                "eta_battery_to_ac"
+            ),
+            "later_discharge_start_utc": (
+                later_discharge["start"] if later_discharge else None
+            ),
+            "later_discharge_buy_dkk_per_kwh": later_discharge_source.get(
+                "buy_dkk_per_kwh"
+            ),
+            "later_discharge_dc_kwh": (
+                later_discharge.get("battery_to_home_dc_kwh")
+                if later_discharge
+                else None
+            ),
+            "later_grid_charge_start_utc": (
+                later_grid_charge["start"] if later_grid_charge else None
+            ),
+            "later_grid_charge_buy_dkk_per_kwh": later_grid_charge_source.get(
+                "buy_dkk_per_kwh"
+            ),
         }
 
     TOU_STARTS = (0, 400, 800, 1200, 1600, 2000)
