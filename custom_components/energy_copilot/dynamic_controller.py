@@ -11,7 +11,6 @@ from zoneinfo import ZoneInfo
 
 from .deye_commands import (
     CHARGE_CURRENT,
-    DISCHARGE_CURRENT,
     GRID_CHARGE,
     GRID_CURRENT,
     SOLAR_SELL,
@@ -350,18 +349,42 @@ class DynamicDeyeController:
                 charge_enabled = charge > 1e-7 and grid_a > 1e-7
                 if charge > 1e-7 and not charge_enabled:
                     raise CommandRejected("controller:charge_plan_without_grid_current")
+                projected_soc = float(row["soc_end_pct"])
+                if not isfinite(projected_soc) or not 20 - 1e-6 <= projected_soc <= 100 + 1e-6:
+                    raise CommandRejected("controller:target_soc_invalid")
                 if charge_enabled:
-                    projected_soc = float(row["soc_end_pct"])
-                    if not isfinite(projected_soc):
-                        raise CommandRejected("controller:target_soc_invalid")
-                    target_soc = max(ceil(soc_pct), ceil(projected_soc))
-                    target_soc = max(20, min(100, target_soc))
+                    # With Grid Charge ON, this SOC becomes the *charging target*.
+                    # Never use a PV-only rise to request additional grid charging.
+                    grid_efficiency = float(
+                        (preview.replay_snapshot or {}).get("plant", {}).get(
+                            "eta_grid_to_battery", 0.95
+                        )
+                    )
+                    if not 0 < grid_efficiency <= 1:
+                        raise CommandRejected("controller:grid_efficiency_invalid")
+                    capacity = float(
+                        (preview.replay_snapshot or {}).get("plant", {}).get(
+                            "battery_capacity_dc_kwh", 10.24
+                        )
+                    )
+                    if not isfinite(capacity) or capacity <= 0:
+                        raise CommandRejected("controller:battery_capacity_invalid")
+                    grid_only_end_soc = min(
+                        100.0,
+                        soc_pct + charge * grid_efficiency / capacity * 100,
+                    )
+                    target_soc = max(ceil(soc_pct), ceil(grid_only_end_soc))
                     if target_soc <= soc_pct:
                         charge_enabled = False
+                elif discharge > 1e-7:
+                    # TOU is the discharge floor, not an instantaneous power cap.
+                    target_soc = min(ceil(soc_pct), ceil(projected_soc))
                 else:
-                    target_soc = 20
+                    # At or below the TOU floor, Deye will preserve the battery.
+                    # Continue following measured SOC as PV raises the charge.
+                    target_soc = ceil(soc_pct)
                 target_soc = self.adapter.quantize_number(
-                    slot["soc"], float(target_soc), direction="up"
+                    slot["soc"], float(max(20, min(100, target_soc))), direction="up"
                 )
                 self.target_tou_soc = target_soc
                 self.target_tou_grid_charge = charge_enabled
@@ -369,39 +392,70 @@ class DynamicDeyeController:
                 self.observed_tou_grid_charge = self.adapter._present(
                     slot["grid_charge"]
                 ).state
-                # Positive current allowance permits PV charging. Never
-                # set it to zero just to suppress grid charging.
-                total_charge_a = 50.0
-                # A quarter energy budget is not an instantaneous power limit.
-                # When discharging is authorised, let Deye follow actual load.
-                # Never command more than 100 A or the entity's lower device cap.
-                discharge_state = self.adapter._present(DISCHARGE_CURRENT)
-                discharge_max = float(discharge_state.attributes.get("max", 100))
-                if not isfinite(discharge_max) or discharge_max < 0:
-                    raise CommandRejected("controller:discharge_max_invalid")
-                discharge_limit = min(100.0, discharge_max) if discharge > 1e-7 else 0.0
-                grid_state = self.adapter._present(GRID_CURRENT)
-                grid_step = float(grid_state.attributes.get("step", 1))
-                if not isfinite(grid_step) or grid_step <= 0:
-                    raise CommandRejected("controller:grid_step_invalid")
-                grid_limit = min(50.0, max(0.0, floor(grid_a / grid_step) * grid_step))
-                # Device steps are validated by the command adapter.
-                settings = (
-                    (
-                        CHARGE_CURRENT,
-                        self.adapter.quantize_number(CHARGE_CURRENT, total_charge_a),
-                    ),
-                    (
-                        DISCHARGE_CURRENT,
-                        self.adapter.quantize_number(
-                            DISCHARGE_CURRENT, discharge_limit
-                        ),
-                    ),
-                    (
-                        GRID_CURRENT,
-                        self.adapter.quantize_number(GRID_CURRENT, grid_limit),
-                    ),
+                # Read the upcoming export policy before choosing charging speed.
+                planned_sell = None
+                for hour in preview.hourly_plan:
+                    hour_start = datetime.fromisoformat(hour["start"])
+                    if hour_start <= now < hour_start + timedelta(hours=1):
+                        planned_sell = bool(hour["solar_sell_planned_on"])
+                        break
+                if planned_sell is None:
+                    planned_sell = self.adapter._present(SOLAR_SELL).state == "on"
+
+                pv_charge = float(row.get("pv_to_battery_dc_kwh") or 0)
+                if not isfinite(pv_charge) or pv_charge < -1e-9:
+                    raise CommandRejected("controller:invalid_pv_charge")
+                charge_state = self.adapter._present(CHARGE_CURRENT)
+                charge_max = min(50.0, float(charge_state.attributes.get("max", 50)))
+                if not isfinite(charge_max) or charge_max < 1:
+                    raise CommandRejected("controller:charge_current_range_invalid")
+                if pv_charge > 1e-7 or charge_enabled:
+                    # A 15-minute DC energy budget translates to an A limit at
+                    # measured voltage. Grid energy becomes DC after efficiency.
+                    total_dc_kwh = pv_charge + (
+                        charge * grid_efficiency if charge_enabled else 0
+                    )
+                    target_charge_a = max(
+                        1.0, min(charge_max, ceil(total_dc_kwh * 4000 / voltage_v))
+                    )
+                else:
+                    # With export prioritized, slow battery charging to the
+                    # allowed minimum; otherwise keep PV charging available.
+                    target_charge_a = 1.0 if planned_sell else charge_max
+                total_charge_a = self.adapter.quantize_number(
+                    CHARGE_CURRENT, target_charge_a
                 )
+
+                grid_state = self.adapter._present(GRID_CURRENT)
+                grid_max = min(50.0, float(grid_state.attributes.get("max", 50)))
+                if not isfinite(grid_max) or grid_max < 1:
+                    raise CommandRejected("controller:grid_current_range_invalid")
+                if charge_enabled:
+                    grid_limit = self.adapter.quantize_number(
+                        GRID_CURRENT,
+                        max(1.0, min(grid_max, ceil(grid_a))),
+                        direction="up",
+                    )
+                    # The global charge limit must not be smaller than the
+                    # current needed for the planned grid portion.
+                    total_charge_a = self.adapter.quantize_number(
+                        CHARGE_CURRENT,
+                        min(charge_max, max(total_charge_a, grid_limit)),
+                        direction="up",
+                    )
+                elif float(grid_state.state) < 1:
+                    # Repair legacy 0 A from previous releases. Off is governed
+                    # by Grid Charge and TOU permission, not by 0 A current.
+                    grid_limit = self.adapter.quantize_number(
+                        GRID_CURRENT, 1.0, direction="up"
+                    )
+                else:
+                    grid_limit = None
+                # Discharge current is never read as a policy input or written.
+                # The existing inverter/BMS discharge-current cap is preserved.
+                settings = [(CHARGE_CURRENT, total_charge_a)]
+                if grid_limit is not None:
+                    settings.append((GRID_CURRENT, grid_limit))
                 # Stop grid charging first, then update active TOU settings.
                 # Never alter window start/end times or non-active SOC settings.
                 if (
@@ -421,17 +475,11 @@ class DynamicDeyeController:
                     await self._set_number_if_changed(entity, value)
                 if charge_enabled:
                     await self._set_switch_if_changed(GRID_CHARGE, True)
-                # Solar Sell is price-controlled by the planner, not by the
-                # instantaneous inverter export measurement.
-                for entry in preview.hourly_plan:
-                    start = datetime.fromisoformat(entry["start"])
-                    if start <= now < start + timedelta(hours=1):
-                        planned_sell = bool(entry["solar_sell_planned_on"])
-                        if self.adapter._present(SOLAR_SELL).state != (
-                            "on" if planned_sell else "off"
-                        ):
-                            await self._set_switch_if_changed(SOLAR_SELL, planned_sell)
-                        break
+                # Solar Sell follows the hourly plan; not instantaneous export.
+                if self.adapter._present(SOLAR_SELL).state != (
+                    "on" if planned_sell else "off"
+                ):
+                    await self._set_switch_if_changed(SOLAR_SELL, planned_sell)
                 self.observed_tou_soc = float(self.adapter._present(slot["soc"]).state)
                 self.observed_tou_grid_charge = self.adapter._present(
                     slot["grid_charge"]
@@ -444,7 +492,8 @@ class DynamicDeyeController:
                     target_soc,
                     charge_enabled,
                     grid_limit,
-                    discharge_limit,
+                    total_charge_a,
+                    grid_limit,
                 )
                 if (
                     application_key != self._last_application_key
@@ -465,7 +514,8 @@ class DynamicDeyeController:
                         target_tou_grid_charge=charge_enabled,
                         observed_tou_grid_charge=self.observed_tou_grid_charge,
                         grid_limit_a=grid_limit,
-                        discharge_limit_a=discharge_limit,
+                        discharge_limit_a=None,
+                        charge_limit_a=total_charge_a,
                         active_tou_slot=self.active_tou_slot,
                         command_changes=list(self._command_changes),
                         commands_sent=len(self._command_changes),
