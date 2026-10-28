@@ -391,14 +391,19 @@ class DynamicDeyeController:
                     if target_soc <= soc_pct:
                         charge_enabled = False
                 elif discharge > 1e-7:
-                    # TOU is the discharge floor, not an instantaneous power cap.
-                    target_soc = min(ceil(soc_pct), ceil(projected_soc))
+                    # A quarter's predicted end SOC is NOT the discharge reserve.
+                    # Release the full usable battery range immediately; the
+                    # inverter's 20% safety floor remains in force. Replanning
+                    # every quarter must not ration access to stored energy.
+                    target_soc = 20.0
                 else:
                     # At or below the TOU floor, Deye will preserve the battery.
                     # Continue following measured SOC as PV raises the charge.
                     target_soc = ceil(soc_pct)
                 target_soc = self.adapter.quantize_number(
-                    slot["soc"], float(max(20, min(100, target_soc))), direction="up"
+                    slot["soc"],
+                    float(max(20, min(100, target_soc))),
+                    direction="down" if discharge > 1e-7 else "up",
                 )
                 self.target_tou_soc = target_soc
                 self.target_tou_grid_charge = charge_enabled
