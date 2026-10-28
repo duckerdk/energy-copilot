@@ -204,7 +204,10 @@ def test_blocked_event_shows_real_planner_reason_not_historical_noise():
             "quality": "valid",
             "planning_status": "blocked",
             "planning_reason": "price:published_gap",
-            "issue_codes": ["home_profile_unverified", "historical_quality_unverifiable"],
+            "issue_codes": [
+                "home_profile_unverified",
+                "historical_quality_unverifiable",
+            ],
             "categorized_issues": [
                 {
                     "code": "historical_quality_unverifiable",
