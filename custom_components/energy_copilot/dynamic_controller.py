@@ -360,24 +360,25 @@ class DynamicDeyeController:
                 if charge > 1e-7 and not charge_enabled:
                     raise CommandRejected("controller:charge_plan_without_grid_current")
                 projected_soc = float(row["soc_end_pct"])
-                if not isfinite(projected_soc) or not (
-                    20 - 1e-6 <= projected_soc <= 100 + 1e-6
+                if (
+                    not isfinite(projected_soc)
+                    or not 20 - 1e-6 <= projected_soc <= 100 + 1e-6
                 ):
                     raise CommandRejected("controller:target_soc_invalid")
                 if charge_enabled:
                     # With Grid Charge ON, this SOC becomes the *charging target*.
                     # Never use a PV-only rise to request additional grid charging.
                     grid_efficiency = float(
-                        (preview.replay_snapshot or {}).get("plant", {}).get(
-                            "eta_grid_to_battery", 0.95
-                        )
+                        (preview.replay_snapshot or {})
+                        .get("plant", {})
+                        .get("eta_grid_to_battery", 0.95)
                     )
                     if not 0 < grid_efficiency <= 1:
                         raise CommandRejected("controller:grid_efficiency_invalid")
                     capacity = float(
-                        (preview.replay_snapshot or {}).get("plant", {}).get(
-                            "battery_capacity_dc_kwh", 10.24
-                        )
+                        (preview.replay_snapshot or {})
+                        .get("plant", {})
+                        .get("battery_capacity_dc_kwh", 10.24)
                     )
                     if not isfinite(capacity) or capacity <= 0:
                         raise CommandRejected("controller:battery_capacity_invalid")
@@ -525,9 +526,7 @@ class DynamicDeyeController:
                         observed_tou_soc=self.observed_tou_soc,
                         target_tou_grid_charge=charge_enabled,
                         observed_tou_grid_charge=self.observed_tou_grid_charge,
-                        grid_limit_a=float(
-                            self.adapter._present(GRID_CURRENT).state
-                        ),
+                        grid_limit_a=float(self.adapter._present(GRID_CURRENT).state),
                         discharge_limit_a=None,
                         charge_limit_a=total_charge_a,
                         discharge_control="tou_soc_floor",
