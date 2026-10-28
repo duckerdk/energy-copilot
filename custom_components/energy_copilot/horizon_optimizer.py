@@ -3,7 +3,7 @@
 No inverter commands are issued; all candidates undergo independent validation.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import ceil, floor
 
 from .planner import (
@@ -37,6 +37,8 @@ class HorizonResult:
     pv_headroom: tuple = ()
     pv_underprediction_kwh: float | None = None
     pv_headroom_enabled: bool = False
+    economic_policy_reason: str | None = None
+    economic_policy_benefit_dkk: float | None = None
 
 
 def _dispatch(
@@ -266,6 +268,17 @@ def optimize_horizon(
             soc_pct=plant.initial_soc_pct,
             already_charging=grid_charge_already_active,
         ):
-            return no_cheap_charge
+            return replace(
+                no_cheap_charge,
+                economic_policy_reason=(
+                    "soc_99_satisfies_grid_charge_target"
+                    if plant.initial_soc_pct >= 99.0
+                    else "grid_charge_below_materiality_threshold"
+                ),
+                economic_policy_benefit_dkk=(
+                    no_cheap_charge.candidate.objective_dkk
+                    - result.candidate.objective_dkk
+                ),
+            )
         return spread_grid_charge_over_cheap_window(plant, quarters, result)
     return result
