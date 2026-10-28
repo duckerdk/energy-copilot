@@ -42,6 +42,7 @@ def optimize_continuous(
     terminal_value_override=None,
     pv_underprediction_kwh=None,
     enable_pv_headroom=True,
+    audit_forbid_first_action=None,
 ):
     """Optimize continuous battery energy (kWh) without an SOC lattice.
 
@@ -56,6 +57,8 @@ def optimize_continuous(
     This implementation is used by the HA dry-run planner.
     """
 
+    if audit_forbid_first_action not in (None, "pv_charge", "grid_charge", "battery_discharge"):
+        raise InfeasibleCandidate("audit:unsupported_alternative")
     if not quarters:
         raise InfeasibleCandidate("horizon:empty")
     if plant.initial_soc_pct < MIN_SOC:
@@ -158,7 +161,9 @@ def optimize_continuous(
             add_edge(
                 after(i),
                 sink,
-                min(max_discharge, home_from_grid / plant.eta_battery_to_ac),
+                0.0
+                if i == 0 and audit_forbid_first_action == "battery_discharge"
+                else min(max_discharge, home_from_grid / plant.eta_battery_to_ac),
                 (
                     DEGRADATION_DKK_PER_KWH_DC
                     - q.buy_dkk_per_kwh * plant.eta_battery_to_ac
@@ -167,14 +172,17 @@ def optimize_continuous(
         )
         pv_edges.append(
             add_edge(
-                source, charge(i), surplus * plant.eta_pv_to_battery, pv_charge_cost
+                source,
+                charge(i),
+                0.0 if i == 0 and audit_forbid_first_action == "pv_charge" else surplus * plant.eta_pv_to_battery,
+                pv_charge_cost
             )
         )
         grid_edges.append(
             add_edge(
                 source,
                 charge(i),
-                max_grid,
+                0.0 if i == 0 and audit_forbid_first_action == "grid_charge" else max_grid,
                 q.buy_dkk_per_kwh / plant.eta_grid_to_battery,
             )
         )
