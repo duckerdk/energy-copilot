@@ -54,9 +54,10 @@ def test_pv_storage_vs_best_plan_without_pv_charge_is_actual_solver_comparison()
         direct.candidate.objective_dkk - chosen.candidate.objective_dkk
     )
     assert result["economic_saving_dkk"] > 0
-    assert result["economic_alternative_first_sale_dkk"] > result[
-        "economic_selected_first_sale_dkk"
-    ]
+    assert (
+        result["economic_alternative_first_sale_dkk"]
+        > result["economic_selected_first_sale_dkk"]
+    )
     # No audit rerun is permitted to change the original source dispatch.
     assert replay["expected"]["quarters"][0]["pv_to_battery_dc_kwh"] > 0.1
 
