@@ -325,8 +325,11 @@ class DecisionJournalSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self):
-        latest = self.coordinator.decision_journal.recent(1)
-        return latest[0]["event"] if latest else "empty"
+        # This is a diagnostic archive access point, not a status transition.
+        # Publishing changing event names as the sensor's state creates misleading
+        # Activity entries such as "planned → blocked", with no event rationale.
+        # Actual decisions are published as native logbook entries.
+        return "ready" if self.coordinator.decision_journal.available else "unavailable"
 
     @property
     def extra_state_attributes(self):
