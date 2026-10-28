@@ -96,7 +96,6 @@ async def test_switch_write_validation():
     assert len(services.calls) == 1
 
 
-
 @pytest.mark.asyncio
 async def test_discharge_current_is_not_writable_even_if_device_exposes_it():
     device, services = adapter()
