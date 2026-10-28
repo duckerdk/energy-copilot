@@ -5,7 +5,6 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
-
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.energy_copilot.decision_journal import (
