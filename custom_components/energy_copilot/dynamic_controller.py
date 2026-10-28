@@ -342,7 +342,7 @@ class DynamicDeyeController:
                         if self.adapter._present(SOLAR_SELL).state != (
                             "on" if planned_sell else "off"
                         ):
-                            await self.adapter.set_switch(SOLAR_SELL, planned_sell)
+                            await self._set_switch_if_changed(SOLAR_SELL, planned_sell)
                         break
                 self.observed_tou_soc = float(self.adapter._present(slot["soc"]).state)
                 self.observed_tou_grid_charge = self.adapter._present(
