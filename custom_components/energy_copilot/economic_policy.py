@@ -7,7 +7,7 @@ Only validated full-horizon alternatives can replace the original dispatch.
 
 from dataclasses import replace
 
-from .planner import Dispatch, InfeasibleCandidate, Plant, simulate_candidate
+from .planner import InfeasibleCandidate, Plant, simulate_candidate
 
 ECONOMIC_TIE_DKK = 0.01
 START_GRID_CHARGE_BENEFIT_DKK = 0.10
