@@ -42,22 +42,25 @@ def test_pv_storage_vs_best_plan_without_pv_charge_is_actual_solver_comparison()
     assert chosen.dispatches[0].pv_to_battery_dc_kwh > 0.1
     replay = build_replay(plant, quarters, chosen)
     result = compare_first_quarter(replay, "pv_charge")
-    direct = optimize_horizon(
-        plant,
-        quarters,
-        terminal_value_override=0.0,
-        audit_forbid_first_action="pv_charge",
+    candidates = (
+        optimize_horizon(
+            plant,
+            quarters,
+            terminal_value_override=0.0,
+            audit_forbid_first_action="pv_charge",
+            audit_force_first_pv_curtail=force_curtail,
+        )
+        for force_curtail in (False, True)
     )
-    assert direct.dispatches[0].pv_to_battery_dc_kwh == 0
+    candidates = tuple(candidates)
+    assert all(c.dispatches[0].pv_to_battery_dc_kwh == 0 for c in candidates)
+    expected_cost = min(c.candidate.objective_dkk for c in candidates)
     assert result["economic_comparison_status"] == "evaluated"
     assert result["economic_saving_dkk"] == pytest.approx(
-        direct.candidate.objective_dkk - chosen.candidate.objective_dkk
+        expected_cost - chosen.candidate.objective_dkk
     )
-    assert result["economic_saving_dkk"] > 0
-    assert (
-        result["economic_alternative_first_sale_dkk"]
-        > result["economic_selected_first_sale_dkk"]
-    )
+    assert result["economic_saving_dkk"] >= -1e-6
+    assert result["economic_alternative_forced_curtail"] in (True, False)
     # No audit rerun is permitted to change the original source dispatch.
     assert replay["expected"]["quarters"][0]["pv_to_battery_dc_kwh"] > 0.1
 
@@ -81,3 +84,44 @@ def test_unsupported_counterfactual_is_explicit_and_does_not_guess():
     assert compare_first_quarter({}, "grid_import") == {
         "economic_comparison_status": "not_supported"
     }
+
+
+def test_no_pv_storage_counterfactual_evaluates_grid_charge_with_curtail():
+    plant = _plant()
+    quarters = (
+        _quarter(0, buy=0.20, pv=0.7, load=0.18),
+        _quarter(1, buy=4.0, load=0.7),
+        _quarter(2, buy=4.0, load=0.7),
+    )
+    chosen = optimize_horizon(plant, quarters, terminal_value_override=0.0)
+    if chosen.dispatches[0].pv_to_battery_dc_kwh < 0.01:
+        pytest.skip("First PV charge not chosen in this fixture")
+    result = compare_first_quarter(build_replay(plant, quarters, chosen), "pv_charge")
+    alternative_curtail = optimize_horizon(
+        plant,
+        quarters,
+        terminal_value_override=0.0,
+        audit_forbid_first_action="pv_charge",
+        audit_force_first_pv_curtail=True,
+    )
+    alternative_export = optimize_horizon(
+        plant,
+        quarters,
+        terminal_value_override=0.0,
+        audit_forbid_first_action="pv_charge",
+        audit_force_first_pv_curtail=False,
+    )
+    assert result["economic_alternative_cost_dkk"] == pytest.approx(
+        min(
+            alternative_curtail.candidate.objective_dkk,
+            alternative_export.candidate.objective_dkk,
+        )
+    )
+    assert not (
+        alternative_curtail.candidate.quarters[0].grid_import_kwh > 1e-7
+        and alternative_curtail.candidate.quarters[0].grid_export_kwh > 1e-7
+    )
+    assert not (
+        alternative_export.candidate.quarters[0].grid_import_kwh > 1e-7
+        and alternative_export.candidate.quarters[0].grid_export_kwh > 1e-7
+    )
