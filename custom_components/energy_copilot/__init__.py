@@ -42,8 +42,10 @@ async def async_reload_entry(hass: HomeAssistant, entry: EnergyConfigEntry) -> N
 async def async_unload_entry(hass: HomeAssistant, entry: EnergyConfigEntry) -> bool:
     if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         return False
-    entry.runtime_data.coordinator.dynamic_controller.stop()
-    await entry.runtime_data.coordinator.history_reader.async_close()
+    coordinator = entry.runtime_data.coordinator
+    coordinator.dynamic_controller.stop()
+    await coordinator.decision_journal.async_close()
+    await coordinator.history_reader.async_close()
     return True
 
 
@@ -51,3 +53,4 @@ async def async_remove_entry(hass: HomeAssistant, entry: EnergyConfigEntry) -> N
     from homeassistant.helpers.storage import Store
 
     await Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.forecasts").async_remove()
+    await Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.decisions").async_remove()
