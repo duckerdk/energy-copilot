@@ -458,6 +458,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                             planning_status=self.planning_preview.status,
                             planning_reason=self.planning_preview.reason,
                             issue_codes=issue_codes,
+                            categorized_issues=self.quality["issues"],
                         )
                         self._last_block_fingerprint = fingerprint
                     self.dynamic_controller.status = "blocked"
