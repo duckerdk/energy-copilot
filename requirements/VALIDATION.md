@@ -49,6 +49,10 @@
 | EXE-01 | sukces HA API, brak dowodu skutku | `applied`, nie `confirmed` |
 | EXE-02 | restart z utrwalonymi nastawami | Odczyt, nowy plan, bez odtwarzania starej komendy |
 | LOG-01 | plan `idle`/`blocked` i porównanie alternatyw | Dziennik z cenami, czasem, kosztami, powodem i wersją planu |
+| ARM-01 | restart integracji w trybie `automatic` | ARM domyślnie włączony; brak starych komend |
+| ARM-02 | przejściowy `Degraded` lub `Blocked`, potem `Valid` + `Preview` | brak nowych zapisów podczas przerwy, ARM zachowany, automatyczne wznowienie |
+| ARM-03 | awaria HA API w trakcie zapisu | `recovery_required`; bez ślepego retry |
+| LOG-02 | restart HA oraz upływ 30 dni | zachowanie decyzji, przyczyn i kosztów do limitu 6000; retencja |
 
 ## Backtest i wiarygodność oszczędności
 Dla okresu t: odtwarzaj tylko opublikowane wtedy ceny i prognozy **sprzed** decyzji, wraz z pierwotnym SOC i ograniczeniami. Porównuj realny baseline Deye z wykonawczą alternatywą Co-Pilot przy tej samej pogodzie, obciążeniu, cenach, stanie baterii i granicach BMS. Pomijaj okresy z niedostępnymi historycznymi składowymi domu i podejrzanym curtailment; raportuj procent pokrycia. Wycena końcowego SOC nie może magicznie zerować pozostałej energii ani posługiwać się nieopublikowanymi cenami. Rozdzielić `simulated`, `backtested` i `observed`; brak testu fizycznego ≠ osiągnięty zysk.

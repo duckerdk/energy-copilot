@@ -1,4 +1,4 @@
-"""Explicitly armed live control. OFF is STOP, not an inverter emergency stop."""
+"""Live control ARM/STOP. Automatic mode starts armed after HA restart."""
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
@@ -50,6 +50,8 @@ class DynamicControlSwitch(CoordinatorEntity, SwitchEntity):
             "observed_tou_soc": control.observed_tou_soc,
             "observed_tou_grid_charge": control.observed_tou_grid_charge,
             "device_emergency_stop": False,
+            "temporary_block_keeps_arm": True,
+            "decision_history": "HA diagnostics: decision_journal",
         }
 
     async def async_turn_on(self, **kwargs):
@@ -58,5 +60,5 @@ class DynamicControlSwitch(CoordinatorEntity, SwitchEntity):
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):
-        self.coordinator.dynamic_controller.stop()
+        self.coordinator.dynamic_controller.stop(manual=True)
         self.async_write_ha_state()

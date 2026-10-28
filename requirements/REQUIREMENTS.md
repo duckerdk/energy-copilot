@@ -24,6 +24,12 @@ Minimalizować **całkowity koszt energii w DKK w pełnym horyzoncie opublikowan
 - **Eksport z baterii zachować jako funkcję opcjonalną**; każda konkretna propozycja wymaga jawnej osobnej zgody, określającej plan, okres i limit kWh. Domyślnie zablokowany.
 - Faza początkowa `monitor/dry_run`: zero zapisów do urządzenia. Przejście do live jest osobną decyzją; bezpieczeństwo wykonania: [EXECUTION.md](EXECUTION.md).
 
+## Autostart, recovery i dziennik — decyzja użytkownika 28.10.2026
+
+- W trybie `automatic` wykonawca jest domyślnie **ARM po uruchomieniu HA i po przeładowaniu integracji**. Tryby `monitor`/`dry_run` pozostają bez zapisów. Ręczny STOP zatrzymuje dalsze polecenia w bieżącej sesji; nie jest fizycznym wyłącznikiem awaryjnym.
+- Chwilowy brak poprawnego pomiaru, prognozy albo wykonalnego planu **blokuje wyłącznie nowe zapisy**, nie zmienia intencji ARM i powoduje automatyczne wznowienie po ponownej walidacji. Nie używać poprzedniego, przeterminowanego kwadransa jako zastępczej komendy. Gdy zapis do urządzenia mógł zostać częściowo wykonany, blokada `recovery_required` wymaga dodatkowej ostrożności; nie wolno ślepo ponawiać niepewnego zapisu.
+- Prowadzić trwały lokalny dziennik błędów, przyczyn blokady/odzyskania i decyzji `idle`, `grid_import`, `grid_charge`, `battery_discharge` i `pv_charge`; dołączać plan i kwadrans, źródła, ceny, SOC, koszty oraz rozdzielenie `planned`/`applied`. Przechowywać historię między restartami, z retencją 30 dni i ograniczeniem liczby zdarzeń; udostępniać ją w diagnostyce HA. Nie traktować wyniku optymalizatora jako dowodu fizycznego uzyskania zamierzonego przepływu.
+
 ## Polityka ujemnych chwilowych odczytów domu — decyzja użytkownika 20.10.2026
 
 - `sensor.home_energy_consumption` jest szablonowym bilansem `PV + grid + battery`, a nie niezależnym licznikiem AC. Użytkownik potwierdził krótkie, sekundowe ujemne piki m.in. podczas przełączania źródeł PV/bateria i dużych skoków mocy; możliwe są przesunięcia czasowe aktualizacji Modbus. **Decyzja: do obliczeń w Energy Co-Pilot każdą skończoną, liczbową ujemną moc domu normalizować do 0 W, także w historii Recorder (15-minutowej integracji energii).** Sam czujnik HA, jego surowe dane i ESPHome pozostają bez zmian.

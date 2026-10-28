@@ -32,6 +32,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             ModeledSavingSensor(entry),
             ActualSavingYesterdaySensor(entry),
             SevenDayLoadSensor(entry),
+            DecisionJournalSensor(entry),
         ]
     )
 
@@ -306,4 +307,32 @@ class SevenDayLoadSensor(CoordinatorEntity, SensorEntity):
                 {"date": day, "kwh": round(value, 3)}
                 for day, value in sorted(daily.items())
             ],
+        }
+
+
+class DecisionJournalSensor(CoordinatorEntity, SensorEntity):
+    """Last operational decision; complete history is in HA diagnostics."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Decision journal"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:text-box-search-outline"
+
+    def __init__(self, entry):
+        super().__init__(entry.runtime_data.coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_decision_journal"
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
+
+    @property
+    def native_value(self):
+        latest = self.coordinator.decision_journal.recent(1)
+        return latest[0]["event"] if latest else "empty"
+
+    @property
+    def extra_state_attributes(self):
+        journal = self.coordinator.decision_journal
+        return {
+            **journal.summary,
+            "last_events": journal.recent(5),
+            "full_history": "Settings > Devices & services > Energy Co-Pilot > Download diagnostics",
         }

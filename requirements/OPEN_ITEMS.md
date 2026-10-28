@@ -18,7 +18,7 @@
 
 ## P2 — przed automatyzacją i szerszą dystrybucją
 
-- [ ] **M4/M5:** dziennik decyzji, retencja, dashboard, STOP oraz interfejs indywidualnej zgody na eksport baterii.
+- [ ] **M4/M5:** trwały dziennik z retencją i ręczny STOP są zaimplementowane w v1.16.8; nadal otwarte: pełny dashboard audytu, wyszukiwanie historii po okresach i interfejs indywidualnej zgody na eksport baterii.
 - [ ] **M5/M6:** testy zgodności kolejnych wersji HA i odbiór działań fizycznych. Publikowanie do HACS działa; nie jest otwartym zadaniem.
 
 Kryteria odbioru i regresje: [VALIDATION.md](VALIDATION.md). Polityka wykonania: [EXECUTION.md](EXECUTION.md).

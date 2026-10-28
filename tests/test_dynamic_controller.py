@@ -163,7 +163,7 @@ async def test_discharge_rejected_at_minimum_soc():
             soc_pct=20.0,
             voltage_v=51.0,
         )
-        == "recovery_required"
+        == "blocked"
     )
     assert not service.calls
 
@@ -216,7 +216,7 @@ async def test_mismatched_window_configuration_fails_before_any_writes():
     )
     controller.arm()
     assert await controller.apply(preview(now), now, soc_pct=50, voltage_v=51) == (
-        "recovery_required"
+        "blocked"
     )
     assert not service.calls
     assert "tou_schedule_mismatch" in controller.reason
@@ -380,3 +380,55 @@ async def test_next_quarter_cache_is_refreshed_before_boundary():
         == "applied"
     )
     assert float(service.states.get(DISCHARGE_CURRENT).state) == 0.0
+
+
+@pytest.mark.asyncio
+async def test_temporary_bad_soc_blocks_but_recovers_without_rearming():
+    now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
+    controller, services = setup_controller()
+    controller.arm()
+    plan = preview(now, charge=0.0, discharge=0.1, grid_a=0.0)
+    assert await controller.apply(plan, now, soc_pct=20, voltage_v=51) == "blocked"
+    assert controller.armed
+    assert not controller.halted
+    assert not services.calls
+    assert await controller.apply(plan, now, soc_pct=50, voltage_v=51) == "applied"
+    assert controller.armed
+    assert services.calls
+
+
+@pytest.mark.asyncio
+async def test_charge_decision_explains_prices_costs_and_applied_settings():
+    now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
+    controller, _ = setup_controller()
+    records = []
+
+    class Journal:
+        def record(self, event, **details):
+            records.append({"event": event, **details})
+
+    controller.journal = Journal()
+    controller.arm()
+    plan = preview(now)
+    plan.replay_snapshot["metadata"] = {"forecast_version": "forecast-v3"}
+    plan.replay_snapshot["quarters"] = [
+        {
+            "start": plan.replay_snapshot["expected"]["quarters"][0]["start"],
+            "buy_dkk_per_kwh": 1.42,
+            "sell_dkk_per_kwh": 0.84,
+            "pv_dc_kwh": 0.25,
+            "home_ac_kwh": 0.5,
+        }
+    ]
+    plan.replay_snapshot["expected"]["summary"] = {
+        "objective_dkk": 12.5,
+        "reference_objective_dkk": 18.7,
+    }
+    assert await controller.apply(plan, now, soc_pct=50, voltage_v=51) == "applied"
+    decision = next(item for item in records if item["event"] == "decision")
+    assert decision["action"] == "grid_charge"
+    assert decision["reason"] == "optimizer_selected_grid_charge_for_full_horizon_cost"
+    assert decision["buy_dkk_per_kwh"] == 1.42
+    assert decision["reference_objective_dkk"] == 18.7
+    assert decision["forecast_version"] == "forecast-v3"
+    assert any(item["event"] == "applied" for item in records)

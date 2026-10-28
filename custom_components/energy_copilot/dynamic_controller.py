@@ -1,6 +1,6 @@
 """Dynamic M6 controller using the actual optimizer replay, not six-window compression.
 
-Explicitly armed and stopped from HA. Never writes without a fresh plan.
+Armed on startup in automatic mode; manual STOP inhibits commands until restart.
 The configured Deye TOU schedule remains the underlying inverter safeguard.
 """
 
@@ -39,6 +39,66 @@ class DynamicDeyeController:
         self.observed_tou_grid_charge = None
         self._lock = asyncio.Lock()
         self._pending_quarter = None
+        self.journal = None
+        self._write_started = False
+        self._last_decision_key = None
+        self._last_application_key = None
+
+    def _audit(self, event, **details):
+        if self.journal is not None:
+            self.journal.record(event, **details)
+
+    def _decision(self, preview, row, now, soc_pct):
+        replay = preview.replay_snapshot or {}
+        at = row["start"]
+        source = next(
+            (item for item in replay.get("quarters", ()) if item.get("start") == at),
+            {},
+        )
+        summary = replay.get("expected", {}).get("summary", {})
+        metadata = replay.get("metadata", {})
+        charge = float(row["grid_to_battery_ac_kwh"])
+        discharge = float(row["battery_to_home_dc_kwh"])
+        pv_charge = float(row.get("pv_to_battery_dc_kwh", 0))
+        if charge > 1e-7:
+            action = "grid_charge"
+            reason = "optimizer_selected_grid_charge_for_full_horizon_cost"
+        elif discharge > 1e-7:
+            action = "battery_discharge"
+            reason = "optimizer_selected_discharge_for_full_horizon_cost"
+        elif pv_charge > 1e-7:
+            action = "pv_charge"
+            reason = "optimizer_selected_pv_storage"
+        elif row.get("grid_import_kwh", 0) > 1e-7:
+            action = "grid_import"
+            reason = "optimizer_selected_grid_import_preserving_battery"
+        else:
+            action = "idle"
+            reason = "optimizer_selected_no_grid_charge_or_battery_discharge"
+        return {
+            "reason": reason,
+            "action": action,
+            "plan_id": f"{metadata.get('forecast_version', 'unknown')}:{at}",
+            "quarter_start_utc": at,
+            "observed_at_utc": now.isoformat(),
+            "forecast_version": metadata.get("forecast_version"),
+            "soc_observed_pct": soc_pct,
+            "soc_planned_end_pct": row.get("soc_end_pct"),
+            "buy_dkk_per_kwh": source.get("buy_dkk_per_kwh"),
+            "sell_dkk_per_kwh": source.get("sell_dkk_per_kwh"),
+            "pv_forecast_dc_kwh": source.get("pv_dc_kwh"),
+            "home_forecast_ac_kwh": source.get("home_ac_kwh"),
+            "grid_charge_ac_kwh": charge,
+            "battery_discharge_dc_kwh": discharge,
+            "pv_charge_dc_kwh": pv_charge,
+            "planned_grid_import_kwh": row.get("grid_import_kwh"),
+            "grid_charge_current_a": row.get("grid_charge_current_a"),
+            "purchase_cost_dkk": row.get("purchase_dkk"),
+            "degradation_cost_dkk": row.get("degradation_dkk"),
+            "whole_horizon_objective_dkk": summary.get("objective_dkk"),
+            "reference_objective_dkk": summary.get("reference_objective_dkk"),
+            "cost_basis": "whole_horizon_not_per_quarter_counterfactual",
+        }
 
     TOU_STARTS = (0, 400, 800, 1200, 1600, 2000)
 
@@ -61,22 +121,37 @@ class DynamicDeyeController:
     async def _set_number_if_changed(self, entity, value):
         state = self.adapter._present(entity)
         if abs(float(state.state) - value) > 1e-6:
+            self._write_started = True
             await self.adapter.set_number(entity, value)
 
     async def _set_switch_if_changed(self, entity, enabled):
         if self.adapter._present(entity).state != ("on" if enabled else "off"):
+            self._write_started = True
             await self.adapter.set_switch(entity, enabled)
 
-    def stop(self):
+    def stop(self, *, manual=False):
+        was_armed = self.armed
         self.armed = False
         self._pending_quarter = None
         self.status = "stopped"
+        if manual:
+            self.reason = "controller:manual_stop"
+        if was_armed:
+            self._audit(
+                "manual_stop" if manual else "stop",
+                reason=self.reason,
+                state=self.status,
+            )
 
     def arm(self):
         if self.halted:
             raise CommandRejected("controller:recovery_required")
+        was_armed = self.armed
         self.armed = True
         self.status = "armed"
+        self.reason = None
+        if not was_armed:
+            self._audit("armed", reason="automatic_mode_or_user_arm", state="armed")
 
     def _current_quarter(self, preview, now):
         """Cache next-quarter dispatch until its boundary, not just until poll end.
@@ -121,6 +196,8 @@ class DynamicDeyeController:
         if self._lock.locked():
             return self.status
         async with self._lock:
+            self._write_started = False
+            at = None
             try:
                 if not all(isfinite(x) for x in (soc_pct, voltage_v)):
                     raise CommandRejected("controller:invalid_measurements")
@@ -128,7 +205,14 @@ class DynamicDeyeController:
                     raise CommandRejected("controller:outside_policy")
                 row = self._current_quarter(preview, now)
                 if row is None:
+                    if self.status != "waiting_for_quarter":
+                        self._audit(
+                            "waiting",
+                            reason="next_complete_quarter_not_started",
+                            state="waiting_for_quarter",
+                        )
                     self.status = "waiting_for_quarter"
+                    self.reason = "controller:waiting_for_next_quarter"
                     return self.status
                 at = row["start"]
                 boundary = datetime.fromisoformat(at.replace("Z", "+00:00"))
@@ -152,9 +236,25 @@ class DynamicDeyeController:
                     raise CommandRejected("controller:minimum_soc")
                 tou_state = self.adapter._present(TIME_OF_USE).state
                 if tou_state != "on":
+                    reason = f"controller:tou_not_enabled:observed={tou_state}"
+                    if self.status != "blocked" or self.reason != reason:
+                        self._audit("blocked", reason=reason, state="blocked")
                     self.status = "blocked"
-                    self.reason = f"controller:tou_not_enabled:observed={tou_state}"
+                    self.reason = reason
                     return self.status
+                decision = self._decision(preview, row, now, soc_pct)
+                decision_key = (
+                    at,
+                    decision["action"],
+                    charge,
+                    discharge,
+                    grid_a,
+                    decision["buy_dkk_per_kwh"],
+                    decision["sell_dkk_per_kwh"],
+                )
+                if decision_key != self._last_decision_key:
+                    self._last_decision_key = decision_key
+                    self._audit("decision", **decision)
                 slot = self._active_tou(now)
                 self.active_tou_slot = (
                     now.astimezone(ZoneInfo("Europe/Copenhagen")).hour // 4 + 1
@@ -220,7 +320,7 @@ class DynamicDeyeController:
                     not charge_enabled
                     and self.adapter._present(GRID_CHARGE).state != "off"
                 ):
-                    await self.adapter.set_switch(GRID_CHARGE, False)
+                    await self._set_switch_if_changed(GRID_CHARGE, False)
                 if charge_enabled:
                     # Prepare target SOC and slot permission before global enable.
                     await self._set_number_if_changed(slot["soc"], target_soc)
@@ -242,7 +342,7 @@ class DynamicDeyeController:
                         if self.adapter._present(SOLAR_SELL).state != (
                             "on" if planned_sell else "off"
                         ):
-                            await self.adapter.set_switch(SOLAR_SELL, planned_sell)
+                            await self._set_switch_if_changed(SOLAR_SELL, planned_sell)
                         break
                 self.observed_tou_soc = float(self.adapter._present(slot["soc"]).state)
                 self.observed_tou_grid_charge = self.adapter._present(
@@ -251,9 +351,50 @@ class DynamicDeyeController:
                 self.last_plan_start = at
                 self.status = "applied"
                 self.reason = None
+                application_key = (
+                    at,
+                    target_soc,
+                    charge_enabled,
+                    grid_limit,
+                    discharge_limit,
+                )
+                if application_key != self._last_application_key:
+                    self._last_application_key = application_key
+                    self._audit(
+                        "applied",
+                        reason="settings_written_and_read_back",
+                        quarter_start_utc=at,
+                        state=self.status,
+                        target_tou_soc=target_soc,
+                        observed_tou_soc=self.observed_tou_soc,
+                        target_tou_grid_charge=charge_enabled,
+                        observed_tou_grid_charge=self.observed_tou_grid_charge,
+                        grid_limit_a=grid_limit,
+                        discharge_limit_a=discharge_limit,
+                    )
             except Exception as exc:
-                self.halted = True
-                self.armed = False
-                self.status = "recovery_required"
                 self.reason = f"{type(exc).__name__}:{exc}"
+                if self._write_started:
+                    # A partially executed command cannot be retried blindly.
+                    self.halted = True
+                    self.armed = False
+                    self.status = "recovery_required"
+                    event = "halted"
+                    phase = "device_write_result_uncertain"
+                else:
+                    # A bad measurement/preview must not permanently disarm.
+                    self.status = "blocked"
+                    event = "blocked"
+                    phase = "pre_write_validation"
+                if event == "halted" or self.reason != getattr(
+                    self, "_last_block_reason", None
+                ):
+                    self._audit(
+                        event,
+                        reason=self.reason,
+                        state=self.status,
+                        quarter_start_utc=at,
+                        phase=phase,
+                    )
+                self._last_block_reason = self.reason
             return self.status

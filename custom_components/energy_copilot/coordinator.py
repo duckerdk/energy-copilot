@@ -1,4 +1,4 @@
-"""Read-only HA adapters. Forecast retrieval is the only service invocation."""
+"""HA input coordination, guarded automatic execution and decision auditing."""
 
 import asyncio
 import logging
@@ -21,6 +21,7 @@ from .const import (
     OPTIONAL_ENTITY_ROLES,
     UPDATE_INTERVAL,
 )
+from .decision_journal import DecisionJournal
 from .dynamic_controller import DynamicDeyeController
 from .forecast_accuracy import ForecastAccuracyWindow
 from .forecast_history import ForecastHistory
@@ -88,12 +89,24 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self.quality = None
         self.planning_preview = None
         self.dynamic_controller = DynamicDeyeController(hass)
+        self.decision_journal = DecisionJournal(hass, entry.entry_id)
+        self.dynamic_controller.journal = self.decision_journal
+        self._last_quality_fingerprint = None
+        self._last_plan_fingerprint = None
+        self._last_preview_decision_fingerprint = None
+        self._last_block_fingerprint = None
         self.actual_yesterday = None
         self._actual_yesterday_date = None
         self.live_context = LiveSourceContext()
         self.live_window = LiveMeasurementWindow()
 
     async def _async_setup(self):
+        await self.decision_journal.async_load()
+        if self.settings.get("mode", "monitor") == "automatic":
+            # Explicit automatic mode is already the user's permission to ARM.
+            # Never replay an old dispatch: each startup requires fresh planning.
+            self.dynamic_controller.arm()
+
         # State-change events preserve short outages between the 30-second polls.
         @callback
         def source_changed(event):
@@ -361,20 +374,102 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         else:
             readiness = "not_evaluated_m2"
         self.quality["planning_readiness"] = readiness
+        issue_codes = sorted({i.code for i in snapshot.issues})
+        quality_fingerprint = (self.quality["input_state"], tuple(issue_codes))
+        if quality_fingerprint != self._last_quality_fingerprint:
+            self._last_quality_fingerprint = quality_fingerprint
+            self.decision_journal.record(
+                "input_quality",
+                reason="current_measurement_and_dependency_validation",
+                quality=self.quality["input_state"],
+                issue_codes=issue_codes,
+                categorized_issues=self.quality["issues"],
+            )
+        plan_fingerprint = (
+            self.planning_preview.status,
+            self.planning_preview.reason,
+        )
+        if plan_fingerprint != self._last_plan_fingerprint:
+            self._last_plan_fingerprint = plan_fingerprint
+            self.decision_journal.record(
+                "plan_status",
+                reason=self.planning_preview.reason,
+                planning_status=self.planning_preview.status,
+                quality=self.quality["input_state"],
+                issue_codes=issue_codes,
+                coverage=self.planning_preview.coverage,
+            )
+        # Journal the selected next-quarter schedule even in dry-run. Preview
+        # decisions never cause physical commands.
+        if self.planning_preview.status == "preview":
+            replay = self.planning_preview.replay_snapshot or {}
+            expected = replay.get("expected", {}).get("quarters", ())
+            if expected:
+                first = expected[0]
+                fingerprint = (
+                    first["start"],
+                    first.get("grid_to_battery_ac_kwh"),
+                    first.get("battery_to_home_dc_kwh"),
+                    first.get("pv_to_battery_dc_kwh"),
+                )
+                if fingerprint != self._last_preview_decision_fingerprint:
+                    self._last_preview_decision_fingerprint = fingerprint
+                    soc = snapshot.measurements.get("soc")
+                    details = self.dynamic_controller._decision(
+                        self.planning_preview,
+                        first,
+                        now,
+                        soc.value if soc else first.get("soc_start_pct"),
+                    )
+                    self.decision_journal.record(
+                        "planned",
+                        **details,
+                        planning_status=self.planning_preview.status,
+                        quality=self.quality["input_state"],
+                        mode=self.settings.get("mode", "monitor"),
+                    )
+        else:
+            self._last_preview_decision_fingerprint = None
         if self.settings.get("mode", "monitor") == "automatic":
             if self.dynamic_controller.armed:
                 required = {"soc", "voltage", "grid", "battery", "pv"}
+                missing = sorted(required.difference(snapshot.measurements))
                 if (
-                    not required.issubset(snapshot.measurements)
+                    missing
                     or self.quality["input_state"] != "valid"
                     or self.planning_preview.status != "preview"
                 ):
-                    self.dynamic_controller.stop()
-                    self.dynamic_controller.status = "blocked"
-                    self.dynamic_controller.reason = (
-                        "controller:input_or_plan_unavailable"
+                    # Block writes, not the user's persistent automatic ARM.
+                    reason = "controller:input_or_plan_unavailable"
+                    fingerprint = (
+                        tuple(missing),
+                        self.quality["input_state"],
+                        self.planning_preview.status,
+                        self.planning_preview.reason,
+                        tuple(issue_codes),
                     )
+                    if fingerprint != self._last_block_fingerprint:
+                        self.decision_journal.record(
+                            "blocked",
+                            reason=reason,
+                            state="blocked",
+                            missing_measurements=missing,
+                            quality=self.quality["input_state"],
+                            planning_status=self.planning_preview.status,
+                            planning_reason=self.planning_preview.reason,
+                            issue_codes=issue_codes,
+                        )
+                        self._last_block_fingerprint = fingerprint
+                    self.dynamic_controller.status = "blocked"
+                    self.dynamic_controller.reason = reason
                 else:
+                    if self._last_block_fingerprint is not None:
+                        self.decision_journal.record(
+                            "recovered",
+                            reason="fresh_valid_measurements_and_plan",
+                            state="armed",
+                        )
+                        self._last_block_fingerprint = None
                     await self.dynamic_controller.apply(
                         self.planning_preview,
                         now,

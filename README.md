@@ -1,6 +1,6 @@
 # Energy Co-Pilot
 
-Natywna integracja Home Assistant `custom_components/energy_copilot`. **Wersja przygotowywana do wydania: v1.16.0 (dynamiczny kontroler M6; live wyłącznie po ARM).** Wydanie opublikowane: [v1.15.2](https://github.com/duckerdk/energy-copilot/releases/tag/v1.15.2). Obecnie dostępne: odczyt pomiarów/cen, Forecast.Solar, Recorder, prognoza domu na 7 dni oraz **ciągła optymalizacja w trybie `dry_run`**. W trybach `monitor` i `dry_run` integracja **nie zapisuje nastaw falownika**. W wersji v1.16.0 tryb `automatic` udostępnia osobny przełącznik **Automatic control ARM / STOP** (po każdym restarcie wyłączony). Steruje bezpośrednio limitami prądu ładowania i rozładowania, Grid Charge i Solar Sell na podstawie bieżącego kwadransa planu; nie modyfikuje tabeli sześciu TOU. Ta funkcja jest eksperymentalna i wymaga odpowiedniej konfiguracji bazowej Deye.
+Natywna integracja Home Assistant `custom_components/energy_copilot`. **Wersja v1.16.8:** automatyczny ARM w trybie live, odzyskiwanie po krótkich błędach wejścia i trwały dziennik decyzji. Obecnie dostępne: odczyt pomiarów/cen, Forecast.Solar, Recorder, prognoza domu na 7 dni oraz **ciągła optymalizacja w trybie `dry_run`**. W trybach `monitor` i `dry_run` integracja **nie zapisuje nastaw falownika**. Tryb `automatic` udostępnia przełącznik **Automatic control ARM / STOP** (domyślnie włączony po starcie/reload integracji). Steruje bezpośrednio limitami prądu ładowania i rozładowania, Grid Charge i Solar Sell na podstawie bieżącego kwadransa planu; nie modyfikuje tabeli sześciu TOU. Ta funkcja jest eksperymentalna i wymaga odpowiedniej konfiguracji bazowej Deye.
 
 Zatwierdzone reguły, cele i uprawnienia: [REQUIREMENTS.md](requirements/REQUIREMENTS.md). Jedynym źródłem produkcji w integracji jest `sensor.pv_sum`; nie stosuje się PV1/PV2.
 
@@ -34,7 +34,7 @@ Alternatywne ręczne kopiowanie `custom_components/energy_copilot` nie zapewnia 
 
 ## Planowanie w HA
 
-W **Energy Co-Pilot → Konfiguruj** ustaw `dry_run` dla symulacji, a `automatic` dla jawnie aktywowanego sterowania (po aktywacji trybu dodatkowo włącz encję **Automatic control ARM / STOP**). Status `sensor.energy_co_pilot_planning_status` oznacza: `monitor` — brak planu, `blocked` — brak istotnych danych, `preview` — wygenerowany plan dla dostępnego horyzontu (`complete` albo `partial`). `sensor.energy_co_pilot_modeled_saving` jest **modelowaną** różnicą kosztu względem wariantu bez cykli magazynu, a **nie** realną oszczędnością wobec aktualnego Deye.
+W **Energy Co-Pilot → Konfiguruj** ustaw `dry_run` dla symulacji, a `automatic` dla jawnie aktywowanego sterowania (domyślnie ARM po starcie; **Automatic control ARM / STOP** pozwala ręcznie zatrzymać zapis). Status `sensor.energy_co_pilot_planning_status` oznacza: `monitor` — brak planu, `blocked` — brak istotnych danych, `preview` — wygenerowany plan dla dostępnego horyzontu (`complete` albo `partial`). `sensor.energy_co_pilot_modeled_saving` jest **modelowaną** różnicą kosztu względem wariantu bez cykli magazynu, a **nie** realną oszczędnością wobec aktualnego Deye.
 
 Od v1.13.0 optymalizator rozpatruje **cały wspólny horyzont opublikowanych cen i dostępnych prognoz**, z krokiem czasu 15 min, ale **ciągłą energią baterii** (bez dawnej siatki 0,10 kWh). Zachowuje SOC 20–100%, limity prądowe 50/100 A, koszt degradacji 0,40 DKK/kWh DC, zakaz eksportu baterii i niezależną walidację przepływów. Koniec planu uwzględnia modelowaną wartość pozostawionej energii; nie stosuje sztywnego docelowego SOC. Wycena okresu po końcu znanych cen jest niepewnym wskaźnikiem opartym **wyłącznie na opublikowanych cenach i prognozie zużycia**, nie wymyślonymi cenami jutra.
 
@@ -123,7 +123,7 @@ python3.14 -m venv .venv
 ## v1.16.0 — eksperymentalne sterowanie dynamiczne Deye
 
 - W trybie `automatic` kontroler używa tego samego planu kwadransowego co `dry_run`. Do zapisu korzysta wyłącznie z istniejących usług `number.set_value` i `switch.turn_on/off` HA.
-- Przełącznik ARM/STOP pozostaje OFF po starcie/reload. Bez jawnego ARM żadne nastawy nie są zapisywane. Przełączenie na STOP blokuje kolejne komendy, **nie jest awaryjnym wyłącznikiem falownika** i nie zmienia ostatnich parametrów Deye.
+- Przełącznik ARM/STOP startuje ON w trybie `automatic` po starcie/reload. W `monitor` i `dry_run` pozostaje OFF. Manualny STOP blokuje następne zapisy do restartu lub ręcznego ARM. Przełączenie na STOP blokuje kolejne komendy, **nie jest awaryjnym wyłącznikiem falownika** i nie zmienia ostatnich parametrów Deye.
 - Zapis: limity ładowania/rozładowania, limit Grid Charge, przełącznik Grid Charge, Solar Sell. Stan po zapisie jest odczytywany i potwierdzany; po błędzie zapisów dalsza automatyka jest blokowana do ponownego uruchomienia integracji.
 - Algorytm nie ingeruje w Load First, ustawienia ochronne BMS ani okna TOU. Wymaga od użytkownika bezpiecznej wyjściowej konfiguracji TOU, a zachowanie fizyczne ustawień jest przedmiotem walidacji na falowniku.
 - **Uwaga:** plan 15-minutowy pozostaje prognozą; HA nie może dowieść, że falownik wykonał dokładnie oczekiwany przepływ na podstawie samego odczytu nastawy. Nie utożsamiać `applied` z fizycznie zmierzonym wynikiem.
@@ -135,7 +135,7 @@ W trybie `automatic` istniejące okna Deye mają stałe początki: 00:00, 04:00,
 
 W kwartale ładowania Grid Charge: aktywny cel SOC jest obliczany z końca kwadransa optymalizatora (co najmniej bieżący SOC, maksymalnie 100%), ładowanie slotu włączone, globalny Grid Charge włączany dopiero po zapisaniu limitów. W pozostałych kwadransach zezwolenie ładowania slotu jest wyłączane i jego SOC wraca do 20%; rozładowanie ogranicza planowany prąd. Rejestry/encje innych okien nie są modyfikowane.
 
-Przełączenie `automatic` nie włącza samoczynnie ARM. Niezgodny harmonogram TOU lub brak encji blokuje sterowanie przed wysłaniem komend. Wydanie wymaga uruchomienia przez użytkownika i sprawdzenia diagnostyki.
+Od v1.16.8 uruchomienie trybu `automatic` włącza ARM automatycznie. Niezgodny harmonogram TOU lub brak encji blokuje sterowanie przed wysłaniem komend. Wydanie wymaga uruchomienia przez użytkownika i sprawdzenia diagnostyki.
 
 
 ### v1.16.5 — previous-day estimated savings and icon
