@@ -377,11 +377,17 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         issue_codes = sorted({i.code for i in snapshot.issues})
         quality_fingerprint = (self.quality["input_state"], tuple(issue_codes))
         if quality_fingerprint != self._last_quality_fingerprint:
+            previous_quality = (
+                self._last_quality_fingerprint[0]
+                if self._last_quality_fingerprint
+                else None
+            )
             self._last_quality_fingerprint = quality_fingerprint
             self.decision_journal.record(
                 "input_quality",
                 reason="current_measurement_and_dependency_validation",
                 quality=self.quality["input_state"],
+                previous_quality=previous_quality,
                 issue_codes=issue_codes,
                 categorized_issues=self.quality["issues"],
             )
@@ -390,11 +396,17 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             self.planning_preview.reason,
         )
         if plan_fingerprint != self._last_plan_fingerprint:
+            previous_plan_status = (
+                self._last_plan_fingerprint[0]
+                if self._last_plan_fingerprint
+                else None
+            )
             self._last_plan_fingerprint = plan_fingerprint
             self.decision_journal.record(
                 "plan_status",
                 reason=self.planning_preview.reason,
                 planning_status=self.planning_preview.status,
+                previous_planning_status=previous_plan_status,
                 quality=self.quality["input_state"],
                 issue_codes=issue_codes,
                 coverage=self.planning_preview.coverage,
@@ -406,11 +418,22 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             expected = replay.get("expected", {}).get("quarters", ())
             if expected:
                 first = expected[0]
+                sources = replay.get("quarters", ())
+                current_input = next(
+                    (row for row in sources if row.get("start") == first["start"]),
+                    {},
+                )
                 fingerprint = (
                     first["start"],
                     first.get("grid_to_battery_ac_kwh"),
                     first.get("battery_to_home_dc_kwh"),
                     first.get("pv_to_battery_dc_kwh"),
+                    first.get("soc_end_pct"),
+                    current_input.get("buy_dkk_per_kwh"),
+                    current_input.get("sell_dkk_per_kwh"),
+                    current_input.get("pv_dc_kwh"),
+                    current_input.get("home_ac_kwh"),
+                    self.planning_preview.pv_version,
                 )
                 if fingerprint != self._last_preview_decision_fingerprint:
                     self._last_preview_decision_fingerprint = fingerprint
@@ -441,7 +464,15 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                 ):
                     # Block writes, not the user's persistent automatic ARM.
                     reason = "controller:input_or_plan_unavailable"
+                    # A persistent block is journaled once per quarter, not
+                    # every 30-second poll. This exposes missing quarters.
+                    quarter = now.replace(
+                        minute=now.minute // 15 * 15,
+                        second=0,
+                        microsecond=0,
+                    ).isoformat()
                     fingerprint = (
+                        quarter,
                         tuple(missing),
                         self.quality["input_state"],
                         self.planning_preview.status,
@@ -453,6 +484,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                             "blocked",
                             reason=reason,
                             state="blocked",
+                            quarter_start_utc=quarter,
                             missing_measurements=missing,
                             quality=self.quality["input_state"],
                             planning_status=self.planning_preview.status,
