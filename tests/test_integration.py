@@ -346,3 +346,29 @@ async def test_bad_forecast_store_is_diagnostic_without_overwriting(
         "issues"
     ]
     assert await store.async_load() == original
+
+
+async def test_automatic_mode_starts_armed_and_transient_block_retains_arm(
+    hass, populated_hass, entry
+):
+    hass.config_entries.async_update_entry(entry, options={"mode": "automatic"})
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = entry.runtime_data.coordinator
+    assert coordinator.dynamic_controller.armed
+    assert coordinator.dynamic_controller.status == "blocked"
+    assert coordinator.dynamic_controller.reason == "controller:input_or_plan_unavailable"
+    journal = coordinator.decision_journal
+    assert any(item["event"] == "armed" for item in journal.entries)
+    blocked = [item for item in journal.entries if item["event"] == "blocked"]
+    assert blocked and blocked[-1]["planning_status"] == "blocked"
+    coordinator.dynamic_controller.stop(manual=True)
+    assert not coordinator.dynamic_controller.armed
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    restored = entry.runtime_data.coordinator
+    assert restored.dynamic_controller.armed
+    assert any(
+        item["event"] == "manual_stop" for item in restored.decision_journal.entries
+    )
+    assert await hass.config_entries.async_unload(entry.entry_id)
