@@ -94,8 +94,8 @@ def test_no_pv_storage_counterfactual_evaluates_grid_charge_with_curtail():
         _quarter(2, buy=4.0, load=0.7),
     )
     chosen = optimize_horizon(plant, quarters, terminal_value_override=0.0)
-    if chosen.dispatches[0].pv_to_battery_dc_kwh < 0.01:
-        pytest.skip("First PV charge not chosen in this fixture")
+    # This fixture covers both feasible *alternatives*, even when the
+    # unconstrained planner selects cheap grid charging rather than PV storage.
     result = compare_first_quarter(build_replay(plant, quarters, chosen), "pv_charge")
     alternative_curtail = optimize_horizon(
         plant,
