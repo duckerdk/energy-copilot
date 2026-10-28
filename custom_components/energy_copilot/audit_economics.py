@@ -43,7 +43,11 @@ def compare_first_quarter(replay, action):
         "economic_alternative_cost_dkk": comparison.objective_dkk,
         "economic_alternative_first_sale_dkk": comparison.quarters[0].sales_dkk,
         "economic_selected_first_sale_dkk": expected["quarters"][0]["sales_dkk"],
-        "economic_alternative_first_grid_import_kwh": comparison.quarters[0].grid_import_kwh,
-        "economic_selected_first_grid_import_kwh": expected["quarters"][0]["grid_import_kwh"],
+        "economic_alternative_first_grid_import_kwh": comparison.quarters[
+            0
+        ].grid_import_kwh,
+        "economic_selected_first_grid_import_kwh": expected["quarters"][0][
+            "grid_import_kwh"
+        ],
         "economic_scope": "whole_horizon_same_inputs_no_first_action",
     }
