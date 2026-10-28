@@ -456,9 +456,7 @@ async def test_applied_reports_real_changes_and_next_quarter_noop():
     assert len(applied) == 1
     assert applied[0]["commands_sent"] == len(service.calls)
     assert applied[0]["commands_sent"] >= 2
-    assert any(
-        c["entity_id"] == SOLAR_SELL for c in applied[0]["command_changes"]
-    )
+    assert any(c["entity_id"] == SOLAR_SELL for c in applied[0]["command_changes"])
     assert not any(
         c["entity_id"] == DISCHARGE_CURRENT for c in applied[0]["command_changes"]
     )
@@ -586,9 +584,7 @@ async def test_tou_preservation_follows_pv_rising_soc_and_never_enables_grid_cha
     plan = preview(now, charge=0, discharge=0, grid_a=0)
     await controller.apply(plan, now, soc_pct=70, voltage_v=55)
     assert float(service.states.get(tou_entities(4)["soc"]).state) == 70
-    await controller.apply(
-        plan, now + timedelta(minutes=1), soc_pct=73, voltage_v=55
-    )
+    await controller.apply(plan, now + timedelta(minutes=1), soc_pct=73, voltage_v=55)
     assert float(service.states.get(tou_entities(4)["soc"]).state) == 73
     assert service.states.get(GRID_CHARGE).state == "off"
     assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
@@ -656,7 +652,6 @@ async def test_no_pv_storage_with_solar_sell_on_limits_charge_to_1a():
     assert service.states.get(SOLAR_SELL).state == "on"
 
 
-
 @pytest.mark.asyncio
 async def test_existing_zero_discharge_current_blocks_without_any_writes():
     now = datetime(2026, 10, 27, 12, tzinfo=timezone.utc)
@@ -687,7 +682,6 @@ async def test_existing_zero_discharge_current_blocks_without_any_writes():
         == "applied"
     )
     assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
-
 
 
 @pytest.mark.asyncio
