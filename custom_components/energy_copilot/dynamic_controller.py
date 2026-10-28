@@ -508,9 +508,6 @@ class DynamicDeyeController:
                     charge_policy = "spread_grid_charge_over_low_price_window"
                 # The existing inverter/BMS discharge-current cap is preserved.
                 # Read-only preflight above detects 0 A; no write is permitted.
-                settings = [(CHARGE_CURRENT, total_charge_a)]
-                if grid_limit is not None:
-                    settings.append((GRID_CURRENT, grid_limit))
                 # Stop grid charging first, then update active TOU settings.
                 # Never alter window start/end times or non-active SOC settings.
                 if (
