@@ -54,6 +54,22 @@ _REASON_NAMES = {
     "controller:grid_current_limit": "Przekroczony dopuszczalny limit ładowania z sieci.",
     "controller:charge_plan_without_grid_current": "Plan ładowania nie zawiera odpowiedniego limitu prądu.",
     "planner:internal_error": "Wystąpił wewnętrzny błąd planowania.",
+    "soc:invalid_or_missing": "Brak poprawnego odczytu SOC.",
+    "soc:outside_policy": "SOC jest poza dopuszczalnym zakresem.",
+    "battery:invalid_voltage": "Brak poprawnego napięcia baterii.",
+    "pv:forecast_missing": "Brak prognozy produkcji PV.",
+    "pv:coverage_or_resolution_gap": "Luka w prognozie produkcji PV.",
+    "pv:forecast_from_future": "Prognoza PV ma niepoprawny czas publikacji.",
+    "price:not_published": "Nie opublikowano cen na wymagany okres.",
+    "price:published_gap": "Luka w opublikowanych cenach energii.",
+    "price:coverage_gap": "Brak pokrycia cenami przyszłego okresu planu.",
+    "price:no_complete_future_quarters": "Brak kompletnego przyszłego kwadransa z cenami.",
+    "price:missing_current_future_quarter": "Brak ceny dla najbliższego kwadransa.",
+    "load:model_missing": "Brak prognozy zużycia domu.",
+    "load:forecast_from_future": "Prognoza zużycia domu ma niepoprawny czas publikacji.",
+    "load:awaiting_statistics": "Oczekiwanie na dane historyczne zużycia domu.",
+    "controller:waiting_for_next_quarter": "Oczekiwanie na początek następnego kwadransa.",
+    "controller:tou_start_invalid": "Nieprawidłowe godziny okien Time of Use.",
 }
 _ISSUE_NAMES = {
     "invalid_input": "niepoprawny odczyt",
@@ -296,12 +312,31 @@ def readable_event(entry):
         details = []
         if missing:
             details.append("Brak pomiarów: " + ", ".join(missing) + ".")
-        if issues:
+        actionable = [
+            item.get("code")
+            for item in entry.get("categorized_issues", ())
+            if item.get("category") in {"blocking", "uncertainty"}
+            and item.get("code")
+        ]
+        if actionable:
+            details.append(
+                "Problemy blokujące: "
+                + ", ".join(_ISSUE_NAMES.get(item, item) for item in actionable[:5])
+                + "."
+            )
+        elif issues and not entry.get("categorized_issues"):
             details.append(
                 "Problemy z danymi: "
                 + ", ".join(_ISSUE_NAMES.get(item, item) for item in issues[:5])
                 + "."
             )
+        if entry.get("planning_status") == "blocked":
+            details.append(
+                "Planer nie przygotował planu: "
+                + _reason(entry.get("planning_reason"))
+            )
+        if entry.get("quality") and entry.get("quality") != "valid":
+            details.append("Jakość bieżących danych jest niepoprawna.")
         state = (
             "ARM pozostaje aktywny; nowe polecenia są wstrzymane."
             if entry.get("phase") != "device_write_result_uncertain"
