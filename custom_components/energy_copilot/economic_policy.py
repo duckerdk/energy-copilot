@@ -43,9 +43,8 @@ def spread_grid_charge_over_cheap_window(plant, quarters, result):
     """Delay front-loaded grid charging across an equally cheap contiguous window.
 
     Keep the total scheduled AC energy and all PV/discharge flows unchanged.
-    Never move energy before its original acquisition: each new prefix must
-    have no more charged energy than the original prefix. This ensures no extra
-    battery SOC at intermediate points. Reject on validator failure or a
+    Movement within the same published low-price window is allowed in both
+    directions, but must pass the independent full-horizon physical validator. Reject on validator failure or a
     material cost penalty. Do not invent a window beyond published prices.
     """
     if not quarters or not result.dispatches:
@@ -91,21 +90,11 @@ def spread_grid_charge_over_cheap_window(plant, quarters, result):
     if equal_ac > max_ac + 1e-7:
         return result
 
-    # Only reallocate energy from earlier to later quarters. When original
-    # charging is not front-loaded enough, skip rather than advance it.
-    accumulated_old = 0.0
-    accumulated_new = 0.0
-    smoothed = []
-    for old in original:
-        accumulated_old += old
-        new = min(equal_ac, max(0.0, accumulated_old - accumulated_new))
-        accumulated_new += new
-        smoothed.append(new)
-    remaining = total - sum(smoothed)
-    if remaining > 1e-7:
-        # A narrow initial credit cannot be reconciled with equal rates within
-        # the window; preserve the original plan, no heuristic compensation.
-        return result
+    # Equal prices justify charging earlier or later inside this same window.
+    # The independent whole-horizon validator rejects SOC, current or AC/DC
+    # violations. No shift is allowed outside the published cheap window.
+    smoothed = [equal_ac] * end
+    smoothed[-1] += total - sum(smoothed)
     if max(abs(a - b) for a, b in zip(original, smoothed, strict=True)) < 1e-6:
         return result
     for i, new in enumerate(smoothed):
