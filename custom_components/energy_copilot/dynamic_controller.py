@@ -446,7 +446,10 @@ class DynamicDeyeController:
                     grid_limit,
                     discharge_limit,
                 )
-                if application_key != self._last_application_key or self._command_changes:
+                if (
+                    application_key != self._last_application_key
+                    or self._command_changes
+                ):
                     self._last_application_key = application_key
                     self._audit(
                         "applied",
