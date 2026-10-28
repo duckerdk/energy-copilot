@@ -451,12 +451,20 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                     event = (
                         "revised"
                         if previous
-                        and previous.get("quarter_start_utc") == details["quarter_start_utc"]
+                        and previous.get("quarter_start_utc")
+                        == details["quarter_start_utc"]
                         else "planned"
                     )
-                    details["pv_export_enabled"] = current_input.get("pv_export_enabled")
+                    details["pv_export_enabled"] = current_input.get(
+                        "pv_export_enabled"
+                    )
                     self._last_preview_decision_details = details
-                    pending_plan_audit = (event, details, previous if event == "revised" else None, replay)
+                    pending_plan_audit = (
+                        event,
+                        details,
+                        previous if event == "revised" else None,
+                        replay,
+                    )
         else:
             self._last_preview_decision_fingerprint = None
             self._last_preview_decision_details = None
