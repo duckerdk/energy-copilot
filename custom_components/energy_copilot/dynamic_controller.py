@@ -419,9 +419,11 @@ class DynamicDeyeController:
                 # Global battery charging current stays untouched by default.
                 # A PV forecast or high SOC is not a reason to write a new cap.
                 source_quarters = (preview.replay_snapshot or {}).get("quarters", ())
-                expected_quarters = (preview.replay_snapshot or {}).get(
-                    "expected", {}
-                ).get("quarters", ())
+                expected_quarters = (
+                    (preview.replay_snapshot or {})
+                    .get("expected", {})
+                    .get("quarters", ())
+                )
                 pv_charge = float(row.get("pv_to_battery_dc_kwh") or 0)
                 if not isfinite(pv_charge) or pv_charge < -1e-9:
                     raise CommandRejected("controller:invalid_pv_charge")
@@ -451,7 +453,8 @@ class DynamicDeyeController:
                         and abs(
                             float(src["buy_dkk_per_kwh"])
                             - float(current_input["buy_dkk_per_kwh"])
-                        ) <= 0.01
+                        )
+                        <= 0.01
                         for src in source_quarters
                         if current_input
                     )
@@ -486,7 +489,8 @@ class DynamicDeyeController:
                     # campaign, or enable a planned charge from a legacy 0 A
                     # limit. Otherwise preserve the operator's current cap.
                     desired_grid_a = self.adapter.quantize_number(
-                        GRID_CURRENT, max(1.0, min(50.0, ceil(grid_a))),
+                        GRID_CURRENT,
+                        max(1.0, min(50.0, ceil(grid_a))),
                         direction="up",
                     )
                     if abs(current_grid_a - desired_grid_a) > 1e-6:
@@ -494,7 +498,11 @@ class DynamicDeyeController:
                     # Raise the shared cap only if it would prevent the
                     # specifically planned controlled charging rate.
                     effective_charge_a = next(
-                        (v for entity, v in reversed(settings) if entity == CHARGE_CURRENT),
+                        (
+                            v
+                            for entity, v in reversed(settings)
+                            if entity == CHARGE_CURRENT
+                        ),
                         current_charge_a,
                     )
                     if effective_charge_a < desired_grid_a - 1e-6:
@@ -572,7 +580,9 @@ class DynamicDeyeController:
                         observed_tou_grid_charge=self.observed_tou_grid_charge,
                         grid_limit_a=float(self.adapter._present(GRID_CURRENT).state),
                         discharge_limit_a=None,
-                        charge_limit_a=float(self.adapter._present(CHARGE_CURRENT).state),
+                        charge_limit_a=float(
+                            self.adapter._present(CHARGE_CURRENT).state
+                        ),
                         charging_current_policy=charge_policy,
                         discharge_control="tou_soc_floor",
                         active_tou_slot=self.active_tou_slot,
