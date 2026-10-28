@@ -68,7 +68,10 @@ def optimize_continuous(
         raise InfeasibleCandidate("audit:unsupported_alternative")
     if audit_force_first_pv_curtail and audit_forbid_first_action != "pv_charge":
         raise InfeasibleCandidate("audit:invalid_curtail_option")
-    if not isinstance(audit_forbid_grid_charge_prefix, int) or audit_forbid_grid_charge_prefix < 0:
+    if (
+        not isinstance(audit_forbid_grid_charge_prefix, int)
+        or audit_forbid_grid_charge_prefix < 0
+    ):
         raise InfeasibleCandidate("audit:invalid_grid_charge_prefix")
     if not quarters:
         raise InfeasibleCandidate("horizon:empty")
