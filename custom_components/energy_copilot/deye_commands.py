@@ -96,6 +96,7 @@ class DeyeCommandAdapter:
         if not isfinite(value):
             raise CommandRejected(f"device:number_invalid:{entity_id}")
         low, high = policy[entity_id]
+        is_tou_soc = any(entity_id == tou_entities(i)["soc"] for i in range(1, 7))
         state = self._present(entity_id)
         try:
             minimum = float(state.attributes.get("min", low))
@@ -107,6 +108,10 @@ class DeyeCommandAdapter:
             ) from exc
         if not all(isfinite(x) for x in (minimum, maximum, step)) or step <= 0:
             raise CommandRejected(f"device:number_metadata_invalid:{entity_id}")
+        # Deye TOU SOC uses 1% resolution. Do not silently coarsen
+        # a discharge floor to 5% based on stale HA entity metadata.
+        if is_tou_soc:
+            step = 1.0
         low = max(low, minimum)
         high = min(high, maximum)
         if not low <= value <= high:
@@ -148,6 +153,8 @@ class DeyeCommandAdapter:
             raise CommandRejected("device:number_metadata_invalid") from exc
         if not device_low <= value <= device_high or step <= 0:
             raise CommandRejected("device:number_outside_device_range")
+        if any(entity_id == tou_entities(i)["soc"] for i in range(1, 7)):
+            step = 1.0
         device_base = device_low
         if (
             abs((value - device_base) / step - round((value - device_base) / step))
