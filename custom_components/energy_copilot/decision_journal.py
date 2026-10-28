@@ -35,7 +35,7 @@ class DecisionJournal:
                     raise ValueError("invalid_decision_journal")
                 self.entries = [item for item in entries if isinstance(item, dict)]
             self._trim()
-        except (ValueError, TypeError, OSError) as exc:
+        except Exception as exc:  # A corrupt archive must never stop the controller.
             # Never silently replace unreadable audit history.
             self.available = False
             self.error = f"{type(exc).__name__}:{exc}"
@@ -62,9 +62,14 @@ class DecisionJournal:
         log = _LOGGER.warning if event in {"blocked", "failure", "halted"} else _LOGGER.info
         log("Energy Co-Pilot audit: %s", json.dumps(entry, default=str, sort_keys=True))
         if self.available:
-            self.entries.append(entry)
-            self._trim()
-            self.store.async_delay_save(lambda: {"entries": self.entries}, 5)
+            try:
+                self.entries.append(entry)
+                self._trim()
+                self.store.async_delay_save(lambda: {"entries": self.entries}, 5)
+            except Exception as exc:
+                self.available = False
+                self.error = f"{type(exc).__name__}:{exc}"
+                _LOGGER.exception("Energy Co-Pilot audit storage failed")
         return entry
 
     def recent(self, limit=30):
@@ -84,4 +89,7 @@ class DecisionJournal:
 
     async def async_close(self):
         if self.available:
-            await self.store.async_save({"entries": self.entries})
+            try:
+                await self.store.async_save({"entries": self.entries})
+            except Exception:
+                _LOGGER.exception("Energy Co-Pilot could not persist audit at unload")
