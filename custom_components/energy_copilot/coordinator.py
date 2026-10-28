@@ -366,7 +366,8 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                         ],
                         grid_charge_already_active=(
                             self.dynamic_controller.armed
-                            and (grid_state := self.hass.states.get(GRID_CHARGE)) is not None
+                            and (grid_state := self.hass.states.get(GRID_CHARGE))
+                            is not None
                             and grid_state.state == "on"
                         ),
                     )
