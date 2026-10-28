@@ -71,9 +71,7 @@ class DynamicDeyeController:
             None,
         )
         later_discharge_source = (
-            source_by_time.get(later_discharge["start"], {})
-            if later_discharge
-            else {}
+            source_by_time.get(later_discharge["start"], {}) if later_discharge else {}
         )
         later_grid_charge = next(
             (
