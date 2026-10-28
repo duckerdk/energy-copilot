@@ -88,5 +88,5 @@ Otwarte punkty: [OPEN_ITEMS](OPEN_ITEMS.md).
 - W trybie automatycznym wpisy o decyzji, kwadransie, SOC, cenach i akcji muszą trafiać do **Aktywności** przez `logbook_entry` w formacie czytelnym bez JSON.
 - Blokada i odzyskanie danych mają widoczne komunikaty; ARM pozostaje aktywny przy przejściowym błędzie.
 - Po `applied` komunikat musi wskazywać, że nastawy zostały odczytane, ale przepływ energii nie został potwierdzony.
-- W **Logach systemowych → Core** ostrzeżenia/błędy trafiają na WARNING/ERROR, pozostałe informacje na INFO; zgodnie z ustawioną filtracją HA.
+- W **Logach systemowych → Core** ostrzeżenia/błędy trafiają na WARNING/ERROR, pozostałe informacje na INFO w surowym logu; widok skrócony HA pokazuje przede wszystkim ostrzeżenia i błędy.
 - Awaria publikacji do Aktywności nie może zatrzymać sterowania ani uniemożliwić archiwizacji technicznej.
