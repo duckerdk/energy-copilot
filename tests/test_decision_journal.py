@@ -1,6 +1,7 @@
 """Regression coverage for persistent, bounded audit evidence."""
 
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -9,7 +10,10 @@ from custom_components.energy_copilot.decision_journal import (
     MAX_EVENTS,
     RETENTION_DAYS,
     DecisionJournal,
+    readable_event,
 )
+from custom_components.energy_copilot.dynamic_controller import DynamicDeyeController
+from custom_components.energy_copilot.sensor import DecisionJournalSensor
 
 
 @pytest.mark.asyncio
@@ -79,9 +83,11 @@ async def test_activity_event_is_human_readable_and_explains_plan(hass):
     await hass.async_block_till_done()
     assert len(events) == 1
     assert events[0]["name"] == "Energy Co-Pilot"
+    assert events[0]["domain"] == "energy_copilot"
+    assert "entity_id" not in events[0]
     assert "2,73 DKK/kWh" in events[0]["message"]
     assert "08:00" in events[0]["message"]
-    assert "Uzasadnienie" in events[0]["message"]
+    assert "Wyjaśnienie:" in events[0]["message"]
     assert "optimizer_selected_" not in events[0]["message"]
     await journal.async_close()
 
@@ -125,3 +131,138 @@ async def test_applied_does_not_claim_physical_confirmation(hass):
     assert "25 A" in events[0]["message"]
     assert "nie potwierdza jeszcze rzeczywistego przepływu" in events[0]["message"]
     await journal.async_close()
+
+
+def test_grid_import_has_evidence_not_tautological_justification():
+    message = readable_event(
+        {
+            "event": "planned",
+            "reason": "optimizer_selected_grid_import_preserving_battery",
+            "action": "grid_import",
+            "quarter_start_utc": "2026-10-28T07:00:00+00:00",
+            "soc_observed_pct": 52,
+            "soc_planned_end_pct": 52,
+            "buy_dkk_per_kwh": 2.728,
+            "sell_dkk_per_kwh": 2.244,
+            "planned_grid_import_kwh": 0.0888,
+            "later_discharge_start_utc": "2026-10-28T07:45:00+00:00",
+            "later_discharge_buy_dkk_per_kwh": 2.728,
+        }
+    )
+    assert "08:00" in message
+    assert "08:45" in message
+    assert "0,09 kWh AC" in message
+    assert "Cena późniejszego rozładowania jest taka sama" in message
+    assert "dokładna przyczyna" in message
+    assert "minimalizując modelowany koszt" not in message
+
+
+def test_discharge_explains_avoided_purchase_and_degradation():
+    message = readable_event(
+        {
+            "event": "decision",
+            "action": "battery_discharge",
+            "quarter_start_utc": "2026-10-28T07:45:00+00:00",
+            "soc_observed_pct": 52,
+            "soc_planned_end_pct": 51,
+            "buy_dkk_per_kwh": 3.0,
+            "battery_discharge_dc_kwh": 0.2,
+            "battery_to_ac_efficiency": 0.95,
+            "degradation_cost_dkk": 0.08,
+        }
+    )
+    assert "0,20 kWh DC" in message
+    assert "0,19 kWh AC" in message
+    assert "0,57 DKK" in message
+    assert "0,08 DKK" in message
+    assert "0,49 DKK" in message
+    assert "minimalizując modelowany koszt" not in message
+
+
+def test_charge_with_future_discharge_shows_price_comparison():
+    message = readable_event(
+        {
+            "event": "planned",
+            "action": "grid_charge",
+            "quarter_start_utc": "2026-10-28T07:00:00+00:00",
+            "buy_dkk_per_kwh": 1.0,
+            "grid_charge_ac_kwh": 0.5,
+            "later_discharge_start_utc": "2026-10-28T16:00:00+00:00",
+            "later_discharge_buy_dkk_per_kwh": 3.5,
+        }
+    )
+    assert "2,50 DKK/kWh" in message
+    assert "17:00" in message
+    assert "nie obliczony koszt alternatywnego planu" in message
+
+
+def test_blocked_event_shows_real_planner_reason_not_historical_noise():
+    message = readable_event(
+        {
+            "event": "blocked",
+            "reason": "controller:input_or_plan_unavailable",
+            "quality": "valid",
+            "planning_status": "blocked",
+            "planning_reason": "price:published_gap",
+            "issue_codes": [
+                "home_profile_unverified",
+                "historical_quality_unverifiable",
+            ],
+            "categorized_issues": [
+                {
+                    "code": "historical_quality_unverifiable",
+                    "category": "historical",
+                }
+            ],
+        }
+    )
+    assert "Luka w opublikowanych cenach" in message
+    assert "niepotwierdzona jakość danych historycznych" not in message
+
+
+def test_decision_selects_future_discharge_from_actual_plan(hass):
+    controller = DynamicDeyeController(hass)
+    at = "2026-10-28T07:00:00+00:00"
+    later = "2026-10-28T07:45:00+00:00"
+    current = {
+        "start": at,
+        "grid_to_battery_ac_kwh": 0.0,
+        "battery_to_home_dc_kwh": 0.0,
+        "pv_to_battery_dc_kwh": 0.0,
+        "grid_import_kwh": 0.0888,
+        "soc_end_pct": 52.0,
+        "grid_charge_current_a": 0.0,
+    }
+    future = {
+        "start": later,
+        "grid_to_battery_ac_kwh": 0.0,
+        "battery_to_home_dc_kwh": 0.065,
+    }
+    preview = SimpleNamespace(
+        replay_snapshot={
+            "metadata": {"forecast_version": "version1"},
+            "plant": {"eta_battery_to_ac": 0.95},
+            "quarters": [
+                {"start": at, "buy_dkk_per_kwh": 2.728},
+                {"start": later, "buy_dkk_per_kwh": 2.728},
+            ],
+            "expected": {"quarters": [current, future], "summary": {}},
+        }
+    )
+    decision = controller._decision(
+        preview, current, datetime(2026, 10, 28, 7, tzinfo=timezone.utc), 52
+    )
+    assert decision["later_discharge_start_utc"] == later
+    assert decision["later_discharge_buy_dkk_per_kwh"] == 2.728
+    assert decision["battery_to_ac_efficiency"] == 0.95
+
+
+def test_journal_sensor_does_not_create_state_change_activity(hass):
+    journal = DecisionJournal(hass, "no-fake-activity")
+    coordinator = SimpleNamespace(decision_journal=journal)
+    sensor = SimpleNamespace(coordinator=coordinator)
+    assert DecisionJournalSensor.native_value.fget(sensor) == "ready"
+    journal.entries = [{"event": "blocked", "time_utc": "2026-10-28T07:00:00+00:00"}]
+    assert DecisionJournalSensor.native_value.fget(sensor) == "ready"
+    journal.available = False
+    assert DecisionJournalSensor.native_value.fget(sensor) == "unavailable"

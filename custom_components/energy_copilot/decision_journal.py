@@ -54,6 +54,22 @@ _REASON_NAMES = {
     "controller:grid_current_limit": "Przekroczony dopuszczalny limit ładowania z sieci.",
     "controller:charge_plan_without_grid_current": "Plan ładowania nie zawiera odpowiedniego limitu prądu.",
     "planner:internal_error": "Wystąpił wewnętrzny błąd planowania.",
+    "soc:invalid_or_missing": "Brak poprawnego odczytu SOC.",
+    "soc:outside_policy": "SOC jest poza dopuszczalnym zakresem.",
+    "battery:invalid_voltage": "Brak poprawnego napięcia baterii.",
+    "pv:forecast_missing": "Brak prognozy produkcji PV.",
+    "pv:coverage_or_resolution_gap": "Luka w prognozie produkcji PV.",
+    "pv:forecast_from_future": "Prognoza PV ma niepoprawny czas publikacji.",
+    "price:not_published": "Nie opublikowano cen na wymagany okres.",
+    "price:published_gap": "Luka w opublikowanych cenach energii.",
+    "price:coverage_gap": "Brak pokrycia cenami przyszłego okresu planu.",
+    "price:no_complete_future_quarters": "Brak kompletnego przyszłego kwadransa z cenami.",
+    "price:missing_current_future_quarter": "Brak ceny dla najbliższego kwadransa.",
+    "load:model_missing": "Brak prognozy zużycia domu.",
+    "load:forecast_from_future": "Prognoza zużycia domu ma niepoprawny czas publikacji.",
+    "load:awaiting_statistics": "Oczekiwanie na dane historyczne zużycia domu.",
+    "controller:waiting_for_next_quarter": "Oczekiwanie na początek następnego kwadransa.",
+    "controller:tou_start_invalid": "Nieprawidłowe godziny okien Time of Use.",
 }
 _ISSUE_NAMES = {
     "invalid_input": "niepoprawny odczyt",
@@ -96,6 +112,8 @@ def _local_time(value):
 def _reason(value):
     if not value:
         return "Powód nie został podany."
+    if value.startswith("CommandRejected:"):
+        value = value.removeprefix("CommandRejected:")
     if value in _REASON_NAMES:
         return _REASON_NAMES[value]
     if "tou_not_enabled" in value:
@@ -106,6 +124,116 @@ def _reason(value):
         return "Nie można potwierdzić wyniku polecenia wysłanego do falownika."
     # Unknown codes remain in the technical archive, not the human Activity view.
     return "Nieznany problem wykonania; szczegóły zapisano w diagnostyce."
+
+
+def _decision_evidence(entry):
+    """Report measured/optimized quantities; never invent a counterfactual cause."""
+    action = entry.get("action")
+    buy = entry.get("buy_dkk_per_kwh")
+    later_price = entry.get("later_discharge_buy_dkk_per_kwh")
+    later_at = entry.get("later_discharge_start_utc")
+    later_charge_price = entry.get("later_grid_charge_buy_dkk_per_kwh")
+    later_charge_at = entry.get("later_grid_charge_start_utc")
+    if action == "battery_discharge":
+        dc_kwh = entry.get("battery_discharge_dc_kwh")
+        efficiency = entry.get("battery_to_ac_efficiency")
+        degradation = entry.get("degradation_cost_dkk")
+        if None not in (dc_kwh, efficiency, buy, degradation):
+            ac_kwh = float(dc_kwh) * float(efficiency)
+            avoided = ac_kwh * float(buy)
+            return (
+                f"Rozładowanie {_number(dc_kwh, 'kWh DC')} "
+                f"zastępuje {_number(ac_kwh, 'kWh AC')} zakupu z sieci "
+                f"o wartości {_number(avoided, 'DKK')} przy obecnej cenie. "
+                f"Modelowy koszt degradacji tej operacji: "
+                f"{_number(degradation, 'DKK')}; "
+                f"bilans bez wpływu na dalszy SOC: "
+                f"{_number(avoided - float(degradation), 'DKK')}."
+            )
+        return (
+            "Model przewiduje zasilanie domu energią z baterii. "
+            "Brak danych do obliczenia jego bieżącej korzyści."
+        )
+    if action == "grid_charge":
+        if later_at and later_price is not None:
+            difference = (
+                _number(float(later_price) - float(buy), "DKK/kWh")
+                if buy is not None
+                else None
+            )
+            return (
+                f"W dalszej części tego planu przewidziano rozładowanie "
+                f"o {_local_time(later_at)}, przy cenie zakupu "
+                f"{_number(later_price, 'DKK/kWh')}. "
+                + (
+                    f"Różnica względem obecnej ceny: {difference}. "
+                    if difference
+                    else ""
+                )
+                + "To porównanie cen, nie obliczony koszt alternatywnego planu; "
+                "do oceny opłacalności dochodzą straty i degradacja."
+            )
+        return (
+            "Plan przewiduje pobór energii do baterii, ale nie pokazuje "
+            "późniejszego rozładowania w dostępnym horyzoncie. "
+            "Nie ma obliczonego wariantu alternatywnego uzasadniającego ładowanie."
+        )
+    if action == "grid_import":
+        amount = _number(entry.get("planned_grid_import_kwh"), "kWh AC")
+        if later_at and later_price is not None:
+            message = (
+                f"Zamiast rozładować baterię teraz, plan kupuje "
+                f"{amount or 'nieznaną ilość energii'} z sieci. "
+                f"Pierwsze późniejsze rozładowanie zaplanowano na "
+                f"{_local_time(later_at)}, przy cenie "
+                f"{_number(later_price, 'DKK/kWh')}. "
+            )
+            if buy is not None:
+                if float(later_price) > float(buy) + 1e-6:
+                    message += "Późniejsza cena jest wyższa od obecnej. "
+                elif float(later_price) < float(buy) - 1e-6:
+                    message += "Późniejsza cena jest niższa od obecnej. "
+                else:
+                    message += "Cena późniejszego rozładowania jest taka sama. "
+            return (
+                message + "Nie obliczono wariantu z wymuszonym rozładowaniem teraz, "
+                "więc dokładna przyczyna oszczędzania baterii nie jest potwierdzona."
+            )
+        message = (
+            f"Plan kupuje {amount or 'energię'} z sieci i nie rozładowuje "
+            "baterii w tym kwadransie. "
+        )
+        if later_charge_at and later_charge_price is not None:
+            message += (
+                f"Następne ładowanie z sieci jest zaplanowane "
+                f"na {_local_time(later_charge_at)} po "
+                f"{_number(later_charge_price, 'DKK/kWh')}. "
+            )
+        return (
+            message + "Brak późniejszego rozładowania w bieżącym planie. "
+            "Bez osobnego wariantu nie można wskazać jednoznacznej przyczyny."
+        )
+    if action == "pv_charge":
+        pv = entry.get("pv_forecast_dc_kwh")
+        home = entry.get("home_forecast_ac_kwh")
+        charge = entry.get("pv_charge_dc_kwh")
+        if None not in (pv, home, charge):
+            return (
+                f"Przy prognozie produkcji PV {_number(pv, 'kWh DC')} "
+                f"i zużycia domu {_number(home, 'kWh AC')} "
+                f"model kieruje {_number(charge, 'kWh DC')} energii PV "
+                "do baterii, zamiast ładować ją z sieci. "
+                "To jest przepływ wybrany w planie, nie dowód przewagi "
+                "nad ewentualną sprzedażą tej energii."
+            )
+        return "Plan przydziela dostępną energię PV do ładowania baterii."
+    if action == "idle":
+        return (
+            "W tym kwadransie plan nie przewiduje aktywnego ładowania "
+            "ani rozładowania. Nie wyznaczono osobnego kosztu "
+            "alternatywnych akcji."
+        )
+    return "Brak danych umożliwiających wyjaśnienie decyzji."
 
 
 def readable_event(entry):
@@ -146,10 +274,7 @@ def readable_event(entry):
             energy = _number(entry.get(energy_key), "kWh")
             if energy:
                 parts.append(f"Energia w planie: {energy}/15 min.")
-        parts.append(
-            "Uzasadnienie: optymalizator wybrał tę akcję, minimalizując modelowany "
-            "koszt całego dostępnego horyzontu, a nie tylko bieżącego kwadransa."
-        )
+        parts.append("Wyjaśnienie: " + _decision_evidence(entry))
         return " ".join(parts)
     if event == "applied":
         grid = _number(entry.get("grid_limit_a"), "A", 0)
@@ -184,12 +309,29 @@ def readable_event(entry):
         details = []
         if missing:
             details.append("Brak pomiarów: " + ", ".join(missing) + ".")
-        if issues:
+        actionable = [
+            item.get("code")
+            for item in entry.get("categorized_issues", ())
+            if item.get("category") in {"blocking", "uncertainty"} and item.get("code")
+        ]
+        if actionable:
+            details.append(
+                "Problemy blokujące: "
+                + ", ".join(_ISSUE_NAMES.get(item, item) for item in actionable[:5])
+                + "."
+            )
+        elif issues and not entry.get("categorized_issues"):
             details.append(
                 "Problemy z danymi: "
                 + ", ".join(_ISSUE_NAMES.get(item, item) for item in issues[:5])
                 + "."
             )
+        if entry.get("planning_status") == "blocked":
+            details.append(
+                "Planer nie przygotował planu: " + _reason(entry.get("planning_reason"))
+            )
+        if entry.get("quality") and entry.get("quality") != "valid":
+            details.append("Jakość bieżących danych jest niepoprawna.")
         state = (
             "ARM pozostaje aktywny; nowe polecenia są wstrzymane."
             if entry.get("phase") != "device_write_result_uncertain"
@@ -295,7 +437,7 @@ class DecisionJournal:
                     {
                         "name": "Energy Co-Pilot",
                         "message": message,
-                        "entity_id": "sensor.energy_co_pilot_decision_journal",
+                        "domain": DOMAIN,
                     },
                 )
         except Exception:

@@ -22,3 +22,7 @@
 - [ ] **M5/M6:** testy zgodności kolejnych wersji HA i odbiór działań fizycznych. Publikowanie do HACS działa; nie jest otwartym zadaniem.
 
 Kryteria odbioru i regresje: [VALIDATION.md](VALIDATION.md). Polityka wykonania: [EXECUTION.md](EXECUTION.md).
+
+## Uzasadnienia kontrfaktyczne (otwarte)
+
+Dziennik v1.16.10 wyjaśnia fakty i bieżące koszty: co wybrano, jaką cenę i energię przyjęto, kiedy zaplanowano kolejne rozładowanie i czy istnieje porównanie. **Nie zapewnia jeszcze liczbowej różnicy kosztu między wybranym planem a drugim optymalnym planem z wymuszoną alternatywną akcją w tym samym kwadransie.** Aby sformułować przyczynę przy równych cenach czy decyzji `grid_import` zamiast rozładowania, wymagane jest wiarygodne przeliczenie kontrfaktyczne na tych samych ograniczeniach (bez opóźniania sterownika). Nie wolno przypisywać nieobliczonych motywów solverowi.
