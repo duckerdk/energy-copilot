@@ -361,7 +361,11 @@ def readable_event(entry):
     reason = entry.get("reason")
     quarter = _local_time(entry.get("quarter_start_utc"))
     if event == "revised":
-        return _revised_event(entry)
+        result = _revised_event(entry)
+        previous = entry.get("previous_plan") or {}
+        if previous.get("action") != entry.get("action"):
+            result += " Uzasadnienie: " + _economic_evidence(entry)
+        return result
     if event in {"planned", "decision"}:
         action = _ACTION_NAMES.get(entry.get("action"), "nieznana akcja planera")
         parts = [
@@ -397,11 +401,12 @@ def readable_event(entry):
                 parts.append(f"Energia w planie: {energy}/15 min.")
         purchase = _number(entry.get("purchase_cost_dkk"), "DKK")
         wear = _number(entry.get("degradation_cost_dkk"), "DKK")
-        if purchase:
+        if purchase and abs(float(entry["purchase_cost_dkk"])) >= 0.005:
             parts.append(f"Koszt zakupu w kwadransie: {purchase}.")
-        if wear:
+        if wear and abs(float(entry["degradation_cost_dkk"])) >= 0.005:
             parts.append(f"Degradacja w kwadransie: {wear}.")
-        parts.append("Uzasadnienie: " + _economic_evidence(entry))
+        if event == "planned":
+            parts.append("Uzasadnienie: " + _economic_evidence(entry))
         return " ".join(parts)
     if event == "applied":
         changes = entry.get("command_changes")
