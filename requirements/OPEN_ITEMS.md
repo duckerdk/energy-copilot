@@ -26,3 +26,7 @@ Kryteria odbioru i regresje: [VALIDATION.md](VALIDATION.md). Polityka wykonania:
 ## Uzasadnienia kontrfaktyczne (otwarte)
 
 Dziennik v1.16.10 wyjaśnia fakty i bieżące koszty: co wybrano, jaką cenę i energię przyjęto, kiedy zaplanowano kolejne rozładowanie i czy istnieje porównanie. **Nie zapewnia jeszcze liczbowej różnicy kosztu między wybranym planem a drugim optymalnym planem z wymuszoną alternatywną akcją w tym samym kwadransie.** Aby sformułować przyczynę przy równych cenach czy decyzji `grid_import` zamiast rozładowania, wymagane jest wiarygodne przeliczenie kontrfaktyczne na tych samych ograniczeniach (bez opóźniania sterownika). Nie wolno przypisywać nieobliczonych motywów solverowi.
+
+## Odbiór logów v1.16.11 — wymagany w rzeczywistym HA
+
+Weryfikacja użytkownika w natywnej **Aktywności** wyfiltrowanej do urządzenia Energy Co-Pilot: obecność wpisów co kolejny kwadrans przy poprawnym planie; konkretne przyczyny blokad (także długotrwałych); rozróżnienie zmian nastaw od zgodności bez poleceń; brak technicznych, pozbawionych znaczenia komentarzy. Zaliczone testy CI są tylko odbiorem technicznym, nie potwierdzeniem prezentacji na rzeczywistej instalacji.
