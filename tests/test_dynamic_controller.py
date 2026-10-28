@@ -392,9 +392,7 @@ async def test_temporary_bad_soc_blocks_but_recovers_without_rearming():
     assert controller.armed
     assert not controller.halted
     assert not services.calls
-    assert (
-        await controller.apply(plan, now, soc_pct=50, voltage_v=51) == "applied"
-    )
+    assert await controller.apply(plan, now, soc_pct=50, voltage_v=51) == "applied"
     assert controller.armed
     assert services.calls
 
