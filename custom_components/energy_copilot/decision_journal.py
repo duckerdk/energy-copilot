@@ -448,7 +448,8 @@ def readable_event(entry):
             )
         if commands and changes:
             rate_changes = any(
-                change.get("entity_id") in {
+                change.get("entity_id")
+                in {
                     "number.sun12k_maximum_battery_charge_current",
                     "number.sun12k_maximum_battery_grid_charge_current",
                 }
