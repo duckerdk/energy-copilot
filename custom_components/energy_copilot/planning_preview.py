@@ -349,6 +349,8 @@ def evaluate_preview(
                 "terminal_value_basis": terminal_basis,
                 "source_release": "1.16.14",
                 "grid_charge_already_active": grid_charge_already_active,
+                "economic_policy_reason": result.economic_policy_reason,
+                "economic_policy_benefit_dkk": result.economic_policy_benefit_dkk,
             },
         ),
     )
