@@ -63,6 +63,10 @@ _ISSUE_NAMES = {
     "recorder_recording_gap": "luka w danych historycznych",
     "historical_quality_unverifiable": "niepotwierdzona jakość danych historycznych",
     "forecast_storage_failed": "błąd archiwizacji prognozy",
+    "home_profile_unverified": "profil zużycia domu nie został zweryfikowany",
+    "negative_home_normalized": "skorygowano ujemny odczyt zużycia domu",
+    "recorder_pause_history_unverifiable": "brak potwierdzenia ciągłości zapisu Recorder",
+    "forecast_observed_after_period_start": "prognoza PV zaktualizowana po rozpoczęciu przedziału",
 }
 
 
@@ -100,8 +104,8 @@ def _reason(value):
         return "Godziny okien Time of Use różnią się od oczekiwanej konfiguracji."
     if "device_write_result_uncertain" in value:
         return "Nie można potwierdzić wyniku polecenia wysłanego do falownika."
-    # Unknown failures remain diagnosable without printing an entire JSON record.
-    return f"Powód techniczny: {value}."
+    # Unknown codes remain in the technical archive, not the human Activity view.
+    return "Nieznany problem wykonania; szczegóły zapisano w diagnostyce."
 
 
 def readable_event(entry):
@@ -226,7 +230,7 @@ def readable_event(entry):
             if issues
             else ""
         )
-    return "Energy Co-Pilot: zarejestrowano zdarzenie " + event + ". " + _reason(reason)
+    return "Energy Co-Pilot: odnotowano zdarzenie sterownika. " + _reason(reason)
 
 
 class DecisionJournal:
