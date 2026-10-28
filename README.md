@@ -25,7 +25,7 @@ W trybie Replay HA **nie** dodaje się taryf N1 ani nie wyznacza ponownie progno
 ## Gdzie są logi Energy Co-Pilot
 
 - **Aktywność:** czytelna, chronologiczna historia decyzji planera, wysłanych nastaw, blokad, wznowień i ARM/STOP. Każdy wpis nosi nazwę **Energy Co-Pilot**. Używa natywnego zdarzenia HA `logbook_entry` i podlega retencji Recorder.
-- **Logi systemowe → Core:** czytelne komunikaty `Energy Co-Pilot`. Ostrzeżenia o blokadach i błędy są na poziomie WARNING/ERROR; zwykłe decyzje na INFO, zgodnie z ustawionym poziomem logowania HA.
+- **Logi systemowe → Core:** czytelne komunikaty `Energy Co-Pilot`. Ostrzeżenia o blokadach i błędy są na poziomie WARNING/ERROR; zwykłe decyzje na INFO i są dostępne w widoku surowych logów, jeśli poziom logowania HA dopuszcza INFO. Widok skrócony Logów systemowych pokazuje przede wszystkim ostrzeżenia i błędy.
 - **Pobierz diagnostykę:** techniczne archiwum `data.decision_journal.events` przechowywane do 30 dni/6000 wpisów, niezależne od retencji Recorder. Przeznaczone do dokładnej analizy, nie do codziennej lektury.
 
 Wpis `applied` oznacza wysłanie i odczyt nastaw — nie jest potwierdzeniem faktycznego przepływu energii. Dla decyzji wyświetlane są rzeczywiste wartości planu: SOC, ceny, prognozy i uzasadnienie globalnej optymalizacji. Integracja nie twierdzi, że sprawdziła koszt alternatywny pojedynczego kwadransa.
