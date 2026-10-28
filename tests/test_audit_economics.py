@@ -125,3 +125,19 @@ def test_no_pv_storage_counterfactual_evaluates_grid_charge_with_curtail():
         alternative_export.candidate.quarters[0].grid_import_kwh > 1e-7
         and alternative_export.candidate.quarters[0].grid_export_kwh > 1e-7
     )
+
+
+def test_no_pv_export_alternative_has_no_fake_sales_revenue():
+    plant = _plant()
+    quarters = (
+        _quarter(0, buy=2.27, sell=1.79, pv=0.70, load=0.18, export=False),
+        _quarter(1, buy=3.50, sell=1.79, load=0.7, export=False),
+    )
+    chosen = optimize_horizon(plant, quarters, terminal_value_override=0.0)
+    assert chosen.dispatches[0].pv_to_battery_dc_kwh > 0.01
+    result = compare_first_quarter(build_replay(plant, quarters, chosen), "pv_charge")
+    assert result["economic_comparison_status"] == "evaluated"
+    assert result["economic_saving_dkk"] >= -1e-6
+    assert result["economic_alternative_first_sale_dkk"] == 0.0
+    assert result["economic_selected_first_sale_dkk"] == 0.0
+    assert result["economic_alternative_forced_curtail"] is False
