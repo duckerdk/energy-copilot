@@ -5,7 +5,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from custom_components.energy_copilot.deye_commands import (
-    CHARGE_CURRENT, GRID_CHARGE, GRID_CURRENT,
+    CHARGE_CURRENT,
+    GRID_CHARGE,
+    GRID_CURRENT,
 )
 from tests.test_dynamic_controller import preview, setup_controller
 
