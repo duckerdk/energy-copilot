@@ -41,3 +41,11 @@ Testy i odbiór: [VALIDATION.md](VALIDATION.md).
 - `applied` podaje konkretną liczbę potwierdzonych zmian i wartości przed/po dla encji; przy braku różnic podaje `0` wysłanych poleceń. `halted` zapisuje ostatnie niepotwierdzone polecenie oraz wcześniej potwierdzone zmiany.
 - Wpisy `logbook_entry` zawierają `domain` i `entity_id` powiązany z rejestrem encji `Decision journal`; sensor ma stały stan i nie generuje przypadkowych zmian `planned → blocked`. Właściwe przejścia stanów planera pozostają widoczne z przyczyną.
 - Mechanizm ten **nie wymaga zmian optymalizacji, ARM ani algorytmu sterowania**. Nie przypisywać solverowi hipotetycznych przyczyn bez obliczonego kontrfaktycznego wariantu.
+
+
+### v1.16.12 — uzasadnienie ekonomiczne i korekty planu
+
+- Po obliczeniu i przed audytem decyzji **wykonanie poleceń falownika ma pierwszeństwo**. Dodatkowe przeliczenie wyjaśniające jest read-only, wykonywane po części sterującej, ograniczone do 3 s; awaria lub przekroczenie czasu nie blokuje sterownika i nie jest przedstawiane jako obliczona przyczyna.
+- Dla pierwszego kwadransa, przy akcjach `pv_charge`, `grid_charge`, `battery_discharge`, policz najlepszy plan na **identycznych znormalizowanych danych, efektywnościach, polityce rezerwy PV, wartości końcowego SOC i horyzoncie**, ale bez danej akcji w pierwszym kwadransie. Podawaj różnicę między kosztem alternatywy a oryginalnym celem całego horyzontu, a nie tylko wartości pojedynczych cen. Nie sugeruj, że eksport i magazynowanie tej samej energii są równoważne bez uwzględnienia sprawności i strat.
+- Jeżeli różnica jest pomijalna lub ujemna, powiedz to wyraźnie. Gdy porównanie się nie uda, nie wymyślaj przyczyn. Dla `grid_import` brak wariantu z wymuszonym rozładowaniem — nie twierdzić, że taki wariant policzono.
+- Wpis `planned` powstaje przy zmianie planowanego kwadransa; ponowne przeliczenie tego samego kwadransa publikuje `revised` z przyczyną (np. zmiana prognozy) i wartościami **przed → po**, nie pełną kopię planu. Zmiana akcji w korekcie otrzymuje nowe uzasadnienie ekonomiczne, jeśli jest możliwe.

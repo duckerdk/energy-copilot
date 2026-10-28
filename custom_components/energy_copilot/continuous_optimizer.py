@@ -42,6 +42,8 @@ def optimize_continuous(
     terminal_value_override=None,
     pv_underprediction_kwh=None,
     enable_pv_headroom=True,
+    audit_forbid_first_action=None,
+    audit_force_first_pv_curtail=False,
 ):
     """Optimize continuous battery energy (kWh) without an SOC lattice.
 
@@ -56,6 +58,15 @@ def optimize_continuous(
     This implementation is used by the HA dry-run planner.
     """
 
+    if audit_forbid_first_action not in (
+        None,
+        "pv_charge",
+        "grid_charge",
+        "battery_discharge",
+    ):
+        raise InfeasibleCandidate("audit:unsupported_alternative")
+    if audit_force_first_pv_curtail and audit_forbid_first_action != "pv_charge":
+        raise InfeasibleCandidate("audit:invalid_curtail_option")
     if not quarters:
         raise InfeasibleCandidate("horizon:empty")
     if plant.initial_soc_pct < MIN_SOC:
@@ -117,7 +128,9 @@ def optimize_continuous(
         surplus = max(0.0, q.pv_dc_kwh - pv_home)
         home_from_grid = max(0.0, q.home_ac_kwh - pv_home * eta_pv)
         pv_export_allowed = (
-            q.pv_export_enabled and q.sell_dkk_per_kwh >= PV_EXPORT_MIN_DKK_PER_KWH
+            q.pv_export_enabled
+            and q.sell_dkk_per_kwh >= PV_EXPORT_MIN_DKK_PER_KWH
+            and not (i == 0 and audit_force_first_pv_curtail)
         )
         # Charging with PV replaces potential PV export, if enabled. This
         # opportunity cost must NOT be omitted when sell is above threshold.
@@ -137,7 +150,10 @@ def optimize_continuous(
         if (
             pv_export_allowed
             and surplus > 1e-8
-            and pv_charge_cost >= grid_charge_price_dc - 1e-10
+            and (
+                pv_charge_cost >= grid_charge_price_dc - 1e-10
+                or (i == 0 and audit_forbid_first_action == "pv_charge")
+            )
         ):
             max_grid = 0.0
         max_discharge = plant.battery_voltage_v * plant.discharge_limit_a / 4000.0
@@ -158,7 +174,9 @@ def optimize_continuous(
             add_edge(
                 after(i),
                 sink,
-                min(max_discharge, home_from_grid / plant.eta_battery_to_ac),
+                0.0
+                if i == 0 and audit_forbid_first_action == "battery_discharge"
+                else min(max_discharge, home_from_grid / plant.eta_battery_to_ac),
                 (
                     DEGRADATION_DKK_PER_KWH_DC
                     - q.buy_dkk_per_kwh * plant.eta_battery_to_ac
@@ -167,14 +185,21 @@ def optimize_continuous(
         )
         pv_edges.append(
             add_edge(
-                source, charge(i), surplus * plant.eta_pv_to_battery, pv_charge_cost
+                source,
+                charge(i),
+                0.0
+                if i == 0 and audit_forbid_first_action == "pv_charge"
+                else surplus * plant.eta_pv_to_battery,
+                pv_charge_cost,
             )
         )
         grid_edges.append(
             add_edge(
                 source,
                 charge(i),
-                max_grid,
+                0.0
+                if i == 0 and audit_forbid_first_action == "grid_charge"
+                else max_grid,
                 q.buy_dkk_per_kwh / plant.eta_grid_to_battery,
             )
         )
@@ -257,8 +282,8 @@ def optimize_continuous(
         raise InfeasibleCandidate("continuous:initial_energy_unrouted")
 
     dispatches = []
-    for q, pv_edge, grid_edge, discharge_edge in zip(
-        quarters, pv_edges, grid_edges, discharge_edges, strict=True
+    for i, (q, pv_edge, grid_edge, discharge_edge) in enumerate(
+        zip(quarters, pv_edges, grid_edges, discharge_edges, strict=True)
     ):
         pv_home = min(q.pv_dc_kwh, q.home_ac_kwh / plant.eta_pv_to_ac)
         pv_surplus = max(0.0, q.pv_dc_kwh - pv_home)
@@ -273,7 +298,9 @@ def optimize_continuous(
         battery_to_home = max(0.0, discharge_edge.original - discharge_edge.capacity)
         unused_pv = max(0.0, pv_surplus - pv_to_battery)
         can_export = (
-            q.pv_export_enabled and q.sell_dkk_per_kwh >= PV_EXPORT_MIN_DKK_PER_KWH
+            q.pv_export_enabled
+            and q.sell_dkk_per_kwh >= PV_EXPORT_MIN_DKK_PER_KWH
+            and not (i == 0 and audit_force_first_pv_curtail)
         )
         pv_export = unused_pv if can_export else 0.0
         dispatches.append(

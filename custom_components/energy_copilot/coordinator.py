@@ -12,6 +12,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .actual_saving import YesterdaySaving, read_yesterday, yesterday_bounds
+from .audit_economics import compare_first_quarter
 from .const import (
     DEFAULT_ENTITIES,
     DEFAULT_FORECAST_MAX_VERSIONS,
@@ -94,6 +95,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self._last_quality_fingerprint = None
         self._last_plan_fingerprint = None
         self._last_preview_decision_fingerprint = None
+        self._last_preview_decision_details = None
         self._last_block_fingerprint = None
         self.actual_yesterday = None
         self._actual_yesterday_date = None
@@ -409,6 +411,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                 issue_codes=issue_codes,
                 coverage=self.planning_preview.coverage,
             )
+        pending_plan_audit = None
         # Journal the selected next-quarter schedule even in dry-run. Preview
         # decisions never cause physical commands.
         if self.planning_preview.status == "preview":
@@ -426,6 +429,8 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                     first.get("grid_to_battery_ac_kwh"),
                     first.get("battery_to_home_dc_kwh"),
                     first.get("pv_to_battery_dc_kwh"),
+                    first.get("grid_import_kwh"),
+                    first.get("grid_export_kwh"),
                     first.get("soc_end_pct"),
                     current_input.get("buy_dkk_per_kwh"),
                     current_input.get("sell_dkk_per_kwh"),
@@ -442,15 +447,27 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                         now,
                         soc.value if soc else first.get("soc_start_pct"),
                     )
-                    self.decision_journal.record(
-                        "planned",
-                        **details,
-                        planning_status=self.planning_preview.status,
-                        quality=self.quality["input_state"],
-                        mode=self.settings.get("mode", "monitor"),
+                    previous = self._last_preview_decision_details
+                    event = (
+                        "revised"
+                        if previous
+                        and previous.get("quarter_start_utc")
+                        == details["quarter_start_utc"]
+                        else "planned"
+                    )
+                    details["pv_export_enabled"] = current_input.get(
+                        "pv_export_enabled"
+                    )
+                    self._last_preview_decision_details = details
+                    pending_plan_audit = (
+                        event,
+                        details,
+                        previous if event == "revised" else None,
+                        replay,
                     )
         else:
             self._last_preview_decision_fingerprint = None
+            self._last_preview_decision_details = None
         if self.settings.get("mode", "monitor") == "automatic":
             if self.dynamic_controller.armed:
                 required = {"soc", "voltage", "grid", "battery", "pv"}
@@ -509,6 +526,29 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                     )
         else:
             self.dynamic_controller.stop()
+        # Optional economic counterfactual runs AFTER the controller's apply.
+        # Explanations must not delay or influence safety-critical inverter writes.
+        if pending_plan_audit is not None:
+            event, details, previous, replay = pending_plan_audit
+            try:
+                comparison = await asyncio.wait_for(
+                    self.hass.async_add_executor_job(
+                        partial(compare_first_quarter, replay, details["action"])
+                    ),
+                    timeout=3.0,
+                )
+            except Exception:
+                _LOGGER.exception("Energy Co-Pilot: economic audit unavailable")
+                comparison = {"economic_comparison_status": "unavailable"}
+            self.decision_journal.record(
+                event,
+                **details,
+                **comparison,
+                previous_plan=previous,
+                planning_status=self.planning_preview.status,
+                quality=self.quality["input_state"],
+                mode=self.settings.get("mode", "monitor"),
+            )
         return snapshot
 
     async def _async_forecast(self, now):

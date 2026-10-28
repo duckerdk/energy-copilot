@@ -108,3 +108,11 @@ Otwarte punkty: [OPEN_ITEMS](OPEN_ITEMS.md).
 - Wykonawca podaje liczbę faktycznych zapisów i wartości przed/po; gdy nastawy są już zgodne, ma `commands_sent=0` i nie przypisuje sobie wykonania polecenia. Po częściowo nieudanym zapisie zawiera wszystkie ukończone zmiany i ostatnią niepotwierdzoną operację.
 - Logi nie mogą zawierać obowiązkowego komentarza „Odczyt nastaw nie potwierdza jeszcze rzeczywistego przepływu energii” ani tautologicznego uzasadnienia o minimalizacji kosztu.
 - Należy osobno potwierdzić prezentację w rzeczywistym UI użytkownika; CI nie może deklarować takiego odbioru.
+
+
+## Regresje ekonomicznych uzasadnień — v1.16.12
+
+- Zestawić wynik alternatywnego przeliczenia dla akcji `pv_charge` z osobno uruchomionym `optimize_horizon` na tych samych danych. Potwierdzić prawidłowe uwzględnienie przychodu z eksportu i brak zmiany bazowego dispatchu.
+- Zestawić `grid_charge` z najlepszą alternatywą bez ładowania teraz. Dla zerowej różnicy kosztu nie wolno deklarować oszczędności, a przy nieudanym audycie nie wolno zgadywać przyczyny.
+- Dla dwukrotnego przeliczenia kwadransa z małą zmianą PV (0,30 → 0,31 kWh) pokazać `Korekta planu` i zmiany SOC/energii; po przejściu granicy kwadransa ponownie `Plan` dla następnego kwadransa.
+- Diagnostyczne przeliczenie porównawcze musi być odseparowane od zapisów falownika i mieć ograniczony czas. Dopiero użytkownik może odebrać wynik w rzeczywistej Aktywności HA.
