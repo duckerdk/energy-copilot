@@ -2,6 +2,7 @@
 
 This is an operational audit, not a raw household measurement history.
 """
+
 import json
 import logging
 from datetime import timedelta
@@ -46,8 +47,7 @@ class DecisionJournal:
         self.entries = [
             item
             for item in self.entries
-            if isinstance(item.get("time_utc"), str)
-            and item["time_utc"] >= cutoff
+            if isinstance(item.get("time_utc"), str) and item["time_utc"] >= cutoff
         ][-MAX_EVENTS:]
 
     def record(self, event, *, reason=None, **details):
@@ -59,7 +59,11 @@ class DecisionJournal:
             **details,
         }
         # Log to the normal HA log even when the persistent store is unavailable.
-        log = _LOGGER.warning if event in {"blocked", "failure", "halted"} else _LOGGER.info
+        log = (
+            _LOGGER.warning
+            if event in {"blocked", "failure", "halted"}
+            else _LOGGER.info
+        )
         log("Energy Co-Pilot audit: %s", json.dumps(entry, default=str, sort_keys=True))
         if self.available:
             try:
