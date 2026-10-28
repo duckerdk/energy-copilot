@@ -197,6 +197,7 @@ def evaluate_preview(
     pv_export_enabled: bool = False,
     load_projection=None,
     pv_underprediction_kwh: float | None = None,
+    grid_charge_already_active: bool = False,
 ) -> Preview:
     """Optimize the complete published input horizon, but never actuate Deye."""
     if mode != "dry_run":
@@ -246,6 +247,7 @@ def evaluate_preview(
             quarters,
             terminal_value_override=terminal_value,
             pv_underprediction_kwh=pv_underprediction_kwh,
+            grid_charge_already_active=grid_charge_already_active,
         )
         baseline = (
             optimize_horizon(
@@ -345,7 +347,8 @@ def evaluate_preview(
                 "voltage_source": voltage_source,
                 "coverage": inputs.coverage_status,
                 "terminal_value_basis": terminal_basis,
-                "source_release": "1.16.7",
+                "source_release": "1.16.14",
+                "grid_charge_already_active": grid_charge_already_active,
             },
         ),
     )
