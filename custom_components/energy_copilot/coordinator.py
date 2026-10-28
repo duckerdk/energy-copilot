@@ -93,6 +93,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self.dynamic_controller.journal = self.decision_journal
         self._last_quality_fingerprint = None
         self._last_plan_fingerprint = None
+        self._last_preview_decision_fingerprint = None
         self._last_block_fingerprint = None
         self.actual_yesterday = None
         self._actual_yesterday_date = None
@@ -397,6 +398,37 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                 issue_codes=issue_codes,
                 coverage=self.planning_preview.coverage,
             )
+        # Journal the selected next-quarter schedule even in dry-run. Preview
+        # decisions never cause physical commands.
+        if self.planning_preview.status == "preview":
+            replay = self.planning_preview.replay_snapshot or {}
+            expected = replay.get("expected", {}).get("quarters", ())
+            if expected:
+                first = expected[0]
+                fingerprint = (
+                    first["start"],
+                    first.get("grid_to_battery_ac_kwh"),
+                    first.get("battery_to_home_dc_kwh"),
+                    first.get("pv_to_battery_dc_kwh"),
+                )
+                if fingerprint != self._last_preview_decision_fingerprint:
+                    self._last_preview_decision_fingerprint = fingerprint
+                    soc = snapshot.measurements.get("soc")
+                    details = self.dynamic_controller._decision(
+                        self.planning_preview,
+                        first,
+                        now,
+                        soc.value if soc else first.get("soc_start_pct"),
+                    )
+                    self.decision_journal.record(
+                        "planned",
+                        **details,
+                        planning_status=self.planning_preview.status,
+                        quality=self.quality["input_state"],
+                        mode=self.settings.get("mode", "monitor"),
+                    )
+        else:
+            self._last_preview_decision_fingerprint = None
         if self.settings.get("mode", "monitor") == "automatic":
             if self.dynamic_controller.armed:
                 required = {"soc", "voltage", "grid", "battery", "pv"}
