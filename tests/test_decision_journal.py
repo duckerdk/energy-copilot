@@ -319,7 +319,11 @@ async def test_activity_planner_state_transition_explains_block(hass):
         planning_reason="price:published_gap",
         quality="valid",
         categorized_issues=[
-            {"code": "historical_quality_unverifiable", "source": "recorder", "category": "historical"},
+            {
+                "code": "historical_quality_unverifiable",
+                "source": "recorder",
+                "category": "historical",
+            },
         ],
     )
     await hass.async_block_till_done()
@@ -387,7 +391,9 @@ async def test_activity_failed_write_has_requested_setting_and_safety_state(hass
 
 
 @pytest.mark.asyncio
-async def test_same_valid_quality_with_only_historical_issue_does_not_spam_activity(hass):
+async def test_same_valid_quality_with_only_historical_issue_does_not_spam_activity(
+    hass,
+):
     journal = DecisionJournal(hass, "valid-history")
     events = []
     hass.bus.async_listen("logbook_entry", lambda event: events.append(event.data))
@@ -396,7 +402,9 @@ async def test_same_valid_quality_with_only_historical_issue_does_not_spam_activ
         "input_quality",
         previous_quality="valid",
         quality="valid",
-        categorized_issues=[{"code": "home_profile_unverified", "category": "historical"}],
+        categorized_issues=[
+            {"code": "home_profile_unverified", "category": "historical"}
+        ],
     )
     await hass.async_block_till_done()
     assert not events
