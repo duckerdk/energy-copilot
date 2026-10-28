@@ -106,6 +106,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             # Explicit automatic mode is already the user's permission to ARM.
             # Never replay an old dispatch: each startup requires fresh planning.
             self.dynamic_controller.arm()
+
         # State-change events preserve short outages between the 30-second polls.
         @callback
         def source_changed(event):
