@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
@@ -26,6 +27,8 @@ _ACTIVITY_EVENTS = {
     "recovered",
     "halted",
     "failure",
+    "plan_status",
+    "input_quality",
 }
 
 _ACTION_NAMES = {
@@ -70,9 +73,21 @@ _REASON_NAMES = {
     "load:awaiting_statistics": "Oczekiwanie na dane historyczne zużycia domu.",
     "controller:waiting_for_next_quarter": "Oczekiwanie na początek następnego kwadransa.",
     "controller:tou_start_invalid": "Nieprawidłowe godziny okien Time of Use.",
+    "device:write_unconfirmed": "Falownik nie potwierdził zmiany nastawy.",
+    "device:entity_unavailable": "Nie można odczytać wymaganej encji falownika.",
+    "controller:target_soc_invalid": "Nieprawidłowy docelowy SOC w planie.",
+    "controller:discharge_max_invalid": "Nieprawidłowy limit prądu rozładowania.",
+    "controller:grid_step_invalid": "Nieprawidłowy krok nastawy prądu ładowania.",
+    "controller:naive_timestamp": "Brak strefy czasowej w planie.",
 }
 _ISSUE_NAMES = {
     "invalid_input": "niepoprawny odczyt",
+    "invalid_unit": "nieprawidłowa jednostka pomiaru",
+    "stale_input": "nieaktualny odczyt",
+    "missing_timestamp": "brak znacznika czasu odczytu",
+    "derived_predates_source_recovery": "odczyt domu sprzed przywrócenia danych źródłowych",
+    "derived_source_freshness_unverifiable": "nie można potwierdzić aktualności źródeł danych",
+    "derived_sum_time_uncertain": "rozbieżność bilansu mocy dla niesynchronicznych pomiarów",
     "forecast_unavailable_or_invalid": "brak poprawnej prognozy PV",
     "forecast_entry_missing": "brak konfiguracji prognozy PV",
     "home_predates_source_recovery": "odczyt zużycia domu jest starszy niż dane źródłowe",
@@ -122,118 +137,131 @@ def _reason(value):
         return "Godziny okien Time of Use różnią się od oczekiwanej konfiguracji."
     if "device_write_result_uncertain" in value:
         return "Nie można potwierdzić wyniku polecenia wysłanego do falownika."
-    # Unknown codes remain in the technical archive, not the human Activity view.
-    return "Nieznany problem wykonania; szczegóły zapisano w diagnostyce."
+    # Keep the actual unknown fault code so the log remains useful for debugging.
+    return f"Nieznany kod błędu: {str(value)[:160]}."
 
 
 def _decision_evidence(entry):
-    """Report measured/optimized quantities; never invent a counterfactual cause."""
+    """Explain selected flows with concrete, available values only."""
     action = entry.get("action")
     buy = entry.get("buy_dkk_per_kwh")
-    later_price = entry.get("later_discharge_buy_dkk_per_kwh")
-    later_at = entry.get("later_discharge_start_utc")
-    later_charge_price = entry.get("later_grid_charge_buy_dkk_per_kwh")
-    later_charge_at = entry.get("later_grid_charge_start_utc")
+    future_price = entry.get("later_discharge_buy_dkk_per_kwh")
+    future_at = entry.get("later_discharge_start_utc")
     if action == "battery_discharge":
-        dc_kwh = entry.get("battery_discharge_dc_kwh")
-        efficiency = entry.get("battery_to_ac_efficiency")
-        degradation = entry.get("degradation_cost_dkk")
-        if None not in (dc_kwh, efficiency, buy, degradation):
-            ac_kwh = float(dc_kwh) * float(efficiency)
+        amount = entry.get("battery_discharge_dc_kwh")
+        eta = entry.get("battery_to_ac_efficiency")
+        wear = entry.get("degradation_cost_dkk")
+        if None not in (amount, eta, buy, wear):
+            ac_kwh = float(amount) * float(eta)
             avoided = ac_kwh * float(buy)
             return (
-                f"Rozładowanie {_number(dc_kwh, 'kWh DC')} "
-                f"zastępuje {_number(ac_kwh, 'kWh AC')} zakupu z sieci "
-                f"o wartości {_number(avoided, 'DKK')} przy obecnej cenie. "
-                f"Modelowy koszt degradacji tej operacji: "
-                f"{_number(degradation, 'DKK')}; "
-                f"bilans bez wpływu na dalszy SOC: "
-                f"{_number(avoided - float(degradation), 'DKK')}."
+                f"Rozładowanie baterii: {_number(amount, 'kWh DC')} → "
+                f"do domu: {_number(ac_kwh, 'kWh AC')}; "
+                f"uniknięty zakup: {_number(avoided, 'DKK')}; "
+                f"degradacja: {_number(wear, 'DKK')}; "
+                f"saldo tej operacji: {_number(avoided - float(wear), 'DKK')} "
+                "(bez wyceny pozostałego SOC)."
             )
-        return (
-            "Model przewiduje zasilanie domu energią z baterii. "
-            "Brak danych do obliczenia jego bieżącej korzyści."
-        )
+        return "Brak obliczenia bieżącego kosztu rozładowania w danych planu."
     if action == "grid_charge":
-        if later_at and later_price is not None:
-            difference = (
-                _number(float(later_price) - float(buy), "DKK/kWh")
-                if buy is not None
-                else None
-            )
+        if future_at and future_price is not None and buy is not None:
             return (
-                f"W dalszej części tego planu przewidziano rozładowanie "
-                f"o {_local_time(later_at)}, przy cenie zakupu "
-                f"{_number(later_price, 'DKK/kWh')}. "
-                + (
-                    f"Różnica względem obecnej ceny: {difference}. "
-                    if difference
-                    else ""
-                )
-                + "To porównanie cen, nie obliczony koszt alternatywnego planu; "
-                "do oceny opłacalności dochodzą straty i degradacja."
+                f"Planowane późniejsze rozładowanie: {_local_time(future_at)}, "
+                f"cena wtedy {_number(future_price, 'DKK/kWh')}; "
+                f"cena teraz {_number(buy, 'DKK/kWh')}; "
+                f"różnica {_number(float(future_price) - float(buy), 'DKK/kWh')}. "
+                "To porównanie cen przed stratami i degradacją."
             )
         return (
-            "Plan przewiduje pobór energii do baterii, ale nie pokazuje "
-            "późniejszego rozładowania w dostępnym horyzoncie. "
-            "Nie ma obliczonego wariantu alternatywnego uzasadniającego ładowanie."
+            "W planie brak późniejszego rozładowania powiązanego z tym ładowaniem; "
+            "nie obliczono jego osobnej korzyści."
         )
     if action == "grid_import":
         amount = _number(entry.get("planned_grid_import_kwh"), "kWh AC")
-        if later_at and later_price is not None:
-            message = (
-                f"Zamiast rozładować baterię teraz, plan kupuje "
-                f"{amount or 'nieznaną ilość energii'} z sieci. "
-                f"Pierwsze późniejsze rozładowanie zaplanowano na "
-                f"{_local_time(later_at)}, przy cenie "
-                f"{_number(later_price, 'DKK/kWh')}. "
-            )
-            if buy is not None:
-                if float(later_price) > float(buy) + 1e-6:
-                    message += "Późniejsza cena jest wyższa od obecnej. "
-                elif float(later_price) < float(buy) - 1e-6:
-                    message += "Późniejsza cena jest niższa od obecnej. "
-                else:
-                    message += "Cena późniejszego rozładowania jest taka sama. "
+        if future_at and future_price is not None:
+            if buy is None:
+                comparison = "Brak bieżącej ceny do porównania."
+            elif float(future_price) > float(buy) + 1e-6:
+                comparison = "Późniejsza cena jest wyższa."
+            elif float(future_price) < float(buy) - 1e-6:
+                comparison = "Późniejsza cena jest niższa."
+            else:
+                comparison = "Cena późniejszego rozładowania jest taka sama."
             return (
-                message + "Nie obliczono wariantu z wymuszonym rozładowaniem teraz, "
-                "więc dokładna przyczyna oszczędzania baterii nie jest potwierdzona."
-            )
-        message = (
-            f"Plan kupuje {amount or 'energię'} z sieci i nie rozładowuje "
-            "baterii w tym kwadransie. "
-        )
-        if later_charge_at and later_charge_price is not None:
-            message += (
-                f"Następne ładowanie z sieci jest zaplanowane "
-                f"na {_local_time(later_charge_at)} po "
-                f"{_number(later_charge_price, 'DKK/kWh')}. "
+                f"Zakup z sieci: {amount or 'brak wartości energii'}, zamiast rozładowania. "
+                f"Następne rozładowanie: {_local_time(future_at)}, "
+                f"cena {_number(future_price, 'DKK/kWh')}. "
+                + comparison
+                + " Brak obliczonego kosztu wariantu z rozładowaniem teraz."
             )
         return (
-            message + "Brak późniejszego rozładowania w bieżącym planie. "
-            "Bez osobnego wariantu nie można wskazać jednoznacznej przyczyny."
+            f"Zakup z sieci: {amount or 'brak wartości energii'}. "
+            "W dostępnym planie nie przewidziano późniejszego rozładowania. "
+            "Brak kosztu alternatywnego wariantu."
         )
     if action == "pv_charge":
-        pv = entry.get("pv_forecast_dc_kwh")
-        home = entry.get("home_forecast_ac_kwh")
-        charge = entry.get("pv_charge_dc_kwh")
-        if None not in (pv, home, charge):
-            return (
-                f"Przy prognozie produkcji PV {_number(pv, 'kWh DC')} "
-                f"i zużycia domu {_number(home, 'kWh AC')} "
-                f"model kieruje {_number(charge, 'kWh DC')} energii PV "
-                "do baterii, zamiast ładować ją z sieci. "
-                "To jest przepływ wybrany w planie, nie dowód przewagi "
-                "nad ewentualną sprzedażą tej energii."
-            )
-        return "Plan przydziela dostępną energię PV do ładowania baterii."
-    if action == "idle":
+        pv = _number(entry.get("pv_forecast_dc_kwh"), "kWh DC")
+        home = _number(entry.get("home_forecast_ac_kwh"), "kWh AC")
+        charged = _number(entry.get("pv_charge_dc_kwh"), "kWh DC")
+        parts = []
+        if pv:
+            parts.append(f"prognoza PV {pv}")
+        if home:
+            parts.append(f"prognoza domu {home}")
+        if charged:
+            parts.append(f"do baterii z PV {charged}")
         return (
-            "W tym kwadransie plan nie przewiduje aktywnego ładowania "
-            "ani rozładowania. Nie wyznaczono osobnego kosztu "
-            "alternatywnych akcji."
+            "Dane kwadransa: " + "; ".join(parts) + "."
+            if parts
+            else "Brak szczegółów przepływu PV."
         )
-    return "Brak danych umożliwiających wyjaśnienie decyzji."
+    if action == "idle":
+        return "Plan nie przewiduje ładowania ani rozładowania w tym kwadransie."
+    return "Brak klasyfikacji decyzji."
+
+
+def _setting_change(change):
+    """Concise name, before/after values and exact entity identifier for debugging."""
+    entity = change["entity_id"]
+    names = {
+        "number.sun12k_maximum_battery_charge_current": (
+            "Limit ładowania baterii",
+            "A",
+        ),
+        "number.sun12k_maximum_battery_discharge_current": ("Limit rozładowania", "A"),
+        "number.sun12k_maximum_battery_grid_charge_current": (
+            "Limit ładowania z sieci",
+            "A",
+        ),
+        "switch.sun12k_grid_charge": ("Grid Charge", ""),
+        "switch.sun12k_solar_sell": ("Solar Sell", ""),
+    }
+    if entity in names:
+        name, unit = names[entity]
+    elif entity.startswith("number.sun12k_time_point_") and entity.endswith(
+        "_capacity"
+    ):
+        name, unit = "Docelowy SOC TOU", "%"
+    elif entity.startswith("switch.sun12k_time_point_") and entity.endswith(
+        "_charge_enable"
+    ):
+        name, unit = "Zezwolenie ładowania TOU", ""
+    else:
+        name, unit = "Nastawa", ""
+
+    def fmt(value):
+        if unit:
+            try:
+                return f"{float(value):g} {unit}".replace(".", ",")
+            except TypeError, ValueError:
+                return str(value)
+        return (
+            str(value).upper()
+            if isinstance(value, str) and value in {"on", "off"}
+            else str(value)
+        )
+
+    return f"{name} {fmt(change['before'])} → {fmt(change['after'])} [{entity}]"
 
 
 def readable_event(entry):
@@ -274,26 +302,44 @@ def readable_event(entry):
             energy = _number(entry.get(energy_key), "kWh")
             if energy:
                 parts.append(f"Energia w planie: {energy}/15 min.")
-        parts.append("Wyjaśnienie: " + _decision_evidence(entry))
+        purchase = _number(entry.get("purchase_cost_dkk"), "DKK")
+        wear = _number(entry.get("degradation_cost_dkk"), "DKK")
+        if purchase:
+            parts.append(f"Koszt zakupu w kwadransie: {purchase}.")
+        if wear:
+            parts.append(f"Degradacja w kwadransie: {wear}.")
+        parts.append("Podstawa decyzji: " + _decision_evidence(entry))
         return " ".join(parts)
     if event == "applied":
-        grid = _number(entry.get("grid_limit_a"), "A", 0)
+        changes = entry.get("command_changes")
+        commands = entry.get("commands_sent")
+        slot = entry.get("active_tou_slot")
+        parts = [f"Falownik, kwadrans {quarter}:"]
+        if commands is None:
+            parts.append(
+                "wykonawca zakończył przetwarzanie planu; brak rejestru zmian nastaw."
+            )
+        elif commands == 0:
+            parts.append("nastawy zgodne z planem; nie wysłano poleceń.")
+        else:
+            parts.append(f"zmieniono {commands} nastaw; zapisy potwierdzone odczytem:")
+            parts.append(
+                "; ".join(_setting_change(change) for change in changes or []) + "."
+            )
+        if slot is not None:
+            parts.append(f"Okno TOU {slot}.")
+        soc = _number(entry.get("observed_tou_soc"), "%", 0)
         discharge = _number(entry.get("discharge_limit_a"), "A", 0)
-        soc = _number(entry.get("target_tou_soc"), "%", 0)
-        charge = "włączone" if entry.get("target_tou_grid_charge") else "wyłączone"
-        parts = [
-            f"Nastawy falownika dla kwadransa {quarter} zostały wysłane i odczytane."
-        ]
+        grid = _number(entry.get("grid_limit_a"), "A", 0)
+        charge = entry.get("observed_tou_grid_charge")
+        if soc:
+            parts.append(f"SOC TOU: {soc}.")
         if grid:
-            parts.append(f"Limit ładowania z sieci: {grid}.")
+            parts.append(f"Limit prądu z sieci: {grid}.")
         if discharge:
             parts.append(f"Limit rozładowania: {discharge}.")
-        if soc:
-            parts.append(f"Cel SOC w aktywnym oknie: {soc}.")
-        parts.append(f"Zezwolenie na ładowanie z sieci: {charge}.")
-        parts.append(
-            "Odczyt nastaw nie potwierdza jeszcze rzeczywistego przepływu energii."
-        )
+        if charge is not None:
+            parts.append(f"Ładowanie z sieci w TOU: {charge}.")
         return " ".join(parts)
     if event == "armed":
         return "Sterowanie automatyczne zostało uzbrojone (ARM). " + _reason(reason)
@@ -302,76 +348,100 @@ def readable_event(entry):
     if event == "stop":
         return "Sterowanie automatyczne zostało zatrzymane."
     if event == "waiting":
-        return "Oczekiwanie na rozpoczęcie następnego kwadransa. " + _reason(reason)
+        next_time = entry.get("next_quarter_utc")
+        return (
+            "Wykonawca oczekuje na następny pełny kwadrans"
+            + (f" ({_local_time(next_time)})" if next_time else "")
+            + ". Nie wysłano nowych poleceń."
+        )
     if event == "blocked":
+        problems = []
         missing = entry.get("missing_measurements") or []
-        issues = entry.get("issue_codes") or []
-        details = []
         if missing:
-            details.append("Brak pomiarów: " + ", ".join(missing) + ".")
+            problems.append("brak pomiarów: " + ", ".join(missing))
         actionable = [
-            item.get("code")
+            f"{_ISSUE_NAMES.get(item.get('code'), item.get('code'))} ({item.get('source')})"
             for item in entry.get("categorized_issues", ())
             if item.get("category") in {"blocking", "uncertainty"} and item.get("code")
         ]
         if actionable:
-            details.append(
-                "Problemy blokujące: "
-                + ", ".join(_ISSUE_NAMES.get(item, item) for item in actionable[:5])
-                + "."
-            )
-        elif issues and not entry.get("categorized_issues"):
-            details.append(
-                "Problemy z danymi: "
-                + ", ".join(_ISSUE_NAMES.get(item, item) for item in issues[:5])
-                + "."
-            )
+            problems.append("problem danych: " + ", ".join(actionable[:5]))
+        elif not entry.get("categorized_issues"):
+            issues = entry.get("issue_codes") or []
+            if issues:
+                problems.append(
+                    "kody danych: "
+                    + ", ".join(_ISSUE_NAMES.get(i, i) for i in issues[:5])
+                )
         if entry.get("planning_status") == "blocked":
-            details.append(
-                "Planer nie przygotował planu: " + _reason(entry.get("planning_reason"))
+            problems.append("planer: " + _reason(entry.get("planning_reason")))
+        if entry.get("attempted_command"):
+            problems.append(
+                "nieudany zapis: " + _setting_change(entry["attempted_command"])
             )
-        if entry.get("quality") and entry.get("quality") != "valid":
-            details.append("Jakość bieżących danych jest niepoprawna.")
-        state = (
-            "ARM pozostaje aktywny; nowe polecenia są wstrzymane."
-            if entry.get("phase") != "device_write_result_uncertain"
-            else "Wynik zapisu wymaga kontroli."
-        )
+        completed = entry.get("completed_commands") or []
+        if completed:
+            problems.append(f"wcześniej potwierdzone nastawy: {len(completed)}")
+        suffix = "ARM zachowany, nowe zapisy wstrzymane."
+        if entry.get("phase") == "device_write_result_uncertain":
+            suffix = "Wymagana kontrola nastaw; dalsze polecenia zatrzymane."
         return (
-            "Wstrzymano wykonywanie planu. "
+            f"Blokada wykonawcy dla kwadransa {quarter}. "
             + _reason(reason)
+            + (" Szczegóły: " + "; ".join(problems) + "." if problems else "")
             + " "
-            + " ".join(details + [state])
+            + suffix
         )
     if event == "recovered":
-        return "Wznowiono wykonywanie planu po odzyskaniu poprawnych danych. ARM pozostał aktywny."
-    if event in {"halted", "failure"}:
         return (
-            "Zatrzymano sterowanie po błędzie wykonania. "
+            "Wznowiono wykonywanie planu: pomiary poprawne, plan dostępny, ARM aktywny."
+        )
+    if event in {"halted", "failure"}:
+        attempted = entry.get("attempted_command")
+        completed = entry.get("completed_commands") or []
+        return (
+            "Zatrzymano sterowanie po błędzie zapisu. "
             + _reason(reason)
-            + " Wymagana kontrola przed ponowieniem poleceń."
+            + (
+                f" Niepotwierdzona operacja: {_setting_change(attempted)}."
+                if attempted
+                else ""
+            )
+            + (
+                f" Wcześniejsze potwierdzone zmiany: {len(completed)}."
+                if completed
+                else ""
+            )
+            + " Stan: recovery_required; ARM wyłączony."
         )
     if event == "plan_status":
-        status = entry.get("planning_status")
-        if status == "preview":
-            return (
-                "Planer przygotował plan. Pokrycie danych: "
-                + str(entry.get("coverage") or "nieznane")
-                + "."
+        previous = entry.get("previous_planning_status")
+        current = entry.get("planning_status")
+        parts = [f"Planer: {previous or 'start'} → {current or 'brak statusu'}."]
+        if current == "blocked":
+            parts.append("Przyczyna: " + _reason(reason))
+            parts.append("Nowy plan nie został utworzony.")
+        elif current == "preview":
+            parts.append(
+                f"Plan dostępny, pokrycie: {entry.get('coverage') or 'nieznane'}."
             )
-        if status == "blocked":
-            return "Planer nie może przygotować planu. " + _reason(reason)
-        return f"Status planera: {status or 'nieznany'}."
+        return " ".join(parts)
     if event == "input_quality":
         quality = entry.get("quality")
-        if quality == "valid":
-            return "Bieżące dane sterowania są poprawne."
-        issues = entry.get("issue_codes") or []
-        return f"Jakość bieżących danych: {quality or 'nieznana'}. " + (
-            "Problemy: " + ", ".join(_ISSUE_NAMES.get(i, i) for i in issues[:5]) + "."
-            if issues
-            else ""
-        )
+        previous = entry.get("previous_quality")
+        parts = [
+            f"Dane wejściowe: {previous or 'start'} → {quality or 'brak statusu'}."
+        ]
+        actionable = [
+            f"{_ISSUE_NAMES.get(item.get('code'), item.get('code'))} ({item.get('source')})"
+            for item in entry.get("categorized_issues", ())
+            if item.get("category") in {"blocking", "uncertainty"}
+        ]
+        if actionable:
+            parts.append("Przyczyny: " + ", ".join(actionable[:5]) + ".")
+        elif quality == "valid":
+            parts.append("Wymagane pomiary poprawne.")
+        return " ".join(parts)
     return "Energy Co-Pilot: odnotowano zdarzenie sterownika. " + _reason(reason)
 
 
@@ -380,6 +450,7 @@ class DecisionJournal:
 
     def __init__(self, hass, entry_id):
         self.hass = hass
+        self.entry_id = entry_id
         self.store = Store(hass, 1, f"{DOMAIN}.{entry_id}.decisions")
         self.entries = []
         self.available = True
@@ -427,17 +498,29 @@ class DecisionJournal:
                 _LOGGER.warning("Energy Co-Pilot: %s", message)
             else:
                 _LOGGER.info("Energy Co-Pilot: %s", message)
-            # The native logbook_entry bus event is consumed by Home Assistant's
-            # Activity integration. Keep activity concise, not per-30-second polling.
-            if event in _ACTIVITY_EVENTS or (
-                event == "plan_status" and entry.get("planning_status") == "blocked"
+            # Link the actual entry to the diagnostic entity so filtering the
+            # device in Activity includes it. The sensor's own state is stable.
+            publish = event in _ACTIVITY_EVENTS
+            if (
+                event == "input_quality"
+                and entry.get("previous_quality") == entry.get("quality") == "valid"
             ):
+                publish = False
+            if publish:
+                registry = er.async_get(self.hass)
+                entity_id = (
+                    registry.async_get_entity_id(
+                        "sensor", DOMAIN, f"{self.entry_id}_decision_journal"
+                    )
+                    or "sensor.energy_co_pilot_decision_journal"
+                )
                 self.hass.bus.async_fire(
                     "logbook_entry",
                     {
                         "name": "Energy Co-Pilot",
                         "message": message,
                         "domain": DOMAIN,
+                        "entity_id": entity_id,
                     },
                 )
         except Exception:

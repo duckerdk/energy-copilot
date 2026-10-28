@@ -87,15 +87,24 @@ Otwarte punkty: [OPEN_ITEMS](OPEN_ITEMS.md).
 
 - W trybie automatycznym wpisy o decyzji, kwadransie, SOC, cenach i akcji muszą trafiać do **Aktywności** przez `logbook_entry` w formacie czytelnym bez JSON.
 - Blokada i odzyskanie danych mają widoczne komunikaty; ARM pozostaje aktywny przy przejściowym błędzie.
-- Po `applied` komunikat musi wskazywać, że nastawy zostały odczytane, ale przepływ energii nie został potwierdzony.
+- Po `applied` log musi rozróżniać rzeczywiście wysłane i potwierdzone nastawy od przypadku zgodności bez zapisu. Nie dodawać ogólnych komentarzy o przepływie energii.
 - W **Logach systemowych → Core** ostrzeżenia/błędy trafiają na WARNING/ERROR, pozostałe informacje na INFO w surowym logu; widok skrócony HA pokazuje przede wszystkim ostrzeżenia i błędy.
 - Awaria publikacji do Aktywności nie może zatrzymać sterowania ani uniemożliwić archiwizacji technicznej.
 
 ## Regresja czytelności — v1.16.10
 
-- W **Aktywności** zdarzenie planowania posiada domenę `energy_copilot` i tekst uzasadniający akcję; bez przypięcia `entity_id` sensora diagnostycznego.
+- W **Aktywności** zdarzenie planowania posiada domenę `energy_copilot` oraz identyfikator encji `Decision journal` z rejestru HA (filtrowanie po urządzeniu); treść uzasadnia akcję.
 - `Decision journal` nie przechodzi pomiędzy stanami `planned` i `blocked` (pozostaje `ready`); nie tworzy wtórnych, pozbawionych przyczyny wpisów.
 - Dla kupowania energii z sieci zamiast rozładowania pokazać rzeczywisty planowany import, cenę i pierwszy późniejszy kwadrans rozładowania, jeśli istnieje; gdy późniejsza cena jest identyczna, nie twierdzić, że rozładowanie odłożono przez wzrost cen.
 - Rozładowanie pokazuje wartość unikniętego zakupu, koszt degradacji i różnicę, o ile dostępne są odpowiednie dane wejściowe. Nigdy nie nazywać tego pełnym kontrfaktycznym wynikiem.
 - Blokada pokazuje kod planera przetłumaczony na komunikat i tylko problemy istotne dla sterowania — historyczne ostrzeżenia nie mogą zagłuszyć realnego błędu.
 - Zdanie o minimalizacji kosztu horyzontu nie może być jedynym uzasadnieniem decyzji.
+
+## Kontrola dziennika wykonania — v1.16.11
+
+- Test filtrowalnego wpisu `logbook_entry`: `domain=energy_copilot` oraz `entity_id` sensora z rejestru encji, w tym po zmianie jego identyfikatora przez użytkownika.
+- Rzeczywiste `preview → blocked` wymaga opisania przyczyny planera i braku nowego planu. `input_quality` wskazuje tylko istotne źródła błędów; poprawna jakość z historycznym ostrzeżeniem nie generuje szumu w Aktywności.
+- Wpisy `blocked` i `waiting` wskazują aktualny/następny kwadrans oraz konkretny powód; stałe blokady powodują wpis maksymalnie raz na kwadrans.
+- Wykonawca podaje liczbę faktycznych zapisów i wartości przed/po; gdy nastawy są już zgodne, ma `commands_sent=0` i nie przypisuje sobie wykonania polecenia. Po częściowo nieudanym zapisie zawiera wszystkie ukończone zmiany i ostatnią niepotwierdzoną operację.
+- Logi nie mogą zawierać obowiązkowego komentarza „Odczyt nastaw nie potwierdza jeszcze rzeczywistego przepływu energii” ani tautologicznego uzasadnienia o minimalizacji kosztu.
+- Należy osobno potwierdzić prezentację w rzeczywistym UI użytkownika; CI nie może deklarować takiego odbioru.
