@@ -23,6 +23,7 @@ from .const import (
     UPDATE_INTERVAL,
 )
 from .decision_journal import DecisionJournal
+from .deye_commands import GRID_CHARGE
 from .dynamic_controller import DynamicDeyeController
 from .forecast_accuracy import ForecastAccuracyWindow
 from .forecast_history import ForecastHistory
@@ -363,6 +364,11 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                         pv_underprediction_kwh=self.forecast_accuracy.summary["pv"][
                             "positive_underprediction_p75_kwh_per_quarter"
                         ],
+                        grid_charge_already_active=(
+                            self.dynamic_controller.armed
+                            and (grid_state := self.hass.states.get(GRID_CHARGE)) is not None
+                            and grid_state.state == "on"
+                        ),
                     )
                 )
         except Exception:  # Preview must never interrupt reliable M1/M2 polling.
