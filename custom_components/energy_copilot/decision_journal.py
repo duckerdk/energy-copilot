@@ -21,6 +21,7 @@ _ACTIVITY_EVENTS = {
     "stop",
     "waiting",
     "planned",
+    "revised",
     "decision",
     "applied",
     "blocked",
@@ -200,24 +201,114 @@ def _decision_evidence(entry):
             "Brak kosztu alternatywnego wariantu."
         )
     if action == "pv_charge":
-        pv = _number(entry.get("pv_forecast_dc_kwh"), "kWh DC")
-        home = _number(entry.get("home_forecast_ac_kwh"), "kWh AC")
-        charged = _number(entry.get("pv_charge_dc_kwh"), "kWh DC")
-        parts = []
-        if pv:
-            parts.append(f"prognoza PV {pv}")
-        if home:
-            parts.append(f"prognoza domu {home}")
-        if charged:
-            parts.append(f"do baterii z PV {charged}")
         return (
-            "Dane kwadransa: " + "; ".join(parts) + "."
-            if parts
-            else "Brak szczegółów przepływu PV."
+            "Nadwyżka PV jest kierowana do baterii; "
+            "porównanie ekonomiczne z alternatywą nie jest dostępne."
         )
     if action == "idle":
         return "Plan nie przewiduje ładowania ani rozładowania w tym kwadransie."
     return "Brak klasyfikacji decyzji."
+
+
+def _economic_evidence(entry):
+    """A conclusion supported by an independently re-optimized full horizon."""
+    action = entry.get("action")
+    status = entry.get("economic_comparison_status")
+    if action not in {"pv_charge", "grid_charge", "battery_discharge"}:
+        return _decision_evidence(entry)
+    if status != "evaluated":
+        return "Brak policzonego porównania z wariantem bez tej operacji."
+    saving = entry.get("economic_saving_dkk")
+    if saving is None:
+        return "Brak wyniku porównania ekonomicznego."
+    alternate_names = {
+        "pv_charge": "bez magazynowania PV teraz",
+        "grid_charge": "bez ładowania z sieci teraz",
+        "battery_discharge": "bez rozładowania teraz",
+    }
+    alternative = alternate_names[action]
+    if saving > 1e-5:
+        explanation = (
+            f"Ta akcja obniża koszt całego planu o {_number(saving, 'DKK', 3)} "
+            f"względem najlepszego wariantu {alternative}."
+        )
+    elif saving >= -1e-5:
+        explanation = (
+            f"Przeliczony wariant {alternative} ma praktycznie taki sam koszt; "
+            "model nie wykazuje istotnej przewagi tej akcji."
+        )
+    else:
+        explanation = (
+            f"Uwaga: wariant {alternative} jest tańszy o "
+            f"{_number(-saving, 'DKK', 3)}; wymaga analizy niespójności."
+        )
+    if action == "pv_charge":
+        alternative_sale = entry.get("economic_alternative_first_sale_dkk")
+        current_sale = entry.get("economic_selected_first_sale_dkk")
+        if None not in (alternative_sale, current_sale):
+            sale_difference = alternative_sale - current_sale
+            if sale_difference > 1e-5:
+                explanation += (
+                    f" Alternatywny plan sprzedałby teraz dodatkowo "
+                    f"{_number(sale_difference, 'DKK', 3)} energii PV."
+                )
+            elif not entry.get("pv_export_enabled"):
+                explanation += " Eksport PV nie jest dozwolony."
+    return explanation
+
+
+def _revised_event(entry):
+    """Only changed material facts, no repeated full plan or economic narrative."""
+    previous = entry.get("previous_plan") or {}
+    names = (
+        ("action", "akcja", None),
+        ("pv_forecast_dc_kwh", "PV", "kWh"),
+        ("home_forecast_ac_kwh", "dom", "kWh"),
+        ("buy_dkk_per_kwh", "zakup", "DKK/kWh"),
+        ("sell_dkk_per_kwh", "sprzedaż", "DKK/kWh"),
+        ("pv_charge_dc_kwh", "ładowanie PV", "kWh"),
+        ("grid_charge_ac_kwh", "ładowanie z sieci", "kWh"),
+        ("battery_discharge_dc_kwh", "rozładowanie", "kWh"),
+        ("soc_planned_end_pct", "SOC końcowy", "%"),
+    )
+    details = []
+    for key, label, unit in names:
+        before, after = previous.get(key), entry.get(key)
+        if before is None or after is None:
+            continue
+        if key == "action":
+            if before != after:
+                details.append(
+                    f"akcja {_ACTION_NAMES.get(before, before)} → "
+                    f"{_ACTION_NAMES.get(after, after)}"
+                )
+        elif abs(float(after) - float(before)) > 1e-7:
+            digits = 1 if unit == "%" else 2
+            details.append(
+                f"{label} {_number(before, unit, digits)} → "
+                f"{_number(after, unit, digits)}"
+            )
+    if not details:
+        return f"Korekta planu na {_local_time(entry.get('quarter_start_utc'))}: nowa wersja prognozy."
+    changed_input_keys = {
+        "pv_forecast_dc_kwh",
+        "home_forecast_ac_kwh",
+        "buy_dkk_per_kwh",
+        "sell_dkk_per_kwh",
+    }
+    input_changed = any(
+        previous.get(k) is not None
+        and entry.get(k) is not None
+        and abs(float(previous[k]) - float(entry[k])) > 1e-7
+        for k in changed_input_keys
+    )
+    suffix = " (po aktualizacji danych)." if input_changed else " (po ponownym planowaniu)."
+    return (
+        f"Korekta planu na {_local_time(entry.get('quarter_start_utc'))}: "
+        + "; ".join(details)
+        + "."
+        + suffix
+    )
 
 
 def _setting_change(change):
@@ -269,6 +360,8 @@ def readable_event(entry):
     event = entry["event"]
     reason = entry.get("reason")
     quarter = _local_time(entry.get("quarter_start_utc"))
+    if event == "revised":
+        return _revised_event(entry)
     if event in {"planned", "decision"}:
         action = _ACTION_NAMES.get(entry.get("action"), "nieznana akcja planera")
         parts = [
@@ -308,7 +401,7 @@ def readable_event(entry):
             parts.append(f"Koszt zakupu w kwadransie: {purchase}.")
         if wear:
             parts.append(f"Degradacja w kwadransie: {wear}.")
-        parts.append("Podstawa decyzji: " + _decision_evidence(entry))
+        parts.append("Uzasadnienie: " + _economic_evidence(entry))
         return " ".join(parts)
     if event == "applied":
         changes = entry.get("command_changes")
