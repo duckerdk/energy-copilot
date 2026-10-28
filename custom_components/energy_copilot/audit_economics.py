@@ -27,8 +27,7 @@ def compare_first_quarter(replay, action):
     # a better feasible alternative.
     curtail_options = (
         (False, True)
-        if action == "pv_charge"
-        and quarters[0].pv_export_enabled
+        if action == "pv_charge" and quarters[0].pv_export_enabled
         else (False,)
     )
     for curtail in curtail_options:
