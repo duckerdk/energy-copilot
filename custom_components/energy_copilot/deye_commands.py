@@ -16,9 +16,8 @@ SOLAR_SELL = "switch.sun12k_solar_sell"
 TIME_OF_USE = "switch.sun12k_time_of_use"
 
 LIMITS = {
-    CHARGE_CURRENT: (0.0, 50.0),
-    DISCHARGE_CURRENT: (0.0, 100.0),
-    GRID_CURRENT: (0.0, 50.0),
+    CHARGE_CURRENT: (1.0, 50.0),
+    GRID_CURRENT: (1.0, 50.0),
 }
 SWITCHES = frozenset({GRID_CHARGE, SOLAR_SELL, TIME_OF_USE})
 

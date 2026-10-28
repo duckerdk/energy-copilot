@@ -35,3 +35,10 @@ Weryfikacja użytkownika w natywnej **Aktywności** wyfiltrowanej do urządzenia
 ### Uzasadnienia ekonomiczne po v1.16.12
 
 Dostępne: faktyczna read-only ponowna optymalizacja całego planu bez wybranej akcji `pv_charge`, `grid_charge` lub `battery_discharge` w pierwszym kwadransie. Nie jest jeszcze dostępne kontrfaktyczne porównanie dla `grid_import` z **wymuszonym dodatnim rozładowaniem**. Tego wniosku nie wolno dopowiadać; do dalszej akceptacji zostaje odbiór czytelności w działającym HA.
+
+
+## Deye: stan po poprawce v1.16.13
+
+- Potwierdzona w instalacji niepożądana zależność: `Maximum Battery Discharge Current = 0 A` po kilku minutach zatrzymuje PV. Wykonawca nie może dotknąć tego rejestru; rozładowanie tylko przez TOU.
+- W diagnostyce 28.10.2026 przy 99% SOC wcześniejszy plan importu został zrewidowany na 0,108 kWh ładowania z sieci do SOC 100%, a Grid Charge ON wykonano zgodnie z planem. **Do oceny pozostaje**, czy przy rezerwie PV i przyszłych cenach optymalizator słusznie wybrał tę decyzję; to nie jest brak planu ani samowolny zapis wykonawcy. Nie należy zmieniać strategii optymalizacji bez osobno uzgodnionego zakresu.
+- Weryfikacja fizyczna: czy zmiany samego TOU SOC w kolejnych kwadransach zapewniają zaplanowane zachowanie bez niepożądanego eksportu baterii oraz czy dynamiczny limit ładowania 1–50 A nie dławi potrzebnego ładowania w praktyce.
