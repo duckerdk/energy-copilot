@@ -432,3 +432,117 @@ async def test_charge_decision_explains_prices_costs_and_applied_settings():
     assert decision["reference_objective_dkk"] == 18.7
     assert decision["forecast_version"] == "forecast-v3"
     assert any(item["event"] == "applied" for item in records)
+
+
+@pytest.mark.asyncio
+async def test_applied_reports_real_changes_and_next_quarter_noop():
+    now = datetime(2026, 10, 27, 12, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    events = []
+
+    class Journal:
+        def record(self, event, **details):
+            events.append({"event": event, **details})
+
+    controller.journal = Journal()
+    controller.arm()
+    first = preview(now, charge=0, discharge=0.1, grid_a=0)
+    assert await controller.apply(first, now, soc_pct=70, voltage_v=51) == "applied"
+    applied = [event for event in events if event["event"] == "applied"]
+    assert len(applied) == 1
+    assert applied[0]["commands_sent"] == len(service.calls)
+    assert applied[0]["commands_sent"] == 1
+    assert applied[0]["command_changes"] == [
+        {"entity_id": SOLAR_SELL, "before": "off", "after": "on"}
+    ]
+    initial_calls = list(service.calls)
+    later = now + timedelta(minutes=15)
+    next_plan = preview(later, charge=0, discharge=0.1, grid_a=0)
+    assert await controller.apply(next_plan, later, soc_pct=70, voltage_v=51) == "applied"
+    applied = [event for event in events if event["event"] == "applied"]
+    assert len(applied) == 2
+    assert applied[1]["quarter_start_utc"] == later.isoformat()
+    assert applied[1]["commands_sent"] == 0
+    assert applied[1]["command_changes"] == []
+    assert service.calls == initial_calls
+
+
+@pytest.mark.asyncio
+async def test_partial_write_failure_logs_confirmed_and_uncertain_commands():
+    now = datetime(2026, 10, 27, 12, tzinfo=timezone.utc)
+    controller, service = setup_controller(fail_on=SOLAR_SELL)
+    events = []
+
+    class Journal:
+        def record(self, event, **details):
+            events.append({"event": event, **details})
+
+    controller.journal = Journal()
+    controller.arm()
+    assert await controller.apply(preview(now), now, soc_pct=50, voltage_v=51) == (
+        "recovery_required"
+    )
+    halted = [event for event in events if event["event"] == "halted"]
+    assert len(halted) == 1
+    assert halted[0]["attempted_command"]["entity_id"] == SOLAR_SELL
+    assert halted[0]["attempted_command"]["before"] == "off"
+    assert halted[0]["attempted_command"]["after"] == "on"
+    assert halted[0]["completed_commands"]
+    assert not controller.armed
+    assert controller.halted
+    assert any(call[2]["entity_id"] == SOLAR_SELL for call in service.calls)
+
+
+@pytest.mark.asyncio
+async def test_persistent_tou_block_logged_at_next_quarter_not_every_poll():
+    now = datetime(2026, 10, 27, 12, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    service.states.items[TIME_OF_USE].state = "off"
+    events = []
+
+    class Journal:
+        def record(self, event, **details):
+            events.append({"event": event, **details})
+
+    controller.journal = Journal()
+    controller.arm()
+    assert await controller.apply(preview(now), now, soc_pct=50, voltage_v=51) == "blocked"
+    assert (
+        await controller.apply(
+            preview(now), now + timedelta(seconds=20), soc_pct=50, voltage_v=51
+        )
+        == "blocked"
+    )
+    later = now + timedelta(minutes=15)
+    assert (
+        await controller.apply(preview(later), later, soc_pct=50, voltage_v=51)
+        == "blocked"
+    )
+    blocked = [event for event in events if event["event"] == "blocked"]
+    assert len(blocked) == 2
+    assert blocked[0]["quarter_start_utc"] == now.isoformat()
+    assert blocked[1]["quarter_start_utc"] == later.isoformat()
+    assert controller.armed
+    assert not service.calls
+
+
+@pytest.mark.asyncio
+async def test_waiting_records_next_quarter_boundary():
+    now = datetime(2026, 10, 27, 12, 8, tzinfo=timezone.utc)
+    target = now.replace(minute=15)
+    controller, _ = setup_controller()
+    events = []
+
+    class Journal:
+        def record(self, event, **details):
+            events.append({"event": event, **details})
+
+    controller.journal = Journal()
+    controller.arm()
+    assert (
+        await controller.apply(preview(target), now, soc_pct=50, voltage_v=51)
+        == "waiting_for_quarter"
+    )
+    waiting = [event for event in events if event["event"] == "waiting"]
+    assert len(waiting) == 1
+    assert waiting[0]["next_quarter_utc"] == target.isoformat()
