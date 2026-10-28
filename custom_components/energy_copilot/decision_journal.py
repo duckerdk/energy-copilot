@@ -417,8 +417,11 @@ def readable_event(entry):
                     "Nie doładowujemy z sieci: SOC 99% uznano za osiągnięty cel 100%."
                 )
             elif policy_reason == "grid_charge_below_materiality_threshold":
-                advantage = _number(
-                    entry.get("economic_policy_benefit_dkk"), "DKK", 3
+                saved = entry.get("economic_policy_benefit_dkk")
+                advantage = (
+                    "poniżej 0,01 DKK (pomijalna)"
+                    if saved is not None and saved < 0.01
+                    else _number(saved, "DKK", 2)
                 )
                 parts.append(
                     f"Nie uruchamiamy ładowania z sieci: korzyść całego taniego "
