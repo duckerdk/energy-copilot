@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 from .deye_commands import (
     CHARGE_CURRENT,
+    DISCHARGE_CURRENT,
     GRID_CHARGE,
     GRID_CURRENT,
     SOLAR_SELL,
@@ -306,6 +307,15 @@ class DynamicDeyeController:
                     raise CommandRejected("controller:simultaneous_flow")
                 if soc_pct <= 20.1 and discharge > 1e-7:
                     raise CommandRejected("controller:minimum_soc")
+                # This inverter stops PV after several minutes with 0 A
+                # discharge current. Never write that global limit; if a legacy
+                # or external setting is 0 A, refuse automatic control and
+                # require manual correction rather than silently hiding it.
+                discharge_setting = float(
+                    self.adapter._present(DISCHARGE_CURRENT).state
+                )
+                if not isfinite(discharge_setting) or discharge_setting <= 0:
+                    raise CommandRejected("controller:discharge_current_zero")
                 tou_state = self.adapter._present(TIME_OF_USE).state
                 if tou_state != "on":
                     reason = f"controller:tou_not_enabled:observed={tou_state}"
@@ -451,8 +461,8 @@ class DynamicDeyeController:
                     )
                 else:
                     grid_limit = None
-                # Discharge current is never read as a policy input or written.
                 # The existing inverter/BMS discharge-current cap is preserved.
+                # Read-only preflight above detects 0 A; no write is permitted.
                 settings = [(CHARGE_CURRENT, total_charge_a)]
                 if grid_limit is not None:
                     settings.append((GRID_CURRENT, grid_limit))
