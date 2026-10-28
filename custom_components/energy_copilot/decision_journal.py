@@ -142,113 +142,77 @@ def _reason(value):
 
 
 def _decision_evidence(entry):
-    """Report measured/optimized quantities; never invent a counterfactual cause."""
+    """Explain selected flows with concrete, available values only."""
     action = entry.get("action")
     buy = entry.get("buy_dkk_per_kwh")
-    later_price = entry.get("later_discharge_buy_dkk_per_kwh")
-    later_at = entry.get("later_discharge_start_utc")
-    later_charge_price = entry.get("later_grid_charge_buy_dkk_per_kwh")
-    later_charge_at = entry.get("later_grid_charge_start_utc")
+    future_price = entry.get("later_discharge_buy_dkk_per_kwh")
+    future_at = entry.get("later_discharge_start_utc")
     if action == "battery_discharge":
-        dc_kwh = entry.get("battery_discharge_dc_kwh")
-        efficiency = entry.get("battery_to_ac_efficiency")
-        degradation = entry.get("degradation_cost_dkk")
-        if None not in (dc_kwh, efficiency, buy, degradation):
-            ac_kwh = float(dc_kwh) * float(efficiency)
+        amount = entry.get("battery_discharge_dc_kwh")
+        eta = entry.get("battery_to_ac_efficiency")
+        wear = entry.get("degradation_cost_dkk")
+        if None not in (amount, eta, buy, wear):
+            ac_kwh = float(amount) * float(eta)
             avoided = ac_kwh * float(buy)
             return (
-                f"Rozładowanie {_number(dc_kwh, 'kWh DC')} "
-                f"zastępuje {_number(ac_kwh, 'kWh AC')} zakupu z sieci "
-                f"o wartości {_number(avoided, 'DKK')} przy obecnej cenie. "
-                f"Modelowy koszt degradacji tej operacji: "
-                f"{_number(degradation, 'DKK')}; "
-                f"bilans bez wpływu na dalszy SOC: "
-                f"{_number(avoided - float(degradation), 'DKK')}."
+                f"Z baterii do domu: {_number(ac_kwh, 'kWh AC')}; "
+                f"uniknięty zakup: {_number(avoided, 'DKK')}; "
+                f"degradacja: {_number(wear, 'DKK')}; "
+                f"saldo tej operacji: {_number(avoided - float(wear), 'DKK')} "
+                "(bez wyceny pozostałego SOC)."
             )
-        return (
-            "Model przewiduje zasilanie domu energią z baterii. "
-            "Brak danych do obliczenia jego bieżącej korzyści."
-        )
+        return "Brak obliczenia bieżącego kosztu rozładowania w danych planu."
     if action == "grid_charge":
-        if later_at and later_price is not None:
-            difference = (
-                _number(float(later_price) - float(buy), "DKK/kWh")
-                if buy is not None
-                else None
-            )
+        if future_at and future_price is not None and buy is not None:
             return (
-                f"W dalszej części tego planu przewidziano rozładowanie "
-                f"o {_local_time(later_at)}, przy cenie zakupu "
-                f"{_number(later_price, 'DKK/kWh')}. "
-                + (
-                    f"Różnica względem obecnej ceny: {difference}. "
-                    if difference
-                    else ""
-                )
-                + "To porównanie cen, nie obliczony koszt alternatywnego planu; "
-                "do oceny opłacalności dochodzą straty i degradacja."
+                f"Planowane późniejsze rozładowanie: {_local_time(future_at)}, "
+                f"cena wtedy {_number(future_price, 'DKK/kWh')}; "
+                f"cena teraz {_number(buy, 'DKK/kWh')}; "
+                f"różnica {_number(float(future_price) - float(buy), 'DKK/kWh')}. "
+                "To porównanie cen przed stratami i degradacją."
             )
         return (
-            "Plan przewiduje pobór energii do baterii, ale nie pokazuje "
-            "późniejszego rozładowania w dostępnym horyzoncie. "
-            "Nie ma obliczonego wariantu alternatywnego uzasadniającego ładowanie."
+            "W planie brak późniejszego rozładowania powiązanego z tym ładowaniem; "
+            "nie obliczono jego osobnej korzyści."
         )
     if action == "grid_import":
         amount = _number(entry.get("planned_grid_import_kwh"), "kWh AC")
-        if later_at and later_price is not None:
-            message = (
-                f"Zamiast rozładować baterię teraz, plan kupuje "
-                f"{amount or 'nieznaną ilość energii'} z sieci. "
-                f"Pierwsze późniejsze rozładowanie zaplanowano na "
-                f"{_local_time(later_at)}, przy cenie "
-                f"{_number(later_price, 'DKK/kWh')}. "
-            )
-            if buy is not None:
-                if float(later_price) > float(buy) + 1e-6:
-                    message += "Późniejsza cena jest wyższa od obecnej. "
-                elif float(later_price) < float(buy) - 1e-6:
-                    message += "Późniejsza cena jest niższa od obecnej. "
-                else:
-                    message += "Cena późniejszego rozładowania jest taka sama. "
+        if future_at and future_price is not None:
+            if buy is None:
+                comparison = "Brak bieżącej ceny do porównania."
+            elif float(future_price) > float(buy) + 1e-6:
+                comparison = "Późniejsza cena jest wyższa."
+            elif float(future_price) < float(buy) - 1e-6:
+                comparison = "Późniejsza cena jest niższa."
+            else:
+                comparison = "Cena późniejszego rozładowania jest taka sama."
             return (
-                message + "Nie obliczono wariantu z wymuszonym rozładowaniem teraz, "
-                "więc dokładna przyczyna oszczędzania baterii nie jest potwierdzona."
-            )
-        message = (
-            f"Plan kupuje {amount or 'energię'} z sieci i nie rozładowuje "
-            "baterii w tym kwadransie. "
-        )
-        if later_charge_at and later_charge_price is not None:
-            message += (
-                f"Następne ładowanie z sieci jest zaplanowane "
-                f"na {_local_time(later_charge_at)} po "
-                f"{_number(later_charge_price, 'DKK/kWh')}. "
+                f"Zakup z sieci: {amount or 'brak wartości energii'}, zamiast rozładowania. "
+                f"Następne rozładowanie: {_local_time(future_at)}, "
+                f"cena {_number(future_price, 'DKK/kWh')}. "
+                + comparison
+                + " Brak obliczonego kosztu wariantu z rozładowaniem teraz."
             )
         return (
-            message + "Brak późniejszego rozładowania w bieżącym planie. "
-            "Bez osobnego wariantu nie można wskazać jednoznacznej przyczyny."
+            f"Zakup z sieci: {amount or 'brak wartości energii'}. "
+            "W dostępnym planie nie przewidziano późniejszego rozładowania. "
+            "Brak kosztu alternatywnego wariantu."
         )
     if action == "pv_charge":
-        pv = entry.get("pv_forecast_dc_kwh")
-        home = entry.get("home_forecast_ac_kwh")
-        charge = entry.get("pv_charge_dc_kwh")
-        if None not in (pv, home, charge):
-            return (
-                f"Przy prognozie produkcji PV {_number(pv, 'kWh DC')} "
-                f"i zużycia domu {_number(home, 'kWh AC')} "
-                f"model kieruje {_number(charge, 'kWh DC')} energii PV "
-                "do baterii, zamiast ładować ją z sieci. "
-                "To jest przepływ wybrany w planie, nie dowód przewagi "
-                "nad ewentualną sprzedażą tej energii."
-            )
-        return "Plan przydziela dostępną energię PV do ładowania baterii."
+        pv = _number(entry.get("pv_forecast_dc_kwh"), "kWh DC")
+        home = _number(entry.get("home_forecast_ac_kwh"), "kWh AC")
+        charged = _number(entry.get("pv_charge_dc_kwh"), "kWh DC")
+        parts = []
+        if pv:
+            parts.append(f"prognoza PV {pv}")
+        if home:
+            parts.append(f"prognoza domu {home}")
+        if charged:
+            parts.append(f"do baterii z PV {charged}")
+        return "Dane kwadransa: " + "; ".join(parts) + "." if parts else "Brak szczegółów przepływu PV."
     if action == "idle":
-        return (
-            "W tym kwadransie plan nie przewiduje aktywnego ładowania "
-            "ani rozładowania. Nie wyznaczono osobnego kosztu "
-            "alternatywnych akcji."
-        )
-    return "Brak danych umożliwiających wyjaśnienie decyzji."
+        return "Plan nie przewiduje ładowania ani rozładowania w tym kwadransie."
+    return "Brak klasyfikacji decyzji."
 
 
 def _setting_change(change):
@@ -314,7 +278,13 @@ def readable_event(entry):
             energy = _number(entry.get(energy_key), "kWh")
             if energy:
                 parts.append(f"Energia w planie: {energy}/15 min.")
-        parts.append("Wyjaśnienie: " + _decision_evidence(entry))
+        purchase = _number(entry.get("purchase_cost_dkk"), "DKK")
+        wear = _number(entry.get("degradation_cost_dkk"), "DKK")
+        if purchase:
+            parts.append(f"Koszt zakupu w kwadransie: {purchase}.")
+        if wear:
+            parts.append(f"Degradacja w kwadransie: {wear}.")
+        parts.append("Podstawa decyzji: " + _decision_evidence(entry))
         return " ".join(parts)
     if event == "applied":
         changes = entry.get("command_changes")
@@ -487,7 +457,13 @@ class DecisionJournal:
                 _LOGGER.info("Energy Co-Pilot: %s", message)
             # Link the actual entry to the diagnostic entity so filtering the
             # device in Activity includes it. The sensor's own state is stable.
-            if event in _ACTIVITY_EVENTS:
+            publish = event in _ACTIVITY_EVENTS
+            if (
+                event == "input_quality"
+                and entry.get("previous_quality") == entry.get("quality") == "valid"
+            ):
+                publish = False
+            if publish:
                 registry = er.async_get(self.hass)
                 entity_id = registry.async_get_entity_id(
                     "sensor", DOMAIN, f"{self.entry_id}_decision_journal"
