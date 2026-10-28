@@ -383,7 +383,8 @@ async def test_next_quarter_cache_is_refreshed_before_boundary():
         )
         == "applied"
     )
-    assert float(service.states.get(DISCHARGE_CURRENT).state) == 0.0
+    assert float(service.states.get(DISCHARGE_CURRENT).state) == 100.0
+    assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
 
 
 @pytest.mark.asyncio
