@@ -654,3 +654,36 @@ async def test_no_pv_storage_with_solar_sell_on_limits_charge_to_1a():
     )
     assert float(service.states.get(CHARGE_CURRENT).state) == 1
     assert service.states.get(SOLAR_SELL).state == "on"
+
+
+
+@pytest.mark.asyncio
+async def test_existing_zero_discharge_current_blocks_without_any_writes():
+    now = datetime(2026, 10, 27, 12, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    service.states.items[DISCHARGE_CURRENT].state = "0"
+    controller.arm()
+    assert (
+        await controller.apply(
+            preview(now, charge=0, discharge=0, grid_a=0),
+            now,
+            soc_pct=70,
+            voltage_v=52,
+        )
+        == "blocked"
+    )
+    assert controller.reason.endswith("controller:discharge_current_zero")
+    assert controller.armed
+    assert not service.calls
+    # Correcting the parameter outside the integration allows recovery.
+    service.states.items[DISCHARGE_CURRENT].state = "100"
+    assert (
+        await controller.apply(
+            preview(now, charge=0, discharge=0, grid_a=0),
+            now,
+            soc_pct=70,
+            voltage_v=52,
+        )
+        == "applied"
+    )
+    assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
