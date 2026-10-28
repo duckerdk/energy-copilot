@@ -557,7 +557,6 @@ async def test_waiting_records_next_quarter_boundary():
     assert waiting[0]["next_quarter_utc"] == target.isoformat()
 
 
-
 @pytest.mark.asyncio
 async def test_preserve_battery_with_tou_safeguard_and_no_discharge_current_write():
     now = datetime(2026, 10, 27, 12, tzinfo=timezone.utc)
