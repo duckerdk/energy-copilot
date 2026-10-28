@@ -357,7 +357,9 @@ async def test_automatic_mode_starts_armed_and_transient_block_retains_arm(
     coordinator = entry.runtime_data.coordinator
     assert coordinator.dynamic_controller.armed
     assert coordinator.dynamic_controller.status == "blocked"
-    assert coordinator.dynamic_controller.reason == "controller:input_or_plan_unavailable"
+    assert (
+        coordinator.dynamic_controller.reason == "controller:input_or_plan_unavailable"
+    )
     journal = coordinator.decision_journal
     assert any(item["event"] == "armed" for item in journal.entries)
     blocked = [item for item in journal.entries if item["event"] == "blocked"]
