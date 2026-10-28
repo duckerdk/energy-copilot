@@ -29,8 +29,7 @@ def material_grid_charge(
     if soc_pct >= 100.0 - SOC_TARGET_TOLERANCE_PCT:
         return False
     saved_dkk = (
-        without_first_grid_charge.candidate.objective_dkk
-        - base.candidate.objective_dkk
+        without_first_grid_charge.candidate.objective_dkk - base.candidate.objective_dkk
     )
     threshold = (
         CHANGE_STRATEGY_BENEFIT_DKK
@@ -57,7 +56,10 @@ def spread_grid_charge_over_cheap_window(plant, quarters, result):
     start_price = quarters[0].buy_dkk_per_kwh
     end = 0
     for q, dispatch in zip(quarters[:MAX_SPREAD_QUARTERS], dispatches, strict=False):
-        if abs(q.buy_dkk_per_kwh - start_price) > CHEAP_WINDOW_PRICE_TOLERANCE_DKK_PER_KWH:
+        if (
+            abs(q.buy_dkk_per_kwh - start_price)
+            > CHEAP_WINDOW_PRICE_TOLERANCE_DKK_PER_KWH
+        ):
             break
         # Avoid changing battery priorities in a PV-producing or discharge slot.
         if (
@@ -75,7 +77,9 @@ def spread_grid_charge_over_cheap_window(plant, quarters, result):
     if total <= 1e-7:
         return result
     # There is no benefit to altering negligible low-current dispatches.
-    min_ac_kwh_per_quarter = plant.battery_voltage_v / (4000 * plant.eta_grid_to_battery)
+    min_ac_kwh_per_quarter = plant.battery_voltage_v / (
+        4000 * plant.eta_grid_to_battery
+    )
     equal_ac = total / end
     if equal_ac < min_ac_kwh_per_quarter:
         return result
@@ -117,7 +121,10 @@ def spread_grid_charge_over_cheap_window(plant, quarters, result):
         checked = simulate_candidate(verified_plant, quarters, tuple(dispatches))
     except InfeasibleCandidate:
         return result
-    if checked.objective_dkk > result.candidate.objective_dkk + CHANGE_STRATEGY_BENEFIT_DKK + 1e-8:
+    if (
+        checked.objective_dkk
+        > result.candidate.objective_dkk + CHANGE_STRATEGY_BENEFIT_DKK + 1e-8
+    ):
         return result
     return replace(
         result,
