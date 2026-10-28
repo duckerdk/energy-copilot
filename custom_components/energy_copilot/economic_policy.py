@@ -17,7 +17,9 @@ CHEAP_WINDOW_PRICE_TOLERANCE_DKK_PER_KWH = 0.01
 MAX_SPREAD_QUARTERS = 20
 
 
-def material_grid_charge(base, without_first_grid_charge, *, soc_pct, already_charging=False):
+def material_grid_charge(
+    base, without_first_grid_charge, *, soc_pct, already_charging=False
+):
     """Retain first-quarter grid charging only if it has a material benefit.
 
     Comparing *whole* re-optimized plans avoids rejecting a series of small
