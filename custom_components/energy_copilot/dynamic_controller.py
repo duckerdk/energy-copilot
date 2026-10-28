@@ -43,6 +43,8 @@ class DynamicDeyeController:
         self._write_started = False
         self._last_decision_key = None
         self._last_application_key = None
+        self._command_changes = []
+        self._attempted_command = None
 
     def _audit(self, event, **details):
         if self.journal is not None:
@@ -171,13 +173,26 @@ class DynamicDeyeController:
     async def _set_number_if_changed(self, entity, value):
         state = self.adapter._present(entity)
         if abs(float(state.state) - value) > 1e-6:
+            change = {"entity_id": entity, "before": state.state, "after": value}
             self._write_started = True
+            self._attempted_command = change
             await self.adapter.set_number(entity, value)
+            self._command_changes.append(change)
+            self._attempted_command = None
 
     async def _set_switch_if_changed(self, entity, enabled):
-        if self.adapter._present(entity).state != ("on" if enabled else "off"):
+        state = self.adapter._present(entity)
+        if state.state != ("on" if enabled else "off"):
+            change = {
+                "entity_id": entity,
+                "before": state.state,
+                "after": "on" if enabled else "off",
+            }
             self._write_started = True
+            self._attempted_command = change
             await self.adapter.set_switch(entity, enabled)
+            self._command_changes.append(change)
+            self._attempted_command = None
 
     def stop(self, *, manual=False):
         was_armed = self.armed
@@ -247,6 +262,8 @@ class DynamicDeyeController:
             return self.status
         async with self._lock:
             self._write_started = False
+            self._command_changes = []
+            self._attempted_command = None
             at = None
             try:
                 if not all(isfinite(x) for x in (soc_pct, voltage_v)):
@@ -408,11 +425,15 @@ class DynamicDeyeController:
                     grid_limit,
                     discharge_limit,
                 )
-                if application_key != self._last_application_key:
+                if application_key != self._last_application_key or self._command_changes:
                     self._last_application_key = application_key
                     self._audit(
                         "applied",
-                        reason="settings_written_and_read_back",
+                        reason=(
+                            "settings_changed"
+                            if self._command_changes
+                            else "settings_already_match"
+                        ),
                         quarter_start_utc=at,
                         state=self.status,
                         target_tou_soc=target_soc,
@@ -421,6 +442,8 @@ class DynamicDeyeController:
                         observed_tou_grid_charge=self.observed_tou_grid_charge,
                         grid_limit_a=grid_limit,
                         discharge_limit_a=discharge_limit,
+                        command_changes=list(self._command_changes),
+                        commands_sent=len(self._command_changes),
                     )
             except Exception as exc:
                 self.reason = f"{type(exc).__name__}:{exc}"
@@ -445,6 +468,8 @@ class DynamicDeyeController:
                         state=self.status,
                         quarter_start_utc=at,
                         phase=phase,
+                        completed_commands=list(self._command_changes),
+                        attempted_command=self._attempted_command,
                     )
                 self._last_block_reason = self.reason
             return self.status
