@@ -163,7 +163,7 @@ async def test_discharge_rejected_at_minimum_soc():
             soc_pct=20.0,
             voltage_v=51.0,
         )
-        == "recovery_required"
+        == "blocked"
     )
     assert not service.calls
 
@@ -216,7 +216,7 @@ async def test_mismatched_window_configuration_fails_before_any_writes():
     )
     controller.arm()
     assert await controller.apply(preview(now), now, soc_pct=50, voltage_v=51) == (
-        "recovery_required"
+        "blocked"
     )
     assert not service.calls
     assert "tou_schedule_mismatch" in controller.reason
