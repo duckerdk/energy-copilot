@@ -210,6 +210,7 @@ def optimize_horizon(
     pv_underprediction_kwh: float | None = None,
     enable_pv_headroom: bool = True,
     audit_forbid_first_action: str | None = None,
+    audit_force_first_pv_curtail: bool = False,
 ) -> HorizonResult:
     """Primary HA dry-run optimizer: continuous flow, no 0.1 kWh SOC grid.
 
@@ -225,4 +226,5 @@ def optimize_horizon(
         pv_underprediction_kwh=pv_underprediction_kwh,
         enable_pv_headroom=enable_pv_headroom,
         audit_forbid_first_action=audit_forbid_first_action,
+        audit_force_first_pv_curtail=audit_force_first_pv_curtail,
     )
