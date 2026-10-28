@@ -687,3 +687,46 @@ async def test_existing_zero_discharge_current_blocks_without_any_writes():
         == "applied"
     )
     assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
+
+
+
+@pytest.mark.asyncio
+async def test_soc_99_without_grid_plan_disables_stale_grid_charge():
+    now = datetime(2026, 10, 27, 12, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    slot = tou_entities(4)
+    service.states.items[GRID_CHARGE].state = "on"
+    service.states.items[slot["grid_charge"]].state = "on"
+    service.states.items[slot["soc"]].state = "100"
+    controller.arm()
+    assert (
+        await controller.apply(
+            preview(now, charge=0, discharge=0, grid_a=0),
+            now,
+            soc_pct=99,
+            voltage_v=58,
+        )
+        == "applied"
+    )
+    assert service.states.get(GRID_CHARGE).state == "off"
+    assert service.states.get(slot["grid_charge"]).state == "off"
+    assert service.states.get(slot["soc"]).state == "99.0"
+    assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
+
+
+@pytest.mark.asyncio
+async def test_soc_99_grid_charge_is_plan_driven_not_executor_invention():
+    now = datetime(2026, 10, 27, 12, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    controller.arm()
+    plan = preview(now, charge=0.10778947, discharge=0, grid_a=6.83)
+    plan.replay_snapshot["plant"] = {
+        "battery_capacity_dc_kwh": 10.24,
+        "eta_grid_to_battery": 0.95,
+    }
+    plan.replay_snapshot["expected"]["quarters"][0]["soc_end_pct"] = 100.0
+    assert await controller.apply(plan, now, soc_pct=99, voltage_v=57.87) == "applied"
+    assert service.states.get(GRID_CHARGE).state == "on"
+    assert float(service.states.get(tou_entities(4)["soc"]).state) == 100
+    assert 1 <= float(service.states.get(GRID_CURRENT).state) <= 50
+    assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
