@@ -30,3 +30,8 @@ Dziennik v1.16.10 wyjaśnia fakty i bieżące koszty: co wybrano, jaką cenę i 
 ## Odbiór logów v1.16.11 — wymagany w rzeczywistym HA
 
 Weryfikacja użytkownika w natywnej **Aktywności** wyfiltrowanej do urządzenia Energy Co-Pilot: obecność wpisów co kolejny kwadrans przy poprawnym planie; konkretne przyczyny blokad (także długotrwałych); rozróżnienie zmian nastaw od zgodności bez poleceń; brak technicznych, pozbawionych znaczenia komentarzy. Zaliczone testy CI są tylko odbiorem technicznym, nie potwierdzeniem prezentacji na rzeczywistej instalacji.
+
+
+### Uzasadnienia ekonomiczne po v1.16.12
+
+Dostępne: faktyczna read-only ponowna optymalizacja całego planu bez wybranej akcji `pv_charge`, `grid_charge` lub `battery_discharge` w pierwszym kwadransie. Nie jest jeszcze dostępne kontrfaktyczne porównanie dla `grid_import` z **wymuszonym dodatnim rozładowaniem**. Tego wniosku nie wolno dopowiadać; do dalszej akceptacji zostaje odbiór czytelności w działającym HA.
