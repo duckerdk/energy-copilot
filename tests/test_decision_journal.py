@@ -87,7 +87,7 @@ async def test_activity_event_is_human_readable_and_explains_plan(hass):
     assert "entity_id" not in events[0]
     assert "2,73 DKK/kWh" in events[0]["message"]
     assert "08:00" in events[0]["message"]
-    assert "Uzasadnienie" in events[0]["message"]
+    assert "Wyjaśnienie:" in events[0]["message"]
     assert "optimizer_selected_" not in events[0]["message"]
     await journal.async_close()
 
