@@ -6,9 +6,9 @@ from unittest.mock import patch
 import pytest
 
 from custom_components.energy_copilot.decision_journal import (
-    DecisionJournal,
     MAX_EVENTS,
     RETENTION_DAYS,
+    DecisionJournal,
 )
 
 
