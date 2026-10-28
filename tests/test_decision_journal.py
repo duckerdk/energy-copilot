@@ -515,7 +515,6 @@ def test_audit_timeout_never_invents_economic_reason():
     assert "obniża koszt" not in message
 
 
-
 def test_sub_cent_grid_charge_benefit_is_logged_as_immaterial():
     message = readable_event(
         {
