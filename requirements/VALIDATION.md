@@ -126,3 +126,14 @@ Otwarte punkty: [OPEN_ITEMS](OPEN_ITEMS.md).
 - Gdy plan zawiera ładowanie z sieci oraz wzrost SOC wskutek PV, cel Grid Charge odpowiada tylko energii z sieci, nie całemu planowanemu końcowemu SOC.
 - Prądy ładowania PV i z sieci zawsze legalne 1–50 A, wyliczane z kwadransowej energii i zmierzonego napięcia. Przy pierwszym przejściu z 0 A grid (starsza wersja) przywrócić 1 A. Przy Grid Charge OFF i istniejącym legalnym limicie, nie wysyłać zbędnych poleceń.
 - Wszystkie inne testy sterowania, blokad, recovery, TOU rollover i logbook bez regresji. Odbiór rzeczywistego zachowania falownika musi wykonać użytkownik na HA, gdyż CI nie ma dostępu do instalacji.
+
+
+## v1.16.14 — testy tolerancji i prądu
+
+- SOC 99% → 100% przy różnicy modelowej 0,0096 DKK nie uruchamia ładowania z sieci; nie blokować przy tym naturalnego 100% od PV.
+- 0,01 DKK = pomijalna różnica, 0,10 DKK do rozpoczęcia kampanii, 0,05 DKK dla jej kontynuacji. Porównanie na całym tanim oknie, bez odkładania pierwszego kwadransa w nieskończoność.
+- Pięć godzin zbliżonych cen: bez BOOST na początku, rozłożyć sumę energii, nie naruszając walidatora fizycznego ani limitów prądowych; nie przenosić ładowania przed pierwotny termin.
+- Przy SOC 99%, Grid Charge OFF i obecnych limitach 1 A oraz 7 A nie wysyłać żadnej komendy zmiany prądów. Sam Solar Sell ON nie jest wystarczającym uzasadnieniem 1 A.
+- Limit dla PV zmieniać na 1 A tylko przy planie: sprzedaż PV teraz + ładowanie później. Przed zakończeniem sterowania przywrócić wcześniej zapamiętane ograniczenie, o ile użytkownik nie nadpisał go ręcznie.
+- Limit prądu z sieci zmieniać jedynie przy rzeczywistym rozłożeniu ładowania na kilka tanich kwadransów lub gdy planowane ładowanie wymaga usunięcia zastanego 0 A.
+- Sprawdzić HA replay/Lab po dodaniu bool `grid_charge_already_active` do metadanych; testy CI nie zastępują weryfikacji rzeczywistej instalacji.
