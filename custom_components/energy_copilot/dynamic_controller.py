@@ -481,9 +481,10 @@ class DynamicDeyeController:
                     self._pv_throttle_previous_a = None
                     charge_policy = "restore_after_pv_deferral"
 
-                if spreading_grid:
-                    # Restrict grid current to the planned per-quarter rate
-                    # only when deliberately using a longer cheap window.
+                if spreading_grid or (charge_enabled and current_grid_a < 1.0):
+                    # Restrict grid current for an explicit multi-quarter
+                    # campaign, or enable a planned charge from a legacy 0 A
+                    # limit. Otherwise preserve the operator's current cap.
                     desired_grid_a = self.adapter.quantize_number(
                         GRID_CURRENT, max(1.0, min(50.0, ceil(grid_a))),
                         direction="up",
@@ -505,7 +506,11 @@ class DynamicDeyeController:
                                 ),
                             )
                         )
-                    charge_policy = "spread_grid_charge_over_low_price_window"
+                    charge_policy = (
+                        "spread_grid_charge_over_low_price_window"
+                        if spreading_grid
+                        else "enable_planned_grid_charge_from_zero"
+                    )
                 # The existing inverter/BMS discharge-current cap is preserved.
                 # Read-only preflight above detects 0 A; no write is permitted.
                 # Stop grid charging first, then update active TOU settings.
