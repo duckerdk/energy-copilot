@@ -304,7 +304,9 @@ def _revised_event(entry):
         and abs(float(previous[k]) - float(entry[k])) > 1e-7
         for k in changed_input_keys
     )
-    suffix = " (po aktualizacji danych)." if input_changed else " (po ponownym planowaniu)."
+    suffix = (
+        " (po aktualizacji danych)." if input_changed else " (po ponownym planowaniu)."
+    )
     return (
         f"Korekta planu na {_local_time(entry.get('quarter_start_utc'))}: "
         + "; ".join(details)
