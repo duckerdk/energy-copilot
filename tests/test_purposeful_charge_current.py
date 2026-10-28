@@ -26,8 +26,7 @@ async def test_soc99_keeps_existing_one_and_seven_amp_limits():
     assert service.states.get(CHARGE_CURRENT).state == "1"
     assert service.states.get(GRID_CURRENT).state == "7"
     assert not any(
-        call[2]["entity_id"] in {CHARGE_CURRENT, GRID_CURRENT}
-        for call in service.calls
+        call[2]["entity_id"] in {CHARGE_CURRENT, GRID_CURRENT} for call in service.calls
     )
 
 
@@ -90,6 +89,5 @@ async def test_grid_charge_switches_on_without_rewriting_existing_positive_limit
     assert await ctrl.apply(plan, now, soc_pct=70, voltage_v=52) == "applied"
     assert service.states.get(GRID_CHARGE).state == "on"
     assert not any(
-        c[2]["entity_id"] in {CHARGE_CURRENT, GRID_CURRENT}
-        for c in service.calls
+        c[2]["entity_id"] in {CHARGE_CURRENT, GRID_CURRENT} for c in service.calls
     )
