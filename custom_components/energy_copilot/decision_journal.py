@@ -251,7 +251,7 @@ def _setting_change(change):
         if unit:
             try:
                 return f"{float(value):g} {unit}".replace(".", ",")
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return str(value)
         return (
             str(value).upper()
