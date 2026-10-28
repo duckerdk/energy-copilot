@@ -209,7 +209,11 @@ def _decision_evidence(entry):
             parts.append(f"prognoza domu {home}")
         if charged:
             parts.append(f"do baterii z PV {charged}")
-        return "Dane kwadransa: " + "; ".join(parts) + "." if parts else "Brak szczegółów przepływu PV."
+        return (
+            "Dane kwadransa: " + "; ".join(parts) + "."
+            if parts
+            else "Brak szczegółów przepływu PV."
+        )
     if action == "idle":
         return "Plan nie przewiduje ładowania ani rozładowania w tym kwadransie."
     return "Brak klasyfikacji decyzji."
@@ -219,24 +223,41 @@ def _setting_change(change):
     """Concise name, before/after values and exact entity identifier for debugging."""
     entity = change["entity_id"]
     names = {
-        "number.sun12k_maximum_battery_charge_current": ("Limit ładowania baterii", "A"),
+        "number.sun12k_maximum_battery_charge_current": (
+            "Limit ładowania baterii",
+            "A",
+        ),
         "number.sun12k_maximum_battery_discharge_current": ("Limit rozładowania", "A"),
-        "number.sun12k_maximum_battery_grid_charge_current": ("Limit ładowania z sieci", "A"),
+        "number.sun12k_maximum_battery_grid_charge_current": (
+            "Limit ładowania z sieci",
+            "A",
+        ),
         "switch.sun12k_grid_charge": ("Grid Charge", ""),
         "switch.sun12k_solar_sell": ("Solar Sell", ""),
     }
     if entity in names:
         name, unit = names[entity]
-    elif entity.startswith("number.sun12k_time_point_") and entity.endswith("_capacity"):
+    elif entity.startswith("number.sun12k_time_point_") and entity.endswith(
+        "_capacity"
+    ):
         name, unit = "Docelowy SOC TOU", "%"
-    elif entity.startswith("switch.sun12k_time_point_") and entity.endswith("_charge_enable"):
+    elif entity.startswith("switch.sun12k_time_point_") and entity.endswith(
+        "_charge_enable"
+    ):
         name, unit = "Zezwolenie ładowania TOU", ""
     else:
         name, unit = "Nastawa", ""
     def fmt(value):
         if unit:
-            return _number(value, unit, 0) or str(value)
-        return str(value).upper() if isinstance(value, str) and value in {"on", "off"} else str(value)
+            try:
+                return f"{float(value):g} {unit}".replace(".", ",")
+            except (TypeError, ValueError):
+                return str(value)
+        return (
+            str(value).upper()
+            if isinstance(value, str) and value in {"on", "off"}
+            else str(value)
+        )
     return f"{name} {fmt(change['before'])} → {fmt(change['after'])} [{entity}]"
 
 
@@ -292,12 +313,16 @@ def readable_event(entry):
         slot = entry.get("active_tou_slot")
         parts = [f"Falownik, kwadrans {quarter}:"]
         if commands is None:
-            parts.append("wykonawca zakończył przetwarzanie planu; brak rejestru zmian nastaw.")
+            parts.append(
+                "wykonawca zakończył przetwarzanie planu; brak rejestru zmian nastaw."
+            )
         elif commands == 0:
             parts.append("nastawy zgodne z planem; nie wysłano poleceń.")
         else:
             parts.append(f"zmieniono {commands} nastaw; zapisy potwierdzone odczytem:")
-            parts.append("; ".join(_setting_change(change) for change in changes or []) + ".")
+            parts.append(
+                "; ".join(_setting_change(change) for change in changes or []) + "."
+            )
         if slot is not None:
             parts.append(f"Okno TOU {slot}.")
         soc = _number(entry.get("observed_tou_soc"), "%", 0)
@@ -342,7 +367,8 @@ def readable_event(entry):
             issues = entry.get("issue_codes") or []
             if issues:
                 problems.append(
-                    "kody danych: " + ", ".join(_ISSUE_NAMES.get(i, i) for i in issues[:5])
+                    "kody danych: "
+                    + ", ".join(_ISSUE_NAMES.get(i, i) for i in issues[:5])
                 )
         if entry.get("planning_status") == "blocked":
             problems.append("planer: " + _reason(entry.get("planning_reason")))
@@ -364,15 +390,25 @@ def readable_event(entry):
             + suffix
         )
     if event == "recovered":
-        return "Wznowiono wykonywanie planu: pomiary poprawne, plan dostępny, ARM aktywny."
+        return (
+            "Wznowiono wykonywanie planu: pomiary poprawne, plan dostępny, ARM aktywny."
+        )
     if event in {"halted", "failure"}:
         attempted = entry.get("attempted_command")
         completed = entry.get("completed_commands") or []
         return (
             "Zatrzymano sterowanie po błędzie zapisu. "
             + _reason(reason)
-            + (f" Niepotwierdzona operacja: {_setting_change(attempted)}." if attempted else "")
-            + (f" Wcześniejsze potwierdzone zmiany: {len(completed)}." if completed else "")
+            + (
+                f" Niepotwierdzona operacja: {_setting_change(attempted)}."
+                if attempted
+                else ""
+            )
+            + (
+                f" Wcześniejsze potwierdzone zmiany: {len(completed)}."
+                if completed
+                else ""
+            )
             + " Stan: recovery_required; ARM wyłączony."
         )
     if event == "plan_status":
@@ -383,12 +419,16 @@ def readable_event(entry):
             parts.append("Przyczyna: " + _reason(reason))
             parts.append("Nowy plan nie został utworzony.")
         elif current == "preview":
-            parts.append(f"Plan dostępny, pokrycie: {entry.get('coverage') or 'nieznane'}.")
+            parts.append(
+                f"Plan dostępny, pokrycie: {entry.get('coverage') or 'nieznane'}."
+            )
         return " ".join(parts)
     if event == "input_quality":
         quality = entry.get("quality")
         previous = entry.get("previous_quality")
-        parts = [f"Dane wejściowe: {previous or 'start'} → {quality or 'brak statusu'}."]
+        parts = [
+            f"Dane wejściowe: {previous or 'start'} → {quality or 'brak statusu'}."
+        ]
         actionable = [
             f"{_ISSUE_NAMES.get(item.get('code'), item.get('code'))} ({item.get('source')})"
             for item in entry.get("categorized_issues", ())
@@ -465,9 +505,12 @@ class DecisionJournal:
                 publish = False
             if publish:
                 registry = er.async_get(self.hass)
-                entity_id = registry.async_get_entity_id(
-                    "sensor", DOMAIN, f"{self.entry_id}_decision_journal"
-                ) or "sensor.energy_co_pilot_decision_journal"
+                entity_id = (
+                    registry.async_get_entity_id(
+                        "sensor", DOMAIN, f"{self.entry_id}_decision_journal"
+                    )
+                    or "sensor.energy_co_pilot_decision_journal"
+                )
                 self.hass.bus.async_fire(
                     "logbook_entry",
                     {
