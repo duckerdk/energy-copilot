@@ -155,7 +155,8 @@ def _decision_evidence(entry):
             ac_kwh = float(amount) * float(eta)
             avoided = ac_kwh * float(buy)
             return (
-                f"Z baterii do domu: {_number(ac_kwh, 'kWh AC')}; "
+                f"Rozładowanie baterii: {_number(amount, 'kWh DC')} → "
+                f"do domu: {_number(ac_kwh, 'kWh AC')}; "
                 f"uniknięty zakup: {_number(avoided, 'DKK')}; "
                 f"degradacja: {_number(wear, 'DKK')}; "
                 f"saldo tej operacji: {_number(avoided - float(wear), 'DKK')} "
