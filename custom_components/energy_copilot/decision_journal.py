@@ -126,7 +126,6 @@ def _reason(value):
     return "Nieznany problem wykonania; szczegóły zapisano w diagnostyce."
 
 
-
 def _decision_evidence(entry):
     """Report measured/optimized quantities; never invent a counterfactual cause."""
     action = entry.get("action")
@@ -143,13 +142,13 @@ def _decision_evidence(entry):
             ac_kwh = float(dc_kwh) * float(efficiency)
             avoided = ac_kwh * float(buy)
             return (
-                f"Rozładowanie { _number(dc_kwh, 'kWh DC') } "
-                f"zastępuje { _number(ac_kwh, 'kWh AC') } zakupu z sieci "
-                f"o wartości { _number(avoided, 'DKK') } przy obecnej cenie. "
+                f"Rozładowanie {_number(dc_kwh, 'kWh DC')} "
+                f"zastępuje {_number(ac_kwh, 'kWh AC')} zakupu z sieci "
+                f"o wartości {_number(avoided, 'DKK')} przy obecnej cenie. "
                 f"Modelowy koszt degradacji tej operacji: "
-                f"{ _number(degradation, 'DKK') }; "
+                f"{_number(degradation, 'DKK')}; "
                 f"bilans bez wpływu na dalszy SOC: "
-                f"{ _number(avoided - float(degradation), 'DKK') }."
+                f"{_number(avoided - float(degradation), 'DKK')}."
             )
         return (
             "Model przewiduje zasilanie domu energią z baterii. "
@@ -197,8 +196,7 @@ def _decision_evidence(entry):
                 else:
                     message += "Cena późniejszego rozładowania jest taka sama. "
             return (
-                message
-                + "Nie obliczono wariantu z wymuszonym rozładowaniem teraz, "
+                message + "Nie obliczono wariantu z wymuszonym rozładowaniem teraz, "
                 "więc dokładna przyczyna oszczędzania baterii nie jest potwierdzona."
             )
         message = (
@@ -212,8 +210,7 @@ def _decision_evidence(entry):
                 f"{_number(later_charge_price, 'DKK/kWh')}. "
             )
         return (
-            message
-            + "Brak późniejszego rozładowania w bieżącym planie. "
+            message + "Brak późniejszego rozładowania w bieżącym planie. "
             "Bez osobnego wariantu nie można wskazać jednoznacznej przyczyny."
         )
     if action == "pv_charge":
@@ -315,8 +312,7 @@ def readable_event(entry):
         actionable = [
             item.get("code")
             for item in entry.get("categorized_issues", ())
-            if item.get("category") in {"blocking", "uncertainty"}
-            and item.get("code")
+            if item.get("category") in {"blocking", "uncertainty"} and item.get("code")
         ]
         if actionable:
             details.append(
@@ -332,8 +328,7 @@ def readable_event(entry):
             )
         if entry.get("planning_status") == "blocked":
             details.append(
-                "Planer nie przygotował planu: "
-                + _reason(entry.get("planning_reason"))
+                "Planer nie przygotował planu: " + _reason(entry.get("planning_reason"))
             )
         if entry.get("quality") and entry.get("quality") != "valid":
             details.append("Jakość bieżących danych jest niepoprawna.")
