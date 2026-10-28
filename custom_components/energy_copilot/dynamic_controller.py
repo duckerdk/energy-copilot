@@ -360,7 +360,9 @@ class DynamicDeyeController:
                 if charge > 1e-7 and not charge_enabled:
                     raise CommandRejected("controller:charge_plan_without_grid_current")
                 projected_soc = float(row["soc_end_pct"])
-                if not isfinite(projected_soc) or not 20 - 1e-6 <= projected_soc <= 100 + 1e-6:
+                if not isfinite(projected_soc) or not (
+                    20 - 1e-6 <= projected_soc <= 100 + 1e-6
+                ):
                     raise CommandRejected("controller:target_soc_invalid")
                 if charge_enabled:
                     # With Grid Charge ON, this SOC becomes the *charging target*.
@@ -433,7 +435,7 @@ class DynamicDeyeController:
                     # allowed minimum; otherwise keep PV charging available.
                     target_charge_a = 1.0 if planned_sell else charge_max
                 total_charge_a = self.adapter.quantize_number(
-                    CHARGE_CURRENT, target_charge_a
+                    CHARGE_CURRENT, target_charge_a, direction="up"
                 )
 
                 grid_state = self.adapter._present(GRID_CURRENT)
@@ -478,7 +480,7 @@ class DynamicDeyeController:
                     await self._set_number_if_changed(slot["soc"], target_soc)
                     await self._set_switch_if_changed(slot["grid_charge"], True)
                 else:
-                    # Disable slot permission before returning the TOU floor to 20%.
+                    # Disable slot permission before updating the TOU SOC floor.
                     await self._set_switch_if_changed(slot["grid_charge"], False)
                     await self._set_number_if_changed(slot["soc"], target_soc)
                 for entity, value in settings:
@@ -503,7 +505,6 @@ class DynamicDeyeController:
                     charge_enabled,
                     grid_limit,
                     total_charge_a,
-                    grid_limit,
                     planned_sell,
                 )
                 if (
