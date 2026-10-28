@@ -246,7 +246,10 @@ def optimize_horizon(
         price = quarters[0].buy_dkk_per_kwh
         window = 0
         for quarter in quarters[:MAX_SPREAD_QUARTERS]:
-            if abs(quarter.buy_dkk_per_kwh - price) > CHEAP_WINDOW_PRICE_TOLERANCE_DKK_PER_KWH:
+            if (
+                abs(quarter.buy_dkk_per_kwh - price)
+                > CHEAP_WINDOW_PRICE_TOLERANCE_DKK_PER_KWH
+            ):
                 break
             window += 1
         no_cheap_charge = optimize_continuous(
