@@ -397,9 +397,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         )
         if plan_fingerprint != self._last_plan_fingerprint:
             previous_plan_status = (
-                self._last_plan_fingerprint[0]
-                if self._last_plan_fingerprint
-                else None
+                self._last_plan_fingerprint[0] if self._last_plan_fingerprint else None
             )
             self._last_plan_fingerprint = plan_fingerprint
             self.decision_journal.record(
