@@ -1,6 +1,6 @@
 # Energy Co-Pilot
 
-Natywna integracja Home Assistant `custom_components/energy_copilot`. **Wersja v1.16.9:** automatyczny ARM, odzyskiwanie po przejściowych błędach i czytelne wpisy decyzji w natywnej **Aktywności** oraz **Logach systemowych → Core** (z zachowaniem technicznego archiwum decyzji). Obecnie dostępne: odczyt pomiarów/cen, Forecast.Solar, Recorder, prognoza domu na 7 dni oraz **ciągła optymalizacja w trybie `dry_run`**. W trybach `monitor` i `dry_run` integracja **nie zapisuje nastaw falownika**. Tryb `automatic` udostępnia przełącznik **Automatic control ARM / STOP** (domyślnie włączony po starcie/reload integracji). Steruje bezpośrednio limitami prądu ładowania i rozładowania, Grid Charge i Solar Sell na podstawie bieżącego kwadransa planu; nie modyfikuje tabeli sześciu TOU. Ta funkcja jest eksperymentalna i wymaga odpowiedniej konfiguracji bazowej Deye.
+Natywna integracja Home Assistant `custom_components/energy_copilot`. **Wersja v1.16.10:** poprawa dziennika HA: osobne wpisy w **Aktywności** zamiast zmian stanu sensora, rzeczowe wyjaśnienia decyzji oparte na faktycznym planie, cenach i kosztach, dokładne przyczyny blokad. ARM i techniczne archiwum z poprzednich wersji pozostają bez zmian. Obecnie dostępne: odczyt pomiarów/cen, Forecast.Solar, Recorder, prognoza domu na 7 dni oraz **ciągła optymalizacja w trybie `dry_run`**. W trybach `monitor` i `dry_run` integracja **nie zapisuje nastaw falownika**. Tryb `automatic` udostępnia przełącznik **Automatic control ARM / STOP** (domyślnie włączony po starcie/reload integracji). Steruje bezpośrednio limitami prądu ładowania i rozładowania, Grid Charge i Solar Sell na podstawie bieżącego kwadransa planu; nie modyfikuje tabeli sześciu TOU. Ta funkcja jest eksperymentalna i wymaga odpowiedniej konfiguracji bazowej Deye.
 
 Zatwierdzone reguły, cele i uprawnienia: [REQUIREMENTS.md](requirements/REQUIREMENTS.md). Jedynym źródłem produkcji w integracji jest `sensor.pv_sum`; nie stosuje się PV1/PV2.
 
@@ -24,11 +24,11 @@ W trybie Replay HA **nie** dodaje się taryf N1 ani nie wyznacza ponownie progno
 
 ## Gdzie są logi Energy Co-Pilot
 
-- **Aktywność:** czytelna, chronologiczna historia decyzji planera, wysłanych nastaw, blokad, wznowień i ARM/STOP. Każdy wpis nosi nazwę **Energy Co-Pilot**. Używa natywnego zdarzenia HA `logbook_entry` i podlega retencji Recorder.
+- **Aktywność:** czytelna, chronologiczna historia decyzji planera, wysłanych nastaw, blokad, wznowień i ARM/STOP. Każdy wpis nosi nazwę **Energy Co-Pilot**. Używa natywnego zdarzenia HA `logbook_entry` z domeną `energy_copilot`, niezależnie od sensora, i podlega retencji Recorder. Sensor `Decision journal` pozostaje punktem dostępu do diagnostyki ze stałym stanem `ready` lub `unavailable` — nie generuje już mylących przejść `planned → blocked`.
 - **Logi systemowe → Core:** czytelne komunikaty `Energy Co-Pilot`. Ostrzeżenia o blokadach i błędy są na poziomie WARNING/ERROR; zwykłe decyzje na INFO i są dostępne w widoku surowych logów, jeśli poziom logowania HA dopuszcza INFO. Widok skrócony Logów systemowych pokazuje przede wszystkim ostrzeżenia i błędy.
 - **Pobierz diagnostykę:** techniczne archiwum `data.decision_journal.events` przechowywane do 30 dni/6000 wpisów, niezależne od retencji Recorder. Przeznaczone do dokładnej analizy, nie do codziennej lektury.
 
-Wpis `applied` oznacza wysłanie i odczyt nastaw — nie jest potwierdzeniem faktycznego przepływu energii. Dla decyzji wyświetlane są rzeczywiste wartości planu: SOC, ceny, prognozy i uzasadnienie globalnej optymalizacji. Integracja nie twierdzi, że sprawdziła koszt alternatywny pojedynczego kwadransa.
+Wpis `applied` oznacza wysłanie i odczyt nastaw — nie jest potwierdzeniem faktycznego przepływu energii. Dla decyzji wyświetlane są rzeczywiste wartości planu: SOC, ceny, prognozy, ilości energii, koszt unikniętego zakupu i degradacji (gdy są policzalne), a także czas i cena późniejszego rozładowania, jeśli zaplanowano. **Brak kontrfaktycznego porównania** musi zostać nazwany wprost — nie wolno zastępować go hasłem, że optymalizator minimalizuje koszt.
 
 ## Instalacja i aktualizacja HACS
 
