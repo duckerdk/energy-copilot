@@ -386,9 +386,8 @@ class DynamicDeyeController:
                     self.status = "blocked"
                     event = "blocked"
                     phase = "pre_write_validation"
-                if (
-                    event == "halted"
-                    or self.reason != getattr(self, "_last_block_reason", None)
+                if event == "halted" or self.reason != getattr(
+                    self, "_last_block_reason", None
                 ):
                     self._audit(
                         event,
