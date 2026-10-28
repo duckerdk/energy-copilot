@@ -133,6 +133,10 @@ async def async_get_config_entry_diagnostics(hass, entry):
         "installed_build": entry.runtime_data.installed_build,
         "mode": coordinator.settings.get("mode", "monitor"),
         "read_only": not coordinator.dynamic_controller.armed,
+        "decision_journal": {
+            **coordinator.decision_journal.summary,
+            "events": coordinator.decision_journal.recent(6000),
+        },
         "execution": {
             "armed": coordinator.dynamic_controller.armed,
             "status": coordinator.dynamic_controller.status,
