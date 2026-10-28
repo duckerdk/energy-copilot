@@ -1,6 +1,6 @@
 # Energy Co-Pilot
 
-Natywna integracja Home Assistant `custom_components/energy_copilot`. **Wersja v1.16.8:** automatyczny ARM w trybie live, odzyskiwanie po krótkich błędach wejścia i trwały dziennik decyzji. Obecnie dostępne: odczyt pomiarów/cen, Forecast.Solar, Recorder, prognoza domu na 7 dni oraz **ciągła optymalizacja w trybie `dry_run`**. W trybach `monitor` i `dry_run` integracja **nie zapisuje nastaw falownika**. Tryb `automatic` udostępnia przełącznik **Automatic control ARM / STOP** (domyślnie włączony po starcie/reload integracji). Steruje bezpośrednio limitami prądu ładowania i rozładowania, Grid Charge i Solar Sell na podstawie bieżącego kwadransa planu; nie modyfikuje tabeli sześciu TOU. Ta funkcja jest eksperymentalna i wymaga odpowiedniej konfiguracji bazowej Deye.
+Natywna integracja Home Assistant `custom_components/energy_copilot`. **Wersja v1.16.9:** automatyczny ARM, odzyskiwanie po przejściowych błędach i czytelne wpisy decyzji w natywnej **Aktywności** oraz **Logach systemowych → Core** (z zachowaniem technicznego archiwum decyzji). Obecnie dostępne: odczyt pomiarów/cen, Forecast.Solar, Recorder, prognoza domu na 7 dni oraz **ciągła optymalizacja w trybie `dry_run`**. W trybach `monitor` i `dry_run` integracja **nie zapisuje nastaw falownika**. Tryb `automatic` udostępnia przełącznik **Automatic control ARM / STOP** (domyślnie włączony po starcie/reload integracji). Steruje bezpośrednio limitami prądu ładowania i rozładowania, Grid Charge i Solar Sell na podstawie bieżącego kwadransa planu; nie modyfikuje tabeli sześciu TOU. Ta funkcja jest eksperymentalna i wymaga odpowiedniej konfiguracji bazowej Deye.
 
 Zatwierdzone reguły, cele i uprawnienia: [REQUIREMENTS.md](requirements/REQUIREMENTS.md). Jedynym źródłem produkcji w integracji jest `sensor.pv_sum`; nie stosuje się PV1/PV2.
 
@@ -21,6 +21,14 @@ W tabeli można zmienić godzinowe ceny spot, prognozę PV, pobór domu, SOC, po
 W trybie Replay HA **nie** dodaje się taryf N1 ani nie wyznacza ponownie prognoz: replay używa oryginalnych, już przygotowanych wejść kwadransowych. Nie wymaga pełnej godziny startu i zachowuje dokładne wartości SOC, napięcia, wydajności i wartości końcowej. Porównuje dwa przebiegi **tego samego** modułu `continuous_optimizer.py`, dołączonego do GitHub Pages razem z `replay.py`, `planner.py` i `horizon_optimizer.py`. Tryb zwykłego Scenariusza pozostaje niezależny.
 
 **Prywatność:** plik diagnostyki zawiera prognozowane zużycie domu z rozdzielczością 15 minut. Lab odczytuje go **lokalnie w przeglądarce**; nie zapisuje go do repo, serwera ani stanu sensora. Pełna diagnostyka HA może zawierać dodatkowe informacje systemowe: udostępniaj ją ostrożnie. Stare diagnostyki z v1.13.0 nie posiadają wymaganej migawki, więc nie można ich odtworzyć w ten sposób. Replay ma cel wyłącznie kontrolny i **nie wykonuje komend falownika**.
+
+## Gdzie są logi Energy Co-Pilot
+
+- **Aktywność:** czytelna, chronologiczna historia decyzji planera, wysłanych nastaw, blokad, wznowień i ARM/STOP. Każdy wpis nosi nazwę **Energy Co-Pilot**. Używa natywnego zdarzenia HA `logbook_entry` i podlega retencji Recorder.
+- **Logi systemowe → Core:** czytelne komunikaty `Energy Co-Pilot`. Ostrzeżenia o blokadach i błędy są na poziomie WARNING/ERROR; zwykłe decyzje na INFO, zgodnie z ustawionym poziomem logowania HA.
+- **Pobierz diagnostykę:** techniczne archiwum `data.decision_journal.events` przechowywane do 30 dni/6000 wpisów, niezależne od retencji Recorder. Przeznaczone do dokładnej analizy, nie do codziennej lektury.
+
+Wpis `applied` oznacza wysłanie i odczyt nastaw — nie jest potwierdzeniem faktycznego przepływu energii. Dla decyzji wyświetlane są rzeczywiste wartości planu: SOC, ceny, prognozy i uzasadnienie globalnej optymalizacji. Integracja nie twierdzi, że sprawdziła koszt alternatywny pojedynczego kwadransa.
 
 ## Instalacja i aktualizacja HACS
 
