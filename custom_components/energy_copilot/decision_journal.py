@@ -247,6 +247,7 @@ def _setting_change(change):
         name, unit = "Zezwolenie ładowania TOU", ""
     else:
         name, unit = "Nastawa", ""
+
     def fmt(value):
         if unit:
             try:
@@ -258,6 +259,7 @@ def _setting_change(change):
             if isinstance(value, str) and value in {"on", "off"}
             else str(value)
         )
+
     return f"{name} {fmt(change['before'])} → {fmt(change['after'])} [{entity}]"
 
 
