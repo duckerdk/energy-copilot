@@ -72,7 +72,7 @@ def _number(value, unit="", digits=2):
         return None
     try:
         formatted = f"{float(value):.{digits}f}".replace(".", ",")
-    except (ValueError, TypeError, OverflowError):
+    except ValueError, TypeError, OverflowError:
         return None
     return f"{formatted} {unit}".strip()
 
@@ -111,7 +111,9 @@ def readable_event(entry):
     quarter = _local_time(entry.get("quarter_start_utc"))
     if event in {"planned", "decision"}:
         action = _ACTION_NAMES.get(entry.get("action"), "nieznana akcja planera")
-        parts = [f"{'Plan' if event == 'planned' else 'Decyzja wykonawcy'} na {quarter}: {action}."]
+        parts = [
+            f"{'Plan' if event == 'planned' else 'Decyzja wykonawcy'} na {quarter}: {action}."
+        ]
         soc = _number(entry.get("soc_observed_pct"), "%", 1)
         target = _number(entry.get("soc_planned_end_pct"), "%", 1)
         if soc and target:
@@ -150,7 +152,9 @@ def readable_event(entry):
         discharge = _number(entry.get("discharge_limit_a"), "A", 0)
         soc = _number(entry.get("target_tou_soc"), "%", 0)
         charge = "włączone" if entry.get("target_tou_grid_charge") else "wyłączone"
-        parts = [f"Nastawy falownika dla kwadransa {quarter} zostały wysłane i odczytane."]
+        parts = [
+            f"Nastawy falownika dla kwadransa {quarter} zostały wysłane i odczytane."
+        ]
         if grid:
             parts.append(f"Limit ładowania z sieci: {grid}.")
         if discharge:
@@ -158,7 +162,9 @@ def readable_event(entry):
         if soc:
             parts.append(f"Cel SOC w aktywnym oknie: {soc}.")
         parts.append(f"Zezwolenie na ładowanie z sieci: {charge}.")
-        parts.append("Odczyt nastaw nie potwierdza jeszcze rzeczywistego przepływu energii.")
+        parts.append(
+            "Odczyt nastaw nie potwierdza jeszcze rzeczywistego przepływu energii."
+        )
         return " ".join(parts)
     if event == "armed":
         return "Sterowanie automatyczne zostało uzbrojone (ARM). " + _reason(reason)
@@ -185,7 +191,12 @@ def readable_event(entry):
             if entry.get("phase") != "device_write_result_uncertain"
             else "Wynik zapisu wymaga kontroli."
         )
-        return "Wstrzymano wykonywanie planu. " + _reason(reason) + " " + " ".join(details + [state])
+        return (
+            "Wstrzymano wykonywanie planu. "
+            + _reason(reason)
+            + " "
+            + " ".join(details + [state])
+        )
     if event == "recovered":
         return "Wznowiono wykonywanie planu po odzyskaniu poprawnych danych. ARM pozostał aktywny."
     if event in {"halted", "failure"}:
@@ -197,7 +208,11 @@ def readable_event(entry):
     if event == "plan_status":
         status = entry.get("planning_status")
         if status == "preview":
-            return "Planer przygotował plan. Pokrycie danych: " + str(entry.get("coverage") or "nieznane") + "."
+            return (
+                "Planer przygotował plan. Pokrycie danych: "
+                + str(entry.get("coverage") or "nieznane")
+                + "."
+            )
         if status == "blocked":
             return "Planer nie może przygotować planu. " + _reason(reason)
         return f"Status planera: {status or 'nieznany'}."
@@ -206,9 +221,10 @@ def readable_event(entry):
         if quality == "valid":
             return "Bieżące dane sterowania są poprawne."
         issues = entry.get("issue_codes") or []
-        return (
-            f"Jakość bieżących danych: {quality or 'nieznana'}. "
-            + ("Problemy: " + ", ".join(_ISSUE_NAMES.get(i, i) for i in issues[:5]) + "." if issues else "")
+        return f"Jakość bieżących danych: {quality or 'nieznana'}. " + (
+            "Problemy: " + ", ".join(_ISSUE_NAMES.get(i, i) for i in issues[:5]) + "."
+            if issues
+            else ""
         )
     return "Energy Co-Pilot: zarejestrowano zdarzenie " + event + ". " + _reason(reason)
 
@@ -235,7 +251,9 @@ class DecisionJournal:
         except Exception as exc:  # A corrupt archive must never stop the controller.
             self.available = False
             self.error = f"{type(exc).__name__}:{exc}"
-            _LOGGER.error("Energy Co-Pilot: niedostępne archiwum decyzji: %s", self.error)
+            _LOGGER.error(
+                "Energy Co-Pilot: niedostępne archiwum decyzji: %s", self.error
+            )
 
     def _trim(self):
         cutoff = (dt_util.utcnow() - timedelta(days=RETENTION_DAYS)).isoformat()
@@ -257,7 +275,9 @@ class DecisionJournal:
             message = readable_event(entry)
             if event in {"halted", "failure"}:
                 _LOGGER.error("Energy Co-Pilot: %s", message)
-            elif event == "blocked" or (event == "input_quality" and entry.get("quality") != "valid"):
+            elif event == "blocked" or (
+                event == "input_quality" and entry.get("quality") != "valid"
+            ):
                 _LOGGER.warning("Energy Co-Pilot: %s", message)
             else:
                 _LOGGER.info("Energy Co-Pilot: %s", message)
@@ -276,7 +296,9 @@ class DecisionJournal:
                 )
         except Exception:
             # Presentation must never interrupt the controller or technical audit.
-            _LOGGER.exception("Energy Co-Pilot: nie udało się opublikować wpisu dziennika")
+            _LOGGER.exception(
+                "Energy Co-Pilot: nie udało się opublikować wpisu dziennika"
+            )
         if self.available:
             try:
                 self.entries.append(entry)
@@ -285,7 +307,9 @@ class DecisionJournal:
             except Exception as exc:
                 self.available = False
                 self.error = f"{type(exc).__name__}:{exc}"
-                _LOGGER.exception("Energy Co-Pilot: zapis archiwum decyzji nie powiódł się")
+                _LOGGER.exception(
+                    "Energy Co-Pilot: zapis archiwum decyzji nie powiódł się"
+                )
         return entry
 
     def recent(self, limit=30):
@@ -308,4 +332,6 @@ class DecisionJournal:
             try:
                 await self.store.async_save({"entries": self.entries})
             except Exception:
-                _LOGGER.exception("Energy Co-Pilot: nie udało się zapisać archiwum przy wyłączaniu")
+                _LOGGER.exception(
+                    "Energy Co-Pilot: nie udało się zapisać archiwum przy wyłączaniu"
+                )
