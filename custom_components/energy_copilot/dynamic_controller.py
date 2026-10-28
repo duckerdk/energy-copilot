@@ -494,6 +494,7 @@ class DynamicDeyeController:
                     grid_limit,
                     total_charge_a,
                     grid_limit,
+                    planned_sell,
                 )
                 if (
                     application_key != self._last_application_key
@@ -513,9 +514,12 @@ class DynamicDeyeController:
                         observed_tou_soc=self.observed_tou_soc,
                         target_tou_grid_charge=charge_enabled,
                         observed_tou_grid_charge=self.observed_tou_grid_charge,
-                        grid_limit_a=grid_limit,
+                        grid_limit_a=float(
+                            self.adapter._present(GRID_CURRENT).state
+                        ),
                         discharge_limit_a=None,
                         charge_limit_a=total_charge_a,
+                        discharge_control="tou_soc_floor",
                         active_tou_slot=self.active_tou_slot,
                         command_changes=list(self._command_changes),
                         commands_sent=len(self._command_changes),
