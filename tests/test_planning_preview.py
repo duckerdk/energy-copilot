@@ -524,7 +524,7 @@ def test_terminal_proxy_does_not_reward_full_soc_without_pre_pv_load():
     from custom_components.energy_copilot.planner import Plant, Quarter
     from custom_components.energy_copilot.planning_preview import _terminal_proxy
 
-    plant = Plant(10.24, 50.0, 51.2, 50, 100, 50, 0.95, 0.95, 0.95, 0.95, 0)
+    plant = Plant(10.24, 50.0, 51.2, 50, 50, 0.95, 0.95, 0.95, 0.95, 0)
     end = BASE + STEP
     quarters = (Quarter(BASE, end, 0.10, 0, 0, 0, False),)
     pv = (ForecastPeriod(end, end + STEP, 1.0),)
@@ -541,7 +541,7 @@ def test_terminal_proxy_scales_with_demand_before_next_pv():
     from custom_components.energy_copilot.planner import Plant, Quarter
     from custom_components.energy_copilot.planning_preview import _terminal_proxy
 
-    plant = Plant(10.24, 50.0, 51.2, 50, 100, 50, 0.95, 0.95, 0.95, 0.95, 0)
+    plant = Plant(10.24, 50.0, 51.2, 50, 50, 0.95, 0.95, 0.95, 0.95, 0)
     end = BASE + STEP
     quarters = (Quarter(BASE, end, 1.0, 0, 0, 0, False),)
     next_pv = end + timedelta(hours=2)
