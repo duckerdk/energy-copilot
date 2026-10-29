@@ -72,11 +72,6 @@ def _dispatch(
         battery_home = -delta_dc
         if battery_home * plant.eta_battery_to_ac > grid_home + EPS:
             return None
-        if (
-            battery_home
-            > plant.battery_voltage_v * plant.discharge_limit_a / 4000 + EPS
-        ):
-            return None
         grid_home = max(0.0, grid_home - battery_home * plant.eta_battery_to_ac)
     remaining_pv = max(0.0, pv_surplus - pv_battery)
     sell_ok = q.pv_export_enabled and q.sell_dkk_per_kwh >= PV_EXPORT_MIN_DKK_PER_KWH
