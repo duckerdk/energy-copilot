@@ -95,7 +95,6 @@ async def test_switch_write_validation():
     assert len(services.calls) == 1
 
 
-
 @pytest.mark.asyncio
 async def test_zero_charge_current_is_rejected_on_both_charging_limits():
     device, services = adapter()
