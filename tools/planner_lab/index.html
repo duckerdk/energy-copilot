@@ -121,7 +121,6 @@ tbody tr:nth-child(2n){background:#1b2938}
     <label class="field">Napięcie baterii (V)<input id="ha-voltage" type="number" min="1" step=".01"></label>
     <label class="field">Maks. prąd ładowania (A)<input id="ha-charge" type="number" min="0" step=".01"></label>
     <label class="field">Maks. prąd ładowania sieciowego (A)<input id="ha-grid" type="number" min="0" step=".01"></label>
-    <label class="field">Maks. prąd rozładowania (A)<input id="ha-discharge" type="number" min="0" step=".01"></label>
     <label class="field">Sprawność PV → AC<input id="ha-eta-pv-ac" type="number" min=".01" max="1" step=".001"></label>
     <label class="field">Sprawność PV → bateria<input id="ha-eta-pv-battery" type="number" min=".01" max="1" step=".001"></label>
     <label class="field">Sprawność sieć → bateria<input id="ha-eta-grid-battery" type="number" min=".01" max="1" step=".001"></label>
@@ -356,7 +355,7 @@ function payload(){
     battery_voltage_v:value("voltage"),
     charge_limit_a:value("charge"),
     grid_charge_limit_a:value("grid"),
-    discharge_limit_a:value("discharge"),
+    
     efficiency:value("eta"),
     pv_export_enabled:$("export").checked,
     hours:rows.map(r=>({...r}))
@@ -427,7 +426,7 @@ function simulate(){
 const haFields = [
   ["ha-soc","initial_soc_pct"],["ha-capacity","battery_capacity_dc_kwh"],
   ["ha-voltage","battery_voltage_v"],["ha-charge","charge_limit_a"],
-  ["ha-grid","grid_charge_limit_a"],["ha-discharge","discharge_limit_a"],
+  ["ha-grid","grid_charge_limit_a"],
   ["ha-eta-pv-ac","eta_pv_to_ac"],["ha-eta-pv-battery","eta_pv_to_battery"],
   ["ha-eta-grid-battery","eta_grid_to_battery"],["ha-eta-battery-ac","eta_battery_to_ac"]
 ];
@@ -788,7 +787,7 @@ $("json-file").addEventListener("change",async e=>{
     const d=JSON.parse(text);
     if(!Array.isArray(d.hours)||d.hours.length<1||d.hours.length>72)throw Error("JSON: nieprawidłowy horyzont");
     $("start").value=d.start_utc;
-    [["soc","initial_soc_pct"],["capacity","battery_capacity_kwh"],["voltage","battery_voltage_v"],["charge","charge_limit_a"],["grid","grid_charge_limit_a"],["discharge","discharge_limit_a"],["eta","efficiency"]].forEach(([id,key])=>{if(d[key]!==undefined)$(id).value=d[key];});
+    [["soc","initial_soc_pct"],["capacity","battery_capacity_kwh"],["voltage","battery_voltage_v"],["charge","charge_limit_a"],["grid","grid_charge_limit_a"],["eta","efficiency"]].forEach(([id,key])=>{if(d[key]!==undefined)$(id).value=d[key];});
     $("export").checked=!!d.pv_export_enabled;
     clearHaImports();setImportedDuration(d.hours.length);
     rows=d.hours.map(r=>({
