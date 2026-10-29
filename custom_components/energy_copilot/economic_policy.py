@@ -121,4 +121,3 @@ def spread_grid_charge_over_cheap_window(plant, quarters, result):
         dispatches=tuple(dispatches),
         method=result.method + "_low_price_charge_spread",
     )
-
