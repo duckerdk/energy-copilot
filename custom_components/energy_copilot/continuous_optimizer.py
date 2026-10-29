@@ -162,7 +162,6 @@ def optimize_continuous(
             )
         ):
             max_grid = 0.0
-        max_discharge = plant.battery_voltage_v * plant.discharge_limit_a / 4000.0
         # SOC gate limits carried + newly charged energy, not merely carry.
         if headroom and headroom[i].target_dc_kwh > 1e-8:
             safe_occupancy = max(0.0, usable - headroom[i].target_dc_kwh)
@@ -182,7 +181,7 @@ def optimize_continuous(
                 sink,
                 0.0
                 if i == 0 and audit_forbid_first_action == "battery_discharge"
-                else min(max_discharge, home_from_grid / plant.eta_battery_to_ac),
+                else home_from_grid / plant.eta_battery_to_ac,
                 (
                     DEGRADATION_DKK_PER_KWH_DC
                     - q.buy_dkk_per_kwh * plant.eta_battery_to_ac
