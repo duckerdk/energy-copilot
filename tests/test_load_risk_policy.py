@@ -65,7 +65,11 @@ def _quarters(*, flat=False):
         if flat:
             buy = 2.6
         at = START + timedelta(minutes=15 * i)
-        rows.append(Quarter(at, at + timedelta(minutes=15), buy, max(0, buy - 0.483), pv, home, True))
+        rows.append(
+            Quarter(
+                at, at + timedelta(minutes=15), buy, max(0, buy - 0.483), pv, home, True
+            )
+        )
     return tuple(rows)
 
 
@@ -81,7 +85,11 @@ def test_evening_underforecast_adds_economically_priced_reserve_not_fake_load():
     policy = hedged.load_risk_policy
     assert policy["status"] == "applied"
     assert 0 < policy["applied_extra_soc_points"] <= 15.0
-    peak = next(i for i, q in enumerate(quarters) if q.start.isoformat() == policy["peak_start_utc"])
+    peak = next(
+        i
+        for i, q in enumerate(quarters)
+        if q.start.isoformat() == policy["peak_start_utc"]
+    )
     gain = (
         hedged.candidate.quarters[peak - 1].soc_end_pct
         - nominal.candidate.quarters[peak - 1].soc_end_pct
@@ -92,9 +100,8 @@ def test_evening_underforecast_adds_economically_priced_reserve_not_fake_load():
         d.grid_to_battery_ac_kwh for d in nominal.dispatches
     )
     assert all(
-        hedged.dispatches[i].battery_to_home_dc_kwh == pytest.approx(
-            nominal.dispatches[i].battery_to_home_dc_kwh, abs=1e-6
-        )
+        hedged.dispatches[i].battery_to_home_dc_kwh
+        == pytest.approx(nominal.dispatches[i].battery_to_home_dc_kwh, abs=1e-6)
         for i in range(len(quarters))
     )
     physical = simulate_candidate(
@@ -107,7 +114,9 @@ def test_evening_underforecast_adds_economically_priced_reserve_not_fake_load():
 
 def test_no_spurious_charge_with_no_peak_or_without_holdout():
     plant = _plant()
-    normal = optimize_horizon(plant, _quarters(flat=True), terminal_value_override=2.078)
+    normal = optimize_horizon(
+        plant, _quarters(flat=True), terminal_value_override=2.078
+    )
     buffered = optimize_horizon(
         plant,
         _quarters(flat=True),
@@ -134,7 +143,9 @@ def test_replay_repeats_hedge_with_frozen_holdout_data():
         load_risk_accuracy=LOAD_ACCURACY,
     )
     frozen = build_replay(
-        plant, quarters, result,
+        plant,
+        quarters,
+        result,
         metadata={"load_risk_accuracy": LOAD_ACCURACY},
     )
     compared = simulate_replay(frozen)
