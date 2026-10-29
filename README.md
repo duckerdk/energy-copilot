@@ -40,9 +40,14 @@ Wymagany Home Assistant **2026.10 lub nowszy** (testowany Core 2026.10.2, Python
 
 Alternatywne ręczne kopiowanie `custom_components/energy_copilot` nie zapewnia `BUILD_INFO.json` ani gwarantowanego pochodzenia wydania. Nie trzeba zmieniać ESPHome, Modbus lub ustawień falownika.
 
+**Rollback 2.0.1 → 2.0.0 lub 1.16.19:** obie starsze wersje zachowują własne, niezmienione tagi i paczki. W HACS wybierz poprzednią wersję, uruchom ponownie HA i sprawdź `installed_build.tag` w diagnostyce.
+
 **Rollback 2.0.0 → 1.16.19:** wersja `v1.16.19` pozostaje osobnym, niezmienionym [GitHub Release](https://github.com/duckerdk/energy-copilot/releases/tag/v1.16.19), z własną paczką i sumami kontrolnymi. W HACS otwórz integrację Energy Co-Pilot, wybierz ponowne pobranie i wersję `1.16.19`, uruchom ponownie HA i zweryfikuj tag oraz sumę w diagnostyce. Nie przesuwać ani nie nadpisywać istniejących tagów.
 
 ## Planowanie w HA
+
+**2.0.1 — korekta bieżącego SOC i rozładowania:** Home Assistant przelicza plan od ostatniego odczytu SOC, także dla **pozostałej części aktualnego kwadransa**. Najbliższe przedziały uwzględniają zanikającą korektę prognoz z pomiarów W PV i domu; po zmianie decyzji `battery_discharge` wykonawca ustawia aktywny próg TOU **20%**, nie prognozowany SOC na koniec kwadransa. Wycenianie niepewnego dodatkowego poboru nie karze nominalnego zużycia baterii — liczy koszt rzeczywiście brakującej energii według godzin jej importu. Nie jest to gwarancja fizycznej realizacji przepływów, a działanie na realnym Deye wymaga weryfikacji.
+
 
 W **Energy Co-Pilot → Konfiguruj** ustaw `dry_run` dla symulacji, a `automatic` dla jawnie aktywowanego sterowania (domyślnie ARM po starcie; **Automatic control ARM / STOP** pozwala ręcznie zatrzymać zapis). Status `sensor.energy_co_pilot_planning_status` oznacza: `monitor` — brak planu, `blocked` — brak istotnych danych, `preview` — wygenerowany plan dla dostępnego horyzontu (`complete` albo `partial`). `sensor.energy_co_pilot_modeled_saving` jest **modelowaną** różnicą kosztu względem wariantu bez cykli magazynu, a **nie** realną oszczędnością wobec aktualnego Deye.
 
