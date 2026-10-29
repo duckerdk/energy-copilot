@@ -117,9 +117,7 @@ def test_45_day_lookback_excludes_older_history():
     model = train_load_model(history(now, count=90), now, "synthetic")
     assert LOOKBACK_DAYS == 45
     assert 44 <= model.distinct_days <= 46
-    assert all(
-        row.start >= now - timedelta(days=45) for row in model.samples
-    )
+    assert all(row.start >= now - timedelta(days=45) for row in model.samples)
 
 
 def test_recent_two_week_usage_change_is_visible_in_hourly_forecast():
@@ -140,12 +138,15 @@ def test_recent_two_week_usage_change_is_visible_in_hourly_forecast():
     new_model = train_load_model(recent, now, "synthetic")
     original = forecast_seven_days(old_model, now)
     modified = forecast_seven_days(new_model, now)
+
     def at_hour(forecast):
         return next(
-            row.kwh for row in forecast.hourly
+            row.kwh
+            for row in forecast.hourly
             if row.start.astimezone(LOCAL).hour == 18
             and row.start.astimezone(LOCAL).weekday() < 5
         )
+
     assert at_hour(modified) > at_hour(original) + 0.6
     assert at_hour(modified) < 2.5
 
