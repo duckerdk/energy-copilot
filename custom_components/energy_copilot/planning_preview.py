@@ -185,9 +185,7 @@ def _terminal_proxy(plant, quarters, projection, pv_periods):
     # A discounted avoided-purchase proxy MUST be lower than the marginal
     # cost of charging now at the cheapest already-known hour; otherwise
     # a terminal proxy by itself fills the battery to 100% every midnight.
-    avoided_import = (
-        min(recent) * plant.eta_battery_to_ac - DEGRADATION_DKK_PER_KWH_DC
-    )
+    avoided_import = min(recent) * plant.eta_battery_to_ac - DEGRADATION_DKK_PER_KWH_DC
     known_charge_cost = min(published) / plant.eta_grid_to_battery
     replacement_price = min(
         max(0.0, avoided_import) * 0.65,
