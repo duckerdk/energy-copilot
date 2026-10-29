@@ -151,7 +151,7 @@ def test_battery_charge_and_grid_charge_current_limits_are_enforced():
             q=quarter(pv_dc_kwh=1, home_ac_kwh=0),
             d=dispatch(pv_to_battery_dc_kwh=1),
         )
-    with pytest.raises(InfeasibleCandidate, match="battery:charge_current_limit"):
+    with pytest.raises(InfeasibleCandidate, match="battery:grid_charge_current_limit"):
         run(
             plant=replace(PLANT, grid_charge_limit_a=5),
             q=quarter(home_ac_kwh=0),
@@ -398,7 +398,7 @@ def test_partial_live_quarter_scales_current_limits_by_remaining_seconds():
         end=START + timedelta(minutes=15),
         home_ac_kwh=0.0,
     )
-    with pytest.raises(InfeasibleCandidate, match="battery:grid_charge_current_limit"):
+    with pytest.raises(InfeasibleCandidate, match="battery:charge_current_limit"):
         run(q=remaining, d=dispatch(grid_to_battery_ac_kwh=0.20))
     legal = run(q=remaining, d=dispatch(grid_to_battery_ac_kwh=0.04))
     assert legal.quarters[0].grid_import_kwh == pytest.approx(0.04)
