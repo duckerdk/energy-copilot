@@ -68,7 +68,7 @@ class DynamicDeyeController:
                 try:
                     before = float(change["before"])
                     after = float(change["after"])
-                except (ValueError, TypeError, KeyError):
+                except ValueError, TypeError, KeyError:
                     return None
                 if (
                     abs(after - 1.0) < 1e-6
@@ -491,7 +491,9 @@ class DynamicDeyeController:
                 # time-spreading campaign. Grid-charge enablement alone is
                 # not a third reason to adjust an arbitrary current.
                 if charge_enabled and current_grid_a < 1.0 and not spreading_grid:
-                    raise CommandRejected("controller:grid_charge_limit_requires_campaign")
+                    raise CommandRejected(
+                        "controller:grid_charge_limit_requires_campaign"
+                    )
                 if spreading_grid:
                     # Deliberately spread charging over several equally cheap
                     # quarters. Never track forecast current outside a campaign.
