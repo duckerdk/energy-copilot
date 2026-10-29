@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from math import ceil, floor, isfinite
 
 CHARGE_CURRENT = "number.sun12k_maximum_battery_charge_current"
-DISCHARGE_CURRENT = "number.sun12k_maximum_battery_discharge_current"
 GRID_CURRENT = "number.sun12k_maximum_battery_grid_charge_current"
 GRID_CHARGE = "switch.sun12k_grid_charge"
 SOLAR_SELL = "switch.sun12k_solar_sell"
