@@ -3,7 +3,7 @@
 No inverter commands are issued; all candidates undergo independent validation.
 """
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from math import ceil, floor
 
 from .planner import (
