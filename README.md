@@ -40,6 +40,8 @@ Wymagany Home Assistant **2026.10 lub nowszy** (testowany Core 2026.10.2, Python
 
 Alternatywne ręczne kopiowanie `custom_components/energy_copilot` nie zapewnia `BUILD_INFO.json` ani gwarantowanego pochodzenia wydania. Nie trzeba zmieniać ESPHome, Modbus lub ustawień falownika.
 
+**Rollback 2.0.0 → 1.16.19:** wersja `v1.16.19` pozostaje osobnym, niezmienionym [GitHub Release](https://github.com/duckerdk/energy-copilot/releases/tag/v1.16.19), z własną paczką i sumami kontrolnymi. W HACS otwórz integrację Energy Co-Pilot, wybierz ponowne pobranie i wersję `1.16.19`, uruchom ponownie HA i zweryfikuj tag oraz sumę w diagnostyce. Nie przesuwać ani nie nadpisywać istniejących tagów.
+
 ## Planowanie w HA
 
 W **Energy Co-Pilot → Konfiguruj** ustaw `dry_run` dla symulacji, a `automatic` dla jawnie aktywowanego sterowania (domyślnie ARM po starcie; **Automatic control ARM / STOP** pozwala ręcznie zatrzymać zapis). Status `sensor.energy_co_pilot_planning_status` oznacza: `monitor` — brak planu, `blocked` — brak istotnych danych, `preview` — wygenerowany plan dla dostępnego horyzontu (`complete` albo `partial`). `sensor.energy_co_pilot_modeled_saving` jest **modelowaną** różnicą kosztu względem wariantu bez cykli magazynu, a **nie** realną oszczędnością wobec aktualnego Deye.
