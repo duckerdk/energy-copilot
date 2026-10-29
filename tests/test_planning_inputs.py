@@ -10,6 +10,7 @@ from custom_components.energy_copilot.models import (
     ForecastSnapshot,
     HistorySlot,
     InputSnapshot,
+    Sample,
     Issue,
     PriceSlot,
 )
@@ -438,3 +439,42 @@ def test_dst_hour_boundary_is_utc_and_has_no_fake_hour():
     result = prepare(data)
     assert len(result.quarters) == 4
     assert result.price_horizon_end == autumn + timedelta(hours=1)
+
+
+def test_live_partial_quarter_uses_observed_power_and_excludes_elapsed_energy():
+    now = HOUR + timedelta(minutes=7, seconds=30)
+    data = snapshot(now=now)
+    data.measurements["pv"] = Sample(2500.0, now)
+    data.measurements["home"] = Sample(1800.0, now)
+    live = prepare(
+        data,
+        factor=1.0,
+        pv_temporal_model="uniform_power_unverified",
+        live_partial=True,
+    )
+    legacy = prepare(data)
+    assert live.quarters[0].start == now
+    assert live.quarters[0].end == HOUR + QUARTER
+    assert live.quarters[1].start == HOUR + QUARTER
+    assert live.live_adjusted_quarters >= 4
+    assert live.quarters[0].pv_dc_kwh > 0.1
+    assert live.quarters[0].home_ac_kwh < 0.3
+    assert live.quarters[0].home_ac_kwh > 0.15
+    # Old mode must continue selecting complete future quarters.
+    assert legacy.quarters[0].start == HOUR + QUARTER
+
+
+def test_live_partial_quarter_no_measurements_keeps_scaled_forecast():
+    now = HOUR + timedelta(minutes=13, seconds=30)
+    data = snapshot(now=now)
+    live = prepare(
+        data,
+        factor=1.0,
+        pv_temporal_model="uniform_power_unverified",
+        live_partial=True,
+    )
+    assert live.quarters[0].start == now
+    assert live.quarters[0].end - live.quarters[0].start == timedelta(seconds=90)
+    assert live.quarters[0].home_ac_kwh == pytest.approx(0.03)
+    assert live.quarters[0].pv_dc_kwh == pytest.approx(0.02)
+    assert live.live_adjusted_quarters == 0
