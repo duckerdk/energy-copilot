@@ -1,6 +1,6 @@
 # Otwarte kwestie techniczne
 
-**Stan przeglądu dokumentacji: 29.10.2026, manifest 1.16.17.** To lista prac **niepotwierdzonych jako zakończone na rzeczywistym HA**. Testy CI nie zastępują pomiarów falownika. Decyzje użytkownika: [REQUIREMENTS.md](REQUIREMENTS.md). Wersje i rozwiązane błędy: historia GitHub Releases, nie ten plik.
+**Stan przeglądu dokumentacji: 29.10.2026, manifest 1.16.18.** To lista prac **niepotwierdzonych jako zakończone na rzeczywistym HA**. Testy CI nie zastępują pomiarów falownika. Decyzje użytkownika: [REQUIREMENTS.md](REQUIREMENTS.md). Wersje i rozwiązane błędy: historia GitHub Releases, nie ten plik.
 
 ## P0 — bezpieczeństwo i zgodność rzeczywistego sterowania
 
