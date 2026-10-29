@@ -171,8 +171,15 @@ def _inputs(payload):
             raise ValueError(f"replay:quarter_{index}:invalid")
         start = _timestamp(raw.get("start"), "start")
         end = _timestamp(raw.get("end"), "end")
-        if end - start != timedelta(minutes=15) or (
-            last_end is not None and start != last_end
+        duration = end - start
+        if (
+            duration <= timedelta(0)
+            or duration > timedelta(minutes=15)
+            or (index and duration != timedelta(minutes=15))
+            or (last_end is not None and start != last_end)
+            or end.second
+            or end.microsecond
+            or end.minute % 15
         ):
             raise ValueError(f"replay:quarter_{index}:non_contiguous")
         if not isinstance(raw.get("pv_export_enabled"), bool):
