@@ -234,7 +234,6 @@ async def test_soc_target_rounds_up_to_entity_step_without_failure():
     assert service.states.get(target).state == "52.0"
 
 
-
 @pytest.mark.asyncio
 async def test_soc_target_noninteger_step_is_rounded_up():
     now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
@@ -264,7 +263,6 @@ async def test_discharge_is_not_throttled_to_forecast_household_load():
         )
         == "applied"
     )
-
 
 
 @pytest.mark.asyncio
@@ -595,7 +593,6 @@ async def test_solar_sell_alone_does_not_trigger_1a_throttle():
     assert float(service.states.get(CHARGE_CURRENT).state) == 50
     assert service.states.get(SOLAR_SELL).state == "on"
     assert not any(c[2]["entity_id"] == CHARGE_CURRENT for c in service.calls)
-
 
 
 @pytest.mark.asyncio
