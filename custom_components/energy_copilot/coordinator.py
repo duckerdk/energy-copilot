@@ -365,6 +365,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                             "positive_underprediction_p75_kwh_per_quarter"
                         ],
                         load_risk_accuracy=self.load_backtest,
+                        live_partial=True,
                         grid_charge_already_active=(
                             self.dynamic_controller.armed
                             and (grid_state := self.hass.states.get(GRID_CHARGE))
@@ -534,7 +535,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                         self._last_block_fingerprint = None
                     await self.dynamic_controller.apply(
                         self.planning_preview,
-                        now,
+                        dt_util.utcnow(),
                         soc_pct=snapshot.measurements["soc"].value,
                         voltage_v=snapshot.measurements["voltage"].value,
                     )
