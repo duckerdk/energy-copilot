@@ -59,14 +59,6 @@ SOC, osobnej karze za PV, sztywnym pustym oknie i premiowaniu końcowego SOC.**
 - **Realizowalność i raportowanie:** każdy wariant przechodzi niezależny model AC/DC i SOC 20–100%, a projekcja na sześć TOU sprawdza kwadransowe zmiany nastaw w kroku SOC 1%. Plan kwadransowy i teoretyczna wykonalność zapisów **nie dowodzą** uzyskania przepływu na rzeczywistym Deye. Pokazywać prognozy, przyjęte wagi, dodatkowy zapas, koszty wariantów, koszt ryzyka i przyczyny wyboru.
 - **Nadrzędna reguła prądów:** żadnej zmiany prądów poza celowym **przesunięciem lub rozciągnięciem ładowania w czasie**. Opis przepływu w planie nie jest nastawą prądu. Zakaz odczytu i zapisu nastawy maksymalnego prądu rozładowania pozostaje bezwzględny.
 
-## Pełnohoryzontowy planer energii — decyzja użytkownika 22.10.2026
-
-- Obliczać **cały nieprzerwany okres dostępnych, opublikowanych cen zakupu i sprzedaży**, przy dostępnej prognozie PV i zużycia, a nie pary 15/30-minutowe. Krok kwadransowy pozostaje tylko rozdzielczością bilansu i SOC.
-- Wybierać godziny ładowania z sieci, gdy zabraknie korzystnej energii PV, i używać energii baterii podczas droższych godzin. **Dopuszczać kupowanie prądu z sieci mimo niepustej baterii**, jeżeli zachowanie energii na później zmniejsza koszt planu.
-- Uwzględniać całe prognozowane PV: pokrywanie domu, magazynowanie nadwyżek, ewentualny eksport nadwyżek i pozostawianie pojemności na zapowiedziane PV. Pozwalać na kilka kolejnych godzin ładowania, rozładowania i powtarzające się cykle, a także świadomy brak cyklu.
-- Ograniczenia fizyczne, polityka ceny zakupu/sprzedaży, degradacja 0,40 DKK/kWh DC, SOC min. 20%, eksport wyłącznie PV i sześć TOU pozostają obowiązujące. Model zużycia opiera się na 45 dniach; nie przywracać starego modelu 365-dniowego.
-- Oddzielać weryfikację planu fizycznego od kwadransowej projekcji na sześć TOU. `dry_run` nie wykonuje zapisów. Nie sugerować w HA możliwych do wykonania oszczędności, dopóki nie ma walidacji TOU i rzeczywistego baseline Deye.
-
 ## Potwierdzone zachowanie falownika — 23.10.2026
 
 - Utrzymać istniejący priorytet **Load First** oraz **eksport z baterii OFF**. Nie planować zmiany tych nastaw w Co-Pilot.
