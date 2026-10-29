@@ -122,9 +122,19 @@ class DynamicDeyeController:
         charge = float(row["grid_to_battery_ac_kwh"])
         discharge = float(row["battery_to_home_dc_kwh"])
         pv_charge = float(row.get("pv_to_battery_dc_kwh", 0))
+        risk = metadata.get("load_risk_policy") or {}
+        risk_campaign = (
+            risk.get("status") == "applied"
+            and risk.get("charge_start_utc", "") <= at
+            and at < risk.get("charge_end_utc", "")
+        )
         if charge > 1e-7:
             action = "grid_charge"
-            reason = "optimizer_selected_grid_charge_for_full_horizon_cost"
+            reason = (
+                "load_risk_reserve_before_price_peak"
+                if risk_campaign
+                else "optimizer_selected_grid_charge_for_full_horizon_cost"
+            )
         elif discharge > 1e-7:
             action = "battery_discharge"
             reason = "optimizer_selected_discharge_for_full_horizon_cost"
@@ -144,6 +154,18 @@ class DynamicDeyeController:
             "quarter_start_utc": at,
             "observed_at_utc": now.isoformat(),
             "forecast_version": metadata.get("forecast_version"),
+            "load_risk_extra_soc_points": (
+                risk.get("applied_extra_soc_points") if risk_campaign else None
+            ),
+            "load_risk_peak_start_utc": (
+                risk.get("peak_start_utc") if risk_campaign else None
+            ),
+            "load_risk_estimated_value_dkk": (
+                risk.get("estimated_avoided_risk_dkk") if risk_campaign else None
+            ),
+            "load_risk_nominal_cost_dkk": (
+                risk.get("extra_nominal_objective_dkk") if risk_campaign else None
+            ),
             "soc_observed_pct": soc_pct,
             "soc_planned_end_pct": row.get("soc_end_pct"),
             "buy_dkk_per_kwh": source.get("buy_dkk_per_kwh"),
