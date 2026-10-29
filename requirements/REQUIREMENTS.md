@@ -59,5 +59,5 @@ Budować prognozę zużycia domu na następne **7 dni** na podstawie historyczny
 
 - Utrzymać istniejący priorytet **Load First** oraz **eksport z baterii OFF**. Nie planować zmiany tych nastaw w Co-Pilot.
 - Użytkownik potwierdził na instalacji, że falownik **realizuje zadany prąd ładowania** (np. 12 A). Traktować ten fakt jako zweryfikowany w bieżącej konfiguracji, bez ponownego kwestionowania.
-- Przy Solar Sell ON falownik sam eksportuje nadwyżkę po obsłużeniu domu i przyjęciu energii przez baterię w granicach zadanej nastawy. Planer dobiera **prąd baterii** i **zezwolenie Solar Sell według ceny ≥0,40 DKK/kWh**, nie steruje ilością eksportu jako niezależnym poleceniem.
+- Przy Solar Sell ON falownik sam eksportuje nadwyżkę po obsłużeniu domu i przyjęciu energii przez baterię w granicach zadanej nastawy. Planer określa celowe przesunięcia lub rozciągnięcia ładowania, a nie przestawia prądu na podstawie prognozy; dobiera **zezwolenie Solar Sell według ceny ≥0,40 DKK/kWh**, nie steruje ilością eksportu jako niezależnym poleceniem.
 - Planer musi nadal uwzględniać finansową alternatywę sprzedaż–magazynowanie (i koszt późniejszego zakupu), zachowując ochronę przed eksportem z baterii.
