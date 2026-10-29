@@ -70,70 +70,14 @@ Każde `decision_id`, `plan_id`, start i ważność, dane wejściowe oraz ich we
 - Różne czasy poprawnych raportów nie są błędem synchronizacji. Wykryta awaria/recovery i rzeczywista rozbieżność wartości domu nadal wymagają weryfikacji.
 - Brak prognozy w nocy nie degraduje wejść, a brak danych o zmierzchu pozostaje jawny, bez dopisywania Wh.
 
-## Odbiór aktualnego M3 — v1.13.0
+## Kryteria wydania i odbioru rzeczywistego HA
 
-- [x] Automatyczne regresje `dry_run`: wielogodzinne i wielocyklowe planowanie, 15-minutowy bilans energii bez siatki 0,10 kWh SOC, zachowanie przy drogim/tańszym prądzie, brak nieopłacalnego dodatkowego cyklu.
-- [x] Niezależny `simulate_candidate` sprawdza SOC, limity prądu, bilans PV/dom/bateria, brak eksportu baterii i niedozwolonego jednoczesnego importu/eksportu. Testowane również zmienne scenariusze.
-- [x] `Solar Sell` planowane na podstawie przyszłej ceny sprzedaży ≥0,40 DKK/kWh, niezależnie od aktualnego stanu przełącznika; raportowane osobno cena zakupu, sprzedaży, przewidywane przepływy i prąd ładowania.
-- [x] Jednoznaczne końce okresów `wh_period`, nierówne odcinki Forecast.Solar, potwierdzone zera nocne, źródłowe luki i brak fikcyjnego pokrycia. Recorder i jego braki nie są modyfikowane.
-- [x] Historyczna prognoza domu 7 dni, dni robocze, święta i DST; 7-dniowy holdout trenowany bez danych z przyszłości oraz obserwacja później wykonanych kwadransów PV i domu. Wynik stanowi raport błędu, nie fizyczną kalibrację.
-- [x] `monitor` i `dry_run` nie wykonują usług HA zapisujących do falownika; błąd planera nie zatrzymuje M1/M2.
-- [ ] Potwierdzić powyższe na rzeczywistych danych pracy HA (dzień/noc, różne ceny i pory roku), porównać z **rzeczywistym** baseline Deye oraz skalibrować sprawności i błąd pochodnego pomiaru zużycia.
-- [ ] Przed M6 sprawdzić translację fizycznego planu na sześć TOU, wykonanie prądu i niezawodny STOP/recovery; zachować `Load First` i zakaz eksportu baterii. Sam `dry_run` nie oznacza planu wykonalnego.
+- Testy automatyczne muszą obejmować planowanie całego opublikowanego horyzontu, limit SOC 20%, ceny/DST, Forecast.Solar, niepełną historię i `unknown/unavailable`, poprawny bilans DC/AC oraz brak eksportu baterii.
+- Testy sterowania muszą weryfikować 6 TOU i aktywny kwadrans, zaokrąglenie SOC do **1%**, brak zapisu `Maximum Battery Discharge Current` w dowolnej wartości, blokadę przy zastanym 0 A i wznowienie dopiero po odczycie poprawnej wartości.
+- Sprawdzić, że szczyt cenowy nie otrzymuje sztucznego limitu rozładowania wynikającego z przydziału energii na jeden kwadrans; próg TOU odpowiada pełnej dopuszczalnej decyzji planera.
+- Zapis prądów ładowania musi mieć jawny cel: przesunięcie PV albo rozłożenie ładowania sieciowego; przy braku takiego celu nie zmieniać dotychczasowych wartości. Testować przy SOC 99%, Solar Sell ON, cenowym remisie i przy naturalnym nadmiarze PV przewyższającym prognozę.
+- Rozróżniać `planned`, `applied`, odczyt nastawy i fizyczny pomiar przepływu; rewizje i blokady nie mogą ginąć na granicy kwadransa. Awaria usługi HA nie może powodować ślepego ponowienia.
+- Raport wydania ma zawierać faktycznie wykonane polecenia testowe i ich wyniki, numer wersji, tag oraz komplet `energy_copilot.zip`, `SHA256SUMS`, `BUILD_INFO.json` w publicznym GitHub Release. Zaliczenie CI nie potwierdza dostępności aktualizacji na konkretnej instalacji HACS.
+- Odbiór na żywym HA (dziennik, poprawność TOU, energia, płynność kwadransów, realna oszczędność) wymaga osobnych obserwacji z instalacji; brak dowodów pozostaje **otwarty**, nie opisany jako zamknięty.
 
-Otwarte punkty: [OPEN_ITEMS](OPEN_ITEMS.md).
-
-## Natywne logowanie HA — v1.16.9
-
-- W trybie automatycznym wpisy o decyzji, kwadransie, SOC, cenach i akcji muszą trafiać do **Aktywności** przez `logbook_entry` w formacie czytelnym bez JSON.
-- Blokada i odzyskanie danych mają widoczne komunikaty; ARM pozostaje aktywny przy przejściowym błędzie.
-- Po `applied` log musi rozróżniać rzeczywiście wysłane i potwierdzone nastawy od przypadku zgodności bez zapisu. Nie dodawać ogólnych komentarzy o przepływie energii.
-- W **Logach systemowych → Core** ostrzeżenia/błędy trafiają na WARNING/ERROR, pozostałe informacje na INFO w surowym logu; widok skrócony HA pokazuje przede wszystkim ostrzeżenia i błędy.
-- Awaria publikacji do Aktywności nie może zatrzymać sterowania ani uniemożliwić archiwizacji technicznej.
-
-## Regresja czytelności — v1.16.10
-
-- W **Aktywności** zdarzenie planowania posiada domenę `energy_copilot` oraz identyfikator encji `Decision journal` z rejestru HA (filtrowanie po urządzeniu); treść uzasadnia akcję.
-- `Decision journal` nie przechodzi pomiędzy stanami `planned` i `blocked` (pozostaje `ready`); nie tworzy wtórnych, pozbawionych przyczyny wpisów.
-- Dla kupowania energii z sieci zamiast rozładowania pokazać rzeczywisty planowany import, cenę i pierwszy późniejszy kwadrans rozładowania, jeśli istnieje; gdy późniejsza cena jest identyczna, nie twierdzić, że rozładowanie odłożono przez wzrost cen.
-- Rozładowanie pokazuje wartość unikniętego zakupu, koszt degradacji i różnicę, o ile dostępne są odpowiednie dane wejściowe. Nigdy nie nazywać tego pełnym kontrfaktycznym wynikiem.
-- Blokada pokazuje kod planera przetłumaczony na komunikat i tylko problemy istotne dla sterowania — historyczne ostrzeżenia nie mogą zagłuszyć realnego błędu.
-- Zdanie o minimalizacji kosztu horyzontu nie może być jedynym uzasadnieniem decyzji.
-
-## Kontrola dziennika wykonania — v1.16.11
-
-- Test filtrowalnego wpisu `logbook_entry`: `domain=energy_copilot` oraz `entity_id` sensora z rejestru encji, w tym po zmianie jego identyfikatora przez użytkownika.
-- Rzeczywiste `preview → blocked` wymaga opisania przyczyny planera i braku nowego planu. `input_quality` wskazuje tylko istotne źródła błędów; poprawna jakość z historycznym ostrzeżeniem nie generuje szumu w Aktywności.
-- Wpisy `blocked` i `waiting` wskazują aktualny/następny kwadrans oraz konkretny powód; stałe blokady powodują wpis maksymalnie raz na kwadrans.
-- Wykonawca podaje liczbę faktycznych zapisów i wartości przed/po; gdy nastawy są już zgodne, ma `commands_sent=0` i nie przypisuje sobie wykonania polecenia. Po częściowo nieudanym zapisie zawiera wszystkie ukończone zmiany i ostatnią niepotwierdzoną operację.
-- Logi nie mogą zawierać obowiązkowego komentarza „Odczyt nastaw nie potwierdza jeszcze rzeczywistego przepływu energii” ani tautologicznego uzasadnienia o minimalizacji kosztu.
-- Należy osobno potwierdzić prezentację w rzeczywistym UI użytkownika; CI nie może deklarować takiego odbioru.
-
-
-## Regresje ekonomicznych uzasadnień — v1.16.12
-
-- Zestawić wynik alternatywnego przeliczenia dla akcji `pv_charge` z osobno uruchomionym `optimize_horizon` na tych samych danych. Potwierdzić prawidłowe uwzględnienie przychodu z eksportu i brak zmiany bazowego dispatchu.
-- Zestawić `grid_charge` z najlepszą alternatywą bez ładowania teraz. Dla zerowej różnicy kosztu nie wolno deklarować oszczędności, a przy nieudanym audycie nie wolno zgadywać przyczyny.
-- Dla dwukrotnego przeliczenia kwadransa z małą zmianą PV (0,30 → 0,31 kWh) pokazać `Korekta planu` i zmiany SOC/energii; po przejściu granicy kwadransa ponownie `Plan` dla następnego kwadransa.
-- Diagnostyczne przeliczenie porównawcze musi być odseparowane od zapisów falownika i mieć ograniczony czas. Dopiero użytkownik może odebrać wynik w rzeczywistej Aktywności HA.
-
-
-## Regresje sterowania TOU i prądami — v1.16.13
-
-- Dla `grid_import`, `pv_charge`, `battery_discharge`, `grid_charge` **żadnego zapisu** `number.sun12k_maximum_battery_discharge_current` (nawet jeśli aktualna nastawa wynosi np. 2 A). Adapter ma odrzucać zapis tego rejestru w każdej wartości, w tym 0 i 100 A.
-- Zastane 0 A discharge powinno zatrzymać wszystkie nowe komendy przed pierwszym zapisem i wskazać kod `controller:discharge_current_zero`. Przy ręcznej korekcie odczytanej na następnym cyklu wykonawca wraca do obsługi planu; sam nie zmienia rejestru.
-- Przy SOC 99%, braku ładowania z sieci, TOU SOC = 99% i Grid Charge OFF, bez limitowania discharge. Przy wzroście SOC o 3 pp w tym samym kwadransie próg TOU podąża za SOC; przy rozładowaniu planowany końcowy SOC staje się progiem.
-- Gdy plan zawiera ładowanie z sieci oraz wzrost SOC wskutek PV, cel Grid Charge odpowiada tylko energii z sieci, nie całemu planowanemu końcowemu SOC.
-- Prądy ładowania PV i z sieci zawsze legalne 1–50 A, wyliczane z kwadransowej energii i zmierzonego napięcia. Przy pierwszym przejściu z 0 A grid (starsza wersja) przywrócić 1 A. Przy Grid Charge OFF i istniejącym legalnym limicie, nie wysyłać zbędnych poleceń.
-- Wszystkie inne testy sterowania, blokad, recovery, TOU rollover i logbook bez regresji. Odbiór rzeczywistego zachowania falownika musi wykonać użytkownik na HA, gdyż CI nie ma dostępu do instalacji.
-
-
-## v1.16.14 — testy tolerancji i prądu
-
-- SOC 99% → 100% przy różnicy modelowej 0,0096 DKK nie uruchamia ładowania z sieci; nie blokować przy tym naturalnego 100% od PV.
-- 0,01 DKK = pomijalna różnica, 0,10 DKK do rozpoczęcia kampanii, 0,05 DKK dla jej kontynuacji. Porównanie na całym tanim oknie, bez odkładania pierwszego kwadransa w nieskończoność.
-- Pięć godzin zbliżonych cen: bez BOOST na początku, rozłożyć sumę energii, nie naruszając walidatora fizycznego ani limitów prądowych; nie przenosić ładowania przed pierwotny termin.
-- Przy SOC 99%, Grid Charge OFF i obecnych limitach 1 A oraz 7 A nie wysyłać żadnej komendy zmiany prądów. Sam Solar Sell ON nie jest wystarczającym uzasadnieniem 1 A.
-- Limit dla PV zmieniać na 1 A tylko przy planie: sprzedaż PV teraz + ładowanie później. Przed zakończeniem sterowania przywrócić wcześniej zapamiętane ograniczenie, o ile użytkownik nie nadpisał go ręcznie.
-- Limit prądu z sieci zmieniać jedynie przy rzeczywistym rozłożeniu ładowania na kilka tanich kwadransów lub gdy planowane ładowanie wymaga usunięcia zastanego 0 A.
-- Sprawdzić HA replay/Lab po dodaniu bool `grid_charge_already_active` do metadanych; testy CI nie zastępują weryfikacji rzeczywistej instalacji.
+Sprawy nieweryfikowane sprzętowo: [OPEN_ITEMS.md](OPEN_ITEMS.md).

@@ -45,10 +45,8 @@ Przy tej samej energii i równoważnym koszcie w horyzoncie wybierać **łagodni
 ## Wynik
 Dla każdego slotu: UTC, ceny i wersja danych, prognoza PV i zużycia, SOC początek/koniec, przepływy PV/dom/bateria/sieć, zamierzony Grid Charge/TOU/prądy/Solar Sell, koszty wariantów, degradacja, niepewność i status wykonalności. Plan jest **intencją**, nie potwierdzonym przepływem. Executor: [EXECUTION.md](EXECUTION.md), testy: [VALIDATION.md](VALIDATION.md).
 
-## Obecna implementacja — v1.13.0
+## Implementacja i ograniczenia dowodów
 
-Domyślny `optimize_horizon` wykonuje całohoryzontową optymalizację ciągłych przepływów energii bez kroku SOC 0,10 kWh. Wariant dyskretny to tylko porównawczy benchmark. Walidacja `simulate_candidate` nadal niezależnie sprawdza SOC, prądy, bilanse, brak równoczesnych przeciwnych przepływów oraz wyłącznie PV do eksportu. Nie jest to wykonywalna translacja na sześć okien TOU.
+Bieżący solver i walidator znajdują się w `custom_components/energy_copilot/continuous_optimizer.py`, `horizon_optimizer.py` i `planner.py`. Wersje implementacji weryfikuj w kodzie i tagu, nie według historycznego numeru w dokumencie. Plan może obejmować wiele kwadransów, ale jego przełożenie na aktywny TOU i fizyczny przepływ wymaga odrębnej weryfikacji. `Load First` i blokada eksportu baterii pozostają obowiązujące.
 
-Przy niezmienionym `Load First` i eksporcie baterii OFF, fizyczną sprzedaż nadwyżki PV realizuje falownik. Planer nie zadaje eksportowanej mocy. Dobiera prąd ładowania i przyszły stan Solar Sell zależny od opublikowanej ceny sprzedaży (próg ≥0,40), a przewidywany eksport jako przepływ wynikowy. Zgodnie z potwierdzeniem użytkownika falownik realizuje zadane wartości prądu ładowania. Nie zmieniać `Load First`, polityki eksportu baterii ani funkcji TOU podczas tej aktualizacji.
-
-Dla niedostępnych jeszcze cen następnego dnia wartość końcowa nie jest równa zero: zapotrzebowanie po końcu cen do następnej prognozowanej produkcji PV pozwala dobrać **oznaczony jako niezweryfikowany** wskaźnik cen z godzin opublikowanych, a nie dopisane fikcyjne ceny. Zmienna nie jest sztywnym docelowym SOC. Godzinowy plan ujawnia ceny zakupu/sprzedaży, eksport, prąd, koszty zakupu i wpływy ze sprzedaży, a diagnostyka pokazuje statystyczne błędy prognoz bez sugerowania kalibracji fizycznej.
+Dane przyszłych cen kończą się na ostatnim opublikowanym przedziale. Wartość energii pozostawionej w baterii jest modelowana i oznaczona jako estymata — nie wolno dopisywać nieopublikowanych cen ani deklarować obserwowanych oszczędności bez pomiaru i baseline.

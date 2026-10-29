@@ -1,44 +1,26 @@
 # Otwarte kwestie techniczne
 
-**Stan: v1.13.0, 23.10.2026.** Tylko sprawy nadal wymagające implementacji lub potwierdzenia; nie powtarzać zamkniętych decyzji użytkownika. Ich źródłem jest [REQUIREMENTS.md](REQUIREMENTS.md). Właściciel implementacji: Codex, chyba że wskazano inaczej. Testy offline i pojedynczy eksport HA nie zastępują walidacji pracy ciągłej.
+**Stan przeglądu dokumentacji: 29.10.2026, manifest 1.16.17.** To lista prac **niepotwierdzonych jako zakończone na rzeczywistym HA**. Testy CI nie zastępują pomiarów falownika. Decyzje użytkownika: [REQUIREMENTS.md](REQUIREMENTS.md). Wersje i rozwiązane błędy: historia GitHub Releases, nie ten plik.
 
-## P0 — przed fizycznym sterowaniem (M6)
+## P0 — bezpieczeństwo i zgodność rzeczywistego sterowania
 
-- [ ] **Bilans i ograniczenia sprzętu:** zweryfikować stronę DC/AC pomiarów, relację P≈V×I baterii, wiarygodność SOC i rzeczywiste limity BMS. Potwierdzone znaki i encje pozostają bez zmian.
-- [ ] **Zapis nastaw:** sprawdzić zakresy i odczyt po zapisie limitów prądu, Grid Charge oraz wszystkich 6 okresów TOU; przetestować przerwanie zapisu, ponowienie, restart i odtwarzanie aktualnego stanu. Test fizyczny wymaga osobnej zgody.
-- [ ] **Bezpieczeństwo eksportu:** potwierdzić, że Solar Sell i zmiany TOU nie powodują niezamierzonego eksportu baterii. Dla opcjonalnego eksportu baterii wymagane są fizyczne potwierdzenie kierunku przepływu, limit energii, niezależny stop i osobna zgoda na **każdą** operację.
-- [ ] **Awaria HA:** sprawdzić bezpieczne limity i zachowanie falownika po utracie/restartcie HA, bez cofania zaakceptowanego przez użytkownika ryzyka ekonomicznego pozostawienia ostatnich nastaw.
+- [ ] **Walidacja fizyczna:** porównać bieżący plan SOC/PV/dom/sieć z pomiarami falownika w następujących po sobie kwadransach, również w szczycie cenowym; sprawdzić brak niezamierzonego ograniczenia rozładowania.
+- [ ] **TOU i recovery:** potwierdzić zapis i odczyt aktywnego slotu, zmianę SOC w krokach 1%, granicę kwadransa, restart HA, częściowy zapis oraz status `recovery_required` — bez utraty kwadransów. Nie utożsamiać testów kodu z testem urządzenia.
+- [ ] **Bezpieczeństwo Deye:** przy istniejącym dodatnim prądzie rozładowania integracja nie może zmieniać jego limitu; 0 A wymaga ręcznej korekty, bo w tej instalacji zatrzymuje PV. Potwierdzić brak eksportu baterii przy Solar Sell/TOU, niezależnie od eksportu PV.
+- [ ] **Prądy ładowania:** na rzeczywistej instalacji potwierdzić, że limiter nie dławi nieplanowanie PV, a zmiany są uzasadnione wyłącznie rozłożeniem ładowania z sieci lub przesunięciem ładowania PV.
+- [ ] **SOC i PV:** sprawdzić skutki zmian 1.16.17: rzeczywisty nadmiar PV może ładować ponad prognozowany SOC. Odróżnić działanie zaimplementowane od potwierdzonego pomiarem.
 
-## P1 — weryfikacja v1.13.0 na rzeczywistej instalacji
+## P1 — jakość prognoz i opłacalność
 
-- [ ] **Prognoza PV i domu:** zebrać błędy MAE/bias dla przyszłych kwadransów oraz 7-dniowy historyczny holdout, ocenić źródło bilansu domu i odróżniać ograniczenie produkcji PV od błędu prognozy. Mechanizm pomiaru błędów już działa; dopiero rzeczywiste wyniki wymagają oceny.
-- [ ] **Dzień i noc:** obserwować nieprzerwane 30 minut w obu warunkach z logiką `unknown/unavailable`, recovery, pokryciem Recorder i normalizacją ujemnych pików. Nocne zera Forecast.Solar są już obsługiwane; pozostałe rzeczywiste luki źródeł nadal wymagają oceny.
-- [ ] **Ceny / DST:** potwierdzić na HA poprawność cen `raw_*` i `current_price`, progów 0,40 DKK/kWh, publikacji cen następnej doby i godzin przy zmianie czasu.
-- [ ] **Przepływy i SOC:** zmierzyć sprawności osobnych ścieżek DC/AC, kontrolować limity BMS i modelowany końcowy SOC, porównać plan z rzeczywistą pracą falownika i rzeczywistym baseline; testy jednostkowe nie dowodzą skuteczności na instalacji.
+- [ ] **Prognozy:** ocenić MAE/bias PV i domu oraz 7-dniowy holdout na żywych danych; rozdzielić błędy pogody od curtailment i niepełnych danych.
+- [ ] **Ceny/DST:** zweryfikować lokalny czas Europe/Copenhagen, 23/25 h przy zmianie czasu i moment otrzymania nowych cen na rzeczywistym HA.
+- [ ] **Efekty ekonomiczne:** porównać plan z realnym baseline Deye, uwzględniając sprawność i ograniczenia; weryfikować pełen horyzont zamiast izolowanych kwadransów.
+- [ ] **Kontrfaktyczne uzasadnienia:** istnieje porównanie dla wybranych akcji, ale brak niezależnego wariantu `grid_import` z **wymuszonym dodatnim rozładowaniem**. Nie przedstawiać takiego porównania jako obliczonego.
 
-## P2 — przed automatyzacją i szerszą dystrybucją
+## P2 — użyteczność i szersze wydanie
 
-- [ ] **M4/M5:** trwały dziennik z retencją i ręczny STOP są zaimplementowane w v1.16.8; nadal otwarte: pełny dashboard audytu, wyszukiwanie historii po okresach i interfejs indywidualnej zgody na eksport baterii.
-- [ ] **M5/M6:** testy zgodności kolejnych wersji HA i odbiór działań fizycznych. Publikowanie do HACS działa; nie jest otwartym zadaniem.
+- [ ] Odbiór czytelności logbook w rzeczywistym HA, zwłaszcza blokad, rewizji i efektów zapisów bez komentarzy-zapychaczy.
+- [ ] Dashboard wyszukiwania historii oraz osobne zatwierdzanie każdej operacji eksportu baterii; funkcja eksportu nadal zablokowana bez odrębnej zgody.
+- [ ] Testy kompatybilności kolejnych wersji HA i dłuższa walidacja pracy ciągłej (dzień, noc, utrata i odzyskanie źródła).
 
-Kryteria odbioru i regresje: [VALIDATION.md](VALIDATION.md). Polityka wykonania: [EXECUTION.md](EXECUTION.md).
-
-## Uzasadnienia kontrfaktyczne (otwarte)
-
-Dziennik v1.16.10 wyjaśnia fakty i bieżące koszty: co wybrano, jaką cenę i energię przyjęto, kiedy zaplanowano kolejne rozładowanie i czy istnieje porównanie. **Nie zapewnia jeszcze liczbowej różnicy kosztu między wybranym planem a drugim optymalnym planem z wymuszoną alternatywną akcją w tym samym kwadransie.** Aby sformułować przyczynę przy równych cenach czy decyzji `grid_import` zamiast rozładowania, wymagane jest wiarygodne przeliczenie kontrfaktyczne na tych samych ograniczeniach (bez opóźniania sterownika). Nie wolno przypisywać nieobliczonych motywów solverowi.
-
-## Odbiór logów v1.16.11 — wymagany w rzeczywistym HA
-
-Weryfikacja użytkownika w natywnej **Aktywności** wyfiltrowanej do urządzenia Energy Co-Pilot: obecność wpisów co kolejny kwadrans przy poprawnym planie; konkretne przyczyny blokad (także długotrwałych); rozróżnienie zmian nastaw od zgodności bez poleceń; brak technicznych, pozbawionych znaczenia komentarzy. Zaliczone testy CI są tylko odbiorem technicznym, nie potwierdzeniem prezentacji na rzeczywistej instalacji.
-
-
-### Uzasadnienia ekonomiczne po v1.16.12
-
-Dostępne: faktyczna read-only ponowna optymalizacja całego planu bez wybranej akcji `pv_charge`, `grid_charge` lub `battery_discharge` w pierwszym kwadransie. Nie jest jeszcze dostępne kontrfaktyczne porównanie dla `grid_import` z **wymuszonym dodatnim rozładowaniem**. Tego wniosku nie wolno dopowiadać; do dalszej akceptacji zostaje odbiór czytelności w działającym HA.
-
-
-## Deye: stan po poprawce v1.16.13
-
-- Potwierdzona w instalacji niepożądana zależność: `Maximum Battery Discharge Current = 0 A` po kilku minutach zatrzymuje PV. Wykonawca nie może dotknąć tego rejestru; rozładowanie tylko przez TOU.
-- W diagnostyce 28.10.2026 przy 99% SOC wcześniejszy plan importu został zrewidowany na 0,108 kWh ładowania z sieci do SOC 100%, a Grid Charge ON wykonano zgodnie z planem. **Do oceny pozostaje**, czy przy rezerwie PV i przyszłych cenach optymalizator słusznie wybrał tę decyzję; to nie jest brak planu ani samowolny zapis wykonawcy. Nie należy zmieniać strategii optymalizacji bez osobno uzgodnionego zakresu.
-- Weryfikacja fizyczna: czy zmiany samego TOU SOC w kolejnych kwadransach zapewniają zaplanowane zachowanie bez niepożądanego eksportu baterii oraz czy dynamiczny limit ładowania 1–50 A nie dławi potrzebnego ładowania w praktyce.
+Kryteria regresji: [VALIDATION.md](VALIDATION.md). Bezpieczeństwo wykonania: [EXECUTION.md](EXECUTION.md).

@@ -1,6 +1,6 @@
 # Kontrakt Home Assistant — źródła i sterowanie
 
-Źródła decyzji i limitów: [REQUIREMENTS.md](REQUIREMENTS.md). Wykonanie: [EXECUTION.md](EXECUTION.md). Poniższy kontrakt opisuje działające M1/M2 i przyszłe encje sterujące; nie upoważnia do wysyłania komend.
+Źródła decyzji i limitów: [REQUIREMENTS.md](REQUIREMENTS.md). Wykonanie: [EXECUTION.md](EXECUTION.md). Poniższy kontrakt dokumentuje źródła i encje sterujące. Sam opis nie jest zgodą na fizyczne testy urządzenia.
 
 ## Pomiary
 
@@ -45,20 +45,20 @@ Normalizacja: `grid_import=max(0,P_grid)`, `grid_export=max(0,-P_grid)`, `batter
 
 Kontrakt czasów i końcowego indeksowania `wh_period` zweryfikowano na rzeczywistych danych HA 2026.10.2 z 20.10.2026. Szczegółowych próbek prywatnej historii nie przechowywać w repozytorium.
 
-## Encje wykonawcze (dopiero M6)
+## Encje wykonawcze (tryb `automatic`)
 
 | Funkcja | Encja |
 | --- | --- |
-| Prąd ładowania 0–50 A | `number.sun12k_maximum_battery_charge_current` |
-| Prąd rozładowania 0–100 A | `number.sun12k_maximum_battery_discharge_current` |
-| Prąd ładowania z sieci 0–50 A | `number.sun12k_maximum_battery_grid_charge_current` |
+| Prąd ładowania (dopuszczalne zapisy 1–50 A) | `number.sun12k_maximum_battery_charge_current` |
+| Prąd rozładowania (wyłącznie odczyt, nigdy zapis) | `number.sun12k_maximum_battery_discharge_current` |
+| Prąd ładowania z sieci (dopuszczalne zapisy 1–50 A) | `number.sun12k_maximum_battery_grid_charge_current` |
 | Global Grid Charge | `switch.sun12k_grid_charge` |
 | Solar Sell (eksport nadwyżki PV) | `switch.sun12k_solar_sell` |
 | TOU globalne | `switch.sun12k_time_of_use` |
 | TOU 1…6: początek, moc, SOC | `number.sun12k_time_point_N_start`, `number.sun12k_time_point_N_power`, `number.sun12k_time_point_N_capacity` |
 | TOU 1…6: zezwolenie na Grid Charge | `switch.sun12k_time_point_N_charge_enable` |
 
-Użytkownik potwierdził działanie nastaw 0 A. Przy zapisie walidować zakresy polityki i odczyt po zmianie; zgłaszane przez HA skrajne `min/max` nie muszą odpowiadać granicom sprzętu. Użytkownik potwierdził, że w obecnej konfiguracji falownik realizuje zadany prąd ładowania. Zachować w planie rozróżnienie pomiędzy nastawą prądu a prognozowaną energią z dostępnego PV. Nie używać nieaktywnych `battery_controller.*` ani nie modyfikować YAML/ESPHome/Modbus. Regresje: [VALIDATION.md](VALIDATION.md).
+Na rzeczywistym falowniku zaobserwowano zatrzymanie produkcji PV po ustawieniu prądu rozładowania na 0 A. **Nigdy nie zapisuj prądu rozładowania**, nawet gdy wartość ma być dodatnia. Zastane 0 A oznacza blokadę i wymaga ręcznej korekty. Dopuszczalne zapisy prądów ładowania to 1–50 A, tylko przy uzasadnionym celu i z odczytem potwierdzającym; HA `min/max` nie musi odpowiadać ograniczeniom sprzętowym. Użytkownik potwierdził, że w obecnej konfiguracji falownik realizuje zadany prąd ładowania. Zachować w planie rozróżnienie pomiędzy nastawą prądu a prognozowaną energią z dostępnego PV. Nie używać nieaktywnych `battery_controller.*` ani nie modyfikować YAML/ESPHome/Modbus. Regresje: [VALIDATION.md](VALIDATION.md).
 
 ## Prognoza domu — statystyki Recorder
 Model czyta 365 dni godzinowych statystyk long-term, **mean** dla W/kW albo **change** dla Wh/kWh/MWh. Przy wyborze sensora `load_statistic` musi on przedstawiać całkowite zużycie domu, nie sam import sieci. W razie braku historycznych statystyk domu może użyć wzoru z trzech średnich mocy PV/grid/battery, oznaczonego jako fizycznie niezweryfikowany, bez mieszania PV1/PV2. Luki nigdy nie są zerowane. Klasyfikacja dat obejmuje DK i DST; prywatnych urlopów model nie zna.
