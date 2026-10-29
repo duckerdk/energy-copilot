@@ -133,6 +133,7 @@ class PlanningStatusSensor(CoordinatorEntity, SensorEntity):
             "pv_forecast_version": preview.pv_version,
             "load_model": preview.source_load_method,
             "load_modeled_quarters": preview.load_modeled_quarters,
+            "live_adjusted_quarters": preview.live_adjusted_quarters,
             "pv_temporal_model": preview.pv_temporal_model,
             "pv_temporal_modeled_quarters": preview.pv_temporal_modeled_quarters,
             "reference_cost_dkk": preview.reference_cost_dkk,
