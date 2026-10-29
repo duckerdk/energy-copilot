@@ -249,9 +249,7 @@ def build_planning_input(
             raise PlanningInputError("price:published_gap", left)
         _finite_price(price.buy)
         _finite_price(price.sell)
-    aligned = now.replace(
-        minute=now.minute // 15 * 15, second=0, microsecond=0
-    )
+    aligned = now.replace(minute=now.minute // 15 * 15, second=0, microsecond=0)
     start = now if live_partial else aligned
     if not live_partial and start < now:
         start += QUARTER
