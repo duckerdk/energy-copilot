@@ -257,6 +257,7 @@ def evaluate_preview(
                 quarters,
                 terminal_value_override=terminal_value,
                 enable_pv_headroom=False,
+                load_risk_accuracy=load_risk_accuracy,
             )
             if any(h.target_dc_kwh > 1e-8 for h in result.pv_headroom)
             else result
