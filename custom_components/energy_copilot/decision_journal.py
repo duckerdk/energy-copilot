@@ -165,6 +165,16 @@ def _decision_evidence(entry):
             )
         return "Brak obliczenia bieżącego kosztu rozładowania w danych planu."
     if action == "grid_charge":
+        if entry.get("reason") == "load_risk_reserve_before_price_peak":
+            extra = _number(entry.get("load_risk_extra_soc_points"), "pp SOC")
+            premium = _number(entry.get("load_risk_nominal_cost_dkk"), "DKK")
+            protected = _local_time(entry.get("load_risk_peak_start_utc"))
+            return (
+                f"Dynamiczny zapas na niepewność zużycia: {extra}; "
+                f"przed szczytem {protected}. "
+                f"Koszt dodatkowego zapasu w modelu: {premium}. "
+                "To wycena ryzyka z historii, nie gwarancja oszczędności."
+            )
         if future_at and future_price is not None and buy is not None:
             return (
                 f"Planowane późniejsze rozładowanie: {_local_time(future_at)}, "
@@ -214,6 +224,8 @@ def _economic_evidence(entry):
     """A conclusion supported by an independently re-optimized full horizon."""
     action = entry.get("action")
     status = entry.get("economic_comparison_status")
+    if entry.get("reason") == "load_risk_reserve_before_price_peak":
+        return _decision_evidence(entry)
     if action not in {"pv_charge", "grid_charge", "battery_discharge"}:
         return _decision_evidence(entry)
     if status is None:
