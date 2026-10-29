@@ -423,9 +423,7 @@ def readable_event(entry):
         if event in {"planned", "decision"}:
             strategy = entry.get("robust_strategy")
             if strategy:
-                improvement = _number(
-                    entry.get("robust_risk_reduction_dkk"), "DKK", 3
-                )
+                improvement = _number(entry.get("robust_risk_reduction_dkk"), "DKK", 3)
                 parts.append(
                     f"Scenariusze 2.0: {strategy}; "
                     f"szacowana poprawa wyniku z ryzykiem: {improvement}. "
