@@ -158,8 +158,15 @@ def optimize_continuous(
             if pv_export_allowed
             else 0.0
         )
-        max_charge = plant.battery_voltage_v * plant.charge_limit_a / 4000.0
-        max_grid = plant.battery_voltage_v * plant.grid_charge_limit_a / 4000.0
+        interval_hours = (q.end - q.start).total_seconds() / 3600.0
+        max_charge = (
+            plant.battery_voltage_v * plant.charge_limit_a / 1000.0
+            * interval_hours
+        )
+        max_grid = (
+            plant.battery_voltage_v * plant.grid_charge_limit_a / 1000.0
+            * interval_hours
+        )
         # Unusually high feed-in prices can incentivize buying grid AC while
         # simultaneously exporting the remaining PV. Deye has a single net
         # connection and cannot execute both opposite flows in a quarter.
