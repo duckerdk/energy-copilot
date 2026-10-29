@@ -292,9 +292,30 @@ def build_planning_input(
         price = prices[price_index]
         try:
             if pv_temporal_model == "uniform_power_unverified":
-                pv_energy, modeled_pv = _modeled_quarter_pv_energy(
-                    pv_periods, cursor, right
-                )
+                try:
+                    pv_energy, modeled_pv = _modeled_quarter_pv_energy(
+                        pv_periods, cursor, right
+                    )
+                except PlanningInputError as pv_error:
+                    # Forecast.Solar may omit the already started period.
+                    # Only for the ACTIVE partial quarter, use the validated
+                    # PV sensor for a measured-power nowcast. Every future
+                    # full quarter still needs published PV coverage.
+                    measured = snapshot.measurements.get("pv")
+                    if (
+                        not live_partial
+                        or quarters
+                        or measured is None
+                        or pv_error.code != "pv:coverage_or_resolution_gap"
+                    ):
+                        raise
+                    pv_energy = (
+                        max(0.0, measured.value / 1000.0)
+                        * (right - cursor).total_seconds()
+                        / 3600.0
+                        / multiplier
+                    )
+                    modeled_pv = True
             else:
                 pv_energy = _exact_quarter_energy(pv_periods, cursor, right, "pv")
                 modeled_pv = False
