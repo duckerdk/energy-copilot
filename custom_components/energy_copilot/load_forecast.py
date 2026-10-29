@@ -185,18 +185,25 @@ def forecast_seven_days(
     now: datetime,
     *,
     workday_overrides: dict[date, bool] | None = None,
+    include_current: bool = False,
 ) -> SevenDayForecast:
     """Return a UTC quarter-hour series plus an hourly chart series.
 
-    7 * 24 hours from the next complete 15-minute boundary. Local classification
-    uses Europe/Copenhagen, including spring/autumn clock changes.
+    7 * 24 hours from a complete quarter boundary, optionally including the
+    active quarter for live SOC replanning. Local classification accounts
+    for Europe/Copenhagen daylight saving time.
     """
     if now.tzinfo is None:
         raise PlanningInputError("load:timezone_missing")
     now = now.astimezone(UTC)
-    start = now.replace(second=0, microsecond=0)
-    if start < now or start.minute % 15:
-        start += timedelta(minutes=(15 - start.minute % 15))
+    if include_current:
+        start = now.replace(
+            minute=now.minute // 15 * 15, second=0, microsecond=0
+        )
+    else:
+        start = now.replace(second=0, microsecond=0)
+        if start < now or start.minute % 15:
+            start += timedelta(minutes=(15 - start.minute % 15))
     end = start + timedelta(days=HORIZON_DAYS)
     quarter_rows = []
     grouped: dict[datetime, float] = defaultdict(float)
