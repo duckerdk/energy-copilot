@@ -171,7 +171,6 @@ def test_backtest_exposes_evening_underforecast_quantile_without_future_leak():
     assert result["peak_positive_underprediction_p75_kwh_per_hour"] > 0.5
 
 
-
 def test_live_household_forecast_also_covers_started_quarter():
     now = datetime(2026, 10, 29, 16, 7, 30, tzinfo=UTC)
     model = train_load_model(history(now), now, "synthetic")
@@ -180,10 +179,6 @@ def test_live_household_forecast_also_covers_started_quarter():
     assert normal.projection.periods[0].start == datetime(
         2026, 10, 29, 16, 15, tzinfo=UTC
     )
-    assert live.projection.periods[0].start == datetime(
-        2026, 10, 29, 16, 0, tzinfo=UTC
-    )
-    assert live.projection.periods[0].end == datetime(
-        2026, 10, 29, 16, 15, tzinfo=UTC
-    )
+    assert live.projection.periods[0].start == datetime(2026, 10, 29, 16, 0, tzinfo=UTC)
+    assert live.projection.periods[0].end == datetime(2026, 10, 29, 16, 15, tzinfo=UTC)
     assert len(live.projection.periods) == 672
