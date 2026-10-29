@@ -176,7 +176,6 @@ class PlanningStatusSensor(CoordinatorEntity, SensorEntity):
             "last_plan_applied": self.coordinator.dynamic_controller.last_plan_start,
             "planner_scope": "all_contiguous_known_prices_pv_and_load",
             "grid_import_baseline": "no_battery_cycling_not_actual_deye",
-            "tou_feasibility": "dynamic_control_bypasses_compilation",
             "voltage_source": preview.voltage_source,
             "nominal_capacity_kwh": 10.24,
             "pv_forecast_dc_multiplier_assumed": 1.0,
