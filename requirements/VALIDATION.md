@@ -35,6 +35,11 @@
 | LOAD-08 | Późniejszy zakup z zyskiem poniżej 0,10 DKK dla całej kampanii | Wykluczyć mikrocykl także wtedy, gdy nie jest w pierwszym kwadransie; przy trwającym ładowaniu próg 0,05 DKK |
 | LOAD-09 | Duży popyt poza końcem opublikowanych cen | Zdyskontowana wartość terminalna nie wymusza doładowania do 100% bez opublikowanych cen; brak sztucznej taryfy |
 | LOAD-10 | Plan 96 kwadransów przy sześciu TOU | Zweryfikowana struktura 6 slotów i odczytywalne cele 1%; jawny status `modeled_quarterly_rewrites_only` oraz `hardware_execution_verified=false` |
+| LOAD-12 | Wzrost rzeczywistego SOC 83% → 96% podczas bieżącego kwadransa | Plan natychmiast uwzględnia dodatkową energię, a po nowej decyzji `battery_discharge` TOU ustawia 20% bez oczekiwania do kolejnego kwadransa |
+| LOAD-13 | Przy cenie 4 DKK/kWh potrzebne teraz 2 kWh, później po 6 DKK/kWh tylko 1 kWh | Nie kupować teraz nieuzasadnionych 2 kWh w celu oszczędzenia maksymalnie 1 kWh; uwzględniać przyszłe zużycie, sprawność, degradację |
+| LOAD-14 | Minuta do końca bieżącego kwadransa, ograniczenie ładowania 50 A | Planer może wykorzystać najwyżej 1 minutę zdolności ładowania, nie pełne 15 minut; bilans fizyczny poprawny |
+| LOAD-15 | Bieżąca PV i pobór różnią się od prognoz | Pierwsze trzy przedziały reagują na ważne pomiary W, wagi zanikają, pozostały horyzont opiera się na prognozach |
+| LOAD-16 | Szczyt cen i nominalne zejście do 20% SOC | Brak sztucznej kary za nominalne rozładowanie; wycena dodatkowego importu z ryzyka według godzin wystąpienia |
 | LOAD-11 | HA Replay z niezmienionymi danymi i wersją solvera 2.0.0 | Równe wyniki kwadransowe, numeryczne SOC/kWh/koszt, decyzja scenariuszowa i jawna polityka nowej wersji; żadnego dodatkowego importu cen |
 | LOAD-02 | ważne liczbowe ujemne home, pozostałe źródła poprawne | `max(0, home)` w bieżących danych i całce odcinkowej; kwadrans zachowany, jawne agregaty czasu/liczby/kWh korekt |
 | MTR-08 | Świeży dom zgodny / rozbieżny z sumą PV/grid/battery | Alert `derived_sum_time_uncertain` przy rozbieżności |
