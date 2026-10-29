@@ -1,6 +1,6 @@
 # Otwarte kwestie techniczne
 
-**Stan przeglądu dokumentacji: 29.10.2026, manifest 1.16.19.** To lista prac **niepotwierdzonych jako zakończone na rzeczywistym HA**. Testy CI nie zastępują pomiarów falownika. Decyzje użytkownika: [REQUIREMENTS.md](REQUIREMENTS.md). Wersje i rozwiązane błędy: historia GitHub Releases, nie ten plik.
+**Stan przeglądu dokumentacji: 29.10.2026, manifest 2.0.0.** To lista prac **niepotwierdzonych jako zakończone na rzeczywistym HA**. Testy CI nie zastępują pomiarów falownika. Decyzje użytkownika: [REQUIREMENTS.md](REQUIREMENTS.md). Wersje i rozwiązane błędy: historia GitHub Releases, nie ten plik.
 
 ## P0 — bezpieczeństwo i zgodność rzeczywistego sterowania
 
@@ -13,7 +13,7 @@
 ## P1 — jakość prognoz i opłacalność
 
 - [ ] **Prognozy:** porównać 45 dni z mocną wagą ostatnich 7/14 dni z dawnym oknem 365 dni; ocenić MAE/bias oraz wieczorne P75 w 7-dniowym holdoucie na żywych danych; rozdzielić błędy pogody od curtailment i niepełnych danych.
-- [ ] **Dynamiczny zapas:** na rzeczywistym HA skontrolować zapas 0–15 pp, powód decyzji ekonomicznej, brak fikcyjnego zużycia i koszt ostrożności w drogim szczycie; kalibracja współczynnika 0,65 wymaga kolejnych obserwacji.
+- [ ] **Polityka 2.0.0 na żywym HA:** sprawdzić wspólną ocenę niedoszacowania zużycia i potencjalnej PV, doładowanie przed szczytem zamiast za wczesnego zakupu, brak zapełnienia wyłącznie przez sztuczną cenę końcową oraz eliminację nieopłacalnych mikrocykli; wagi scenariuszy 0,65/0,55 i niepewność PV wymagają kalibracji.
 - [ ] **Ceny/DST:** zweryfikować lokalny czas Europe/Copenhagen, 23/25 h przy zmianie czasu i moment otrzymania nowych cen na rzeczywistym HA.
 - [ ] **Efekty ekonomiczne:** porównać plan z realnym baseline Deye, uwzględniając sprawność i ograniczenia; weryfikować pełen horyzont zamiast izolowanych kwadransów.
 - [ ] **Kontrfaktyczne uzasadnienia:** istnieje porównanie dla wybranych akcji, ale brak niezależnego wariantu `grid_import` z **wymuszonym dodatnim rozładowaniem**. Nie przedstawiać takiego porównania jako obliczonego.
