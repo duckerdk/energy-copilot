@@ -39,7 +39,6 @@ class HorizonResult:
     pv_headroom_enabled: bool = False
     economic_policy_reason: str | None = None
     economic_policy_benefit_dkk: float | None = None
-    load_risk_policy: dict | None = None
 
 
 def _dispatch(
@@ -211,7 +210,6 @@ def optimize_horizon(
     audit_force_first_pv_curtail: bool = False,
     audit_forbid_grid_charge_prefix: int = 0,
     grid_charge_already_active: bool = False,
-    load_risk_accuracy: dict | None = None,
 ) -> HorizonResult:
     """Primary HA dry-run optimizer: continuous flow, no 0.1 kWh SOC grid.
 
@@ -235,7 +233,6 @@ def optimize_horizon(
     from .economic_policy import (
         CHEAP_WINDOW_PRICE_TOLERANCE_DKK_PER_KWH,
         MAX_SPREAD_QUARTERS,
-        hedge_load_forecast_risk,
         material_grid_charge,
         spread_grid_charge_over_cheap_window,
     )
@@ -266,7 +263,7 @@ def optimize_horizon(
             soc_pct=plant.initial_soc_pct,
             already_charging=grid_charge_already_active,
         ):
-            result = replace(
+            return replace(
                 no_cheap_charge,
                 economic_policy_reason=(
                     "soc_99_satisfies_grid_charge_target"
@@ -278,10 +275,5 @@ def optimize_horizon(
                     - result.candidate.objective_dkk
                 ),
             )
-        else:
-            result = spread_grid_charge_over_cheap_window(plant, quarters, result)
-    if load_risk_accuracy is not None:
-        result = hedge_load_forecast_risk(
-            plant, quarters, result, load_risk_accuracy
-        )
+        return spread_grid_charge_over_cheap_window(plant, quarters, result)
     return result
