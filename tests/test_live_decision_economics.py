@@ -1,9 +1,11 @@
 """Live SOC feedback and actual future demand govern profitable discharge."""
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from custom_components.energy_copilot.horizon_optimizer import optimize_horizon
 from custom_components.energy_copilot.planner import Plant, Quarter
+from custom_components.energy_copilot.replay import build_replay, simulate_replay
 
 START = datetime(2026, 10, 29, 15, tzinfo=UTC)
 LOW_RISK = {
@@ -92,3 +94,25 @@ def test_two_kwh_buy_at_four_cannot_be_justified_by_one_kwh_demand_at_six():
     assert discharged_before_peak(plan) > 1.8
     assert sum(q.grid_import_kwh for q in plan.candidate.quarters[4:]) < 0.3
     assert plan.robust_policy["status"] == "scenario_selected"
+
+
+def test_ha_replay_accepts_partial_active_quarter_with_real_duration():
+    quarters = periods(2.0, 1.0)
+    first = replace(
+        quarters[0],
+        start=quarters[0].start + timedelta(minutes=7),
+        home_ac_kwh=quarters[0].home_ac_kwh * 8 / 15,
+    )
+    quarters = (first, *quarters[1:])
+    battery = plant(96.0)
+    planned = optimize_horizon(
+        battery,
+        quarters,
+        terminal_value_override=0.0,
+        load_risk_accuracy=LOW_RISK,
+    )
+    frozen = build_replay(
+        battery, quarters, planned, metadata={"load_risk_accuracy": LOW_RISK}
+    )
+    compared = simulate_replay(frozen)
+    assert compared["identical"], compared["mismatches"][:3]
