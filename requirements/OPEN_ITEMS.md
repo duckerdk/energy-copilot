@@ -12,7 +12,8 @@
 
 ## P1 — jakość prognoz i opłacalność
 
-- [ ] **Prognozy:** ocenić MAE/bias PV i domu oraz 7-dniowy holdout na żywych danych; rozdzielić błędy pogody od curtailment i niepełnych danych.
+- [ ] **Prognozy:** porównać 45 dni z mocną wagą ostatnich 7/14 dni z dawnym oknem 365 dni; ocenić MAE/bias oraz wieczorne P75 w 7-dniowym holdoucie na żywych danych; rozdzielić błędy pogody od curtailment i niepełnych danych.
+- [ ] **Dynamiczny zapas:** na rzeczywistym HA skontrolować zapas 0–15 pp, powód decyzji ekonomicznej, brak fikcyjnego zużycia i koszt ostrożności w drogim szczycie; kalibracja współczynnika 0,65 wymaga kolejnych obserwacji.
 - [ ] **Ceny/DST:** zweryfikować lokalny czas Europe/Copenhagen, 23/25 h przy zmianie czasu i moment otrzymania nowych cen na rzeczywistym HA.
 - [ ] **Efekty ekonomiczne:** porównać plan z realnym baseline Deye, uwzględniając sprawność i ograniczenia; weryfikować pełen horyzont zamiast izolowanych kwadransów.
 - [ ] **Kontrfaktyczne uzasadnienia:** istnieje porównanie dla wybranych akcji, ale brak niezależnego wariantu `grid_import` z **wymuszonym dodatnim rozładowaniem**. Nie przedstawiać takiego porównania jako obliczonego.
