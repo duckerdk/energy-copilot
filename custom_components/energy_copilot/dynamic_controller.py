@@ -152,9 +152,7 @@ class DynamicDeyeController:
             "reason": reason,
             "action": action,
             "robust_strategy": robust.get("selection"),
-            "robust_risk_reduction_dkk": robust.get(
-                "estimated_risk_reduction_dkk"
-            ),
+            "robust_risk_reduction_dkk": robust.get("estimated_risk_reduction_dkk"),
             "robust_nominal_objective_dkk": robust.get("nominal_objective_dkk"),
             "robust_selected_objective_dkk": robust.get("selected_objective_dkk"),
             "robust_scenario_weights_calibrated": (
