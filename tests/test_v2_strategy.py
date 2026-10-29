@@ -2,7 +2,6 @@
 
 Only invented household load shapes; no diagnostic or Recorder data committed.
 """
-from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
