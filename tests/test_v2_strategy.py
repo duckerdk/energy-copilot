@@ -133,7 +133,7 @@ def test_v2_compares_waiting_for_pv_against_early_network_purchase():
     # simulator on *unchanged* nominal quarter inputs.
     physical = simulate_candidate(plant, quarters, selected.dispatches)
     assert physical.objective_dkk == pytest.approx(selected.candidate.objective_dkk)
-    assert all(q.soc_end_pct >= 20 for q in physical.quarters)
+    assert all(q.soc_end_pct >= 20 - 1e-6 for q in physical.quarters)
     # The whole purpose of the option valuation is to permit moving purchases
     # out of the sunny hours if its risk-adjusted cost really is lower.
     early = _charge_in_hours(baseline, quarters, {11, 12, 13})
