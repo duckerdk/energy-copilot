@@ -220,6 +220,7 @@ def simulate_replay(payload):
         terminal_value_override=terminal,
         pv_underprediction_kwh=upside,
         enable_pv_headroom=policy == "risk_aware_v1",
+        load_risk_accuracy=metadata.get("load_risk_accuracy"),
     )
     actual = _result_output(result)
     errors = []
