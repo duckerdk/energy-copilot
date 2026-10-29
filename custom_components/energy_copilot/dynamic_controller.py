@@ -292,12 +292,20 @@ class DynamicDeyeController:
         if preview.status != "preview" or not preview.replay_snapshot:
             raise CommandRejected("controller:plan_missing")
         expected = preview.replay_snapshot.get("expected", {}).get("quarters", ())
+        source_by_start = {
+            q["start"]: q for q in preview.replay_snapshot.get("quarters", ())
+        }
         next_row = None
         for row in expected:
             at = datetime.fromisoformat(row["start"].replace("Z", "+00:00"))
             if at.tzinfo is None:
                 raise CommandRejected("controller:naive_timestamp")
-            if at <= now < at + timedelta(minutes=15):
+            source = source_by_start.get(row["start"], {})
+            end = datetime.fromisoformat(
+                source.get("end", (at + timedelta(minutes=15)).isoformat())
+                .replace("Z", "+00:00")
+            )
+            if at <= now < end:
                 self._pending_quarter = None
                 return row
             if at > now:
