@@ -6,7 +6,6 @@ Output is never a Deye TOU plan, a confirmed saving or an actuator command.
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from statistics import median
 
 from .horizon_optimizer import optimize_horizon
 from .models import InputSnapshot
@@ -22,6 +21,7 @@ from .planning_inputs import (
     project_previous_utc_day_load,
 )
 from .replay import build_replay
+from .tou_projection import validate_tou_projection
 
 NOMINAL_BATTERY_CAPACITY_KWH = 10.24
 NOMINAL_BATTERY_VOLTAGE_V = 51.2
@@ -73,6 +73,8 @@ class Preview:
     hourly_plan: tuple[dict, ...] = ()
     replay_snapshot: dict | None = None
     load_risk_policy: dict | None = None
+    robust_policy: dict | None = None
+    tou_feasibility: dict | None = None
 
 
 def _hourly_plan(quarters, dispatches, results, headroom=()) -> tuple[dict, ...]:
@@ -179,14 +181,21 @@ def _terminal_proxy(plant, quarters, projection, pv_periods):
     if support_fraction <= 1e-9:
         return 0.0, "no_pre_pv_load_zero_terminal_incentive", demand
     recent = published[-min(32, len(published)) :]
-    replacement_price = max(
-        0.0,
-        min(published) / plant.eta_grid_to_battery,
-        median(recent) * plant.eta_battery_to_ac - DEGRADATION_DKK_PER_KWH_DC,
+    # Unknown post-horizon tariffs are not a guaranteed arbitrage margin.
+    # A discounted avoided-purchase proxy MUST be lower than the marginal
+    # cost of charging now at the cheapest already-known hour; otherwise
+    # a terminal proxy by itself fills the battery to 100% every midnight.
+    avoided_import = (
+        min(recent) * plant.eta_battery_to_ac - DEGRADATION_DKK_PER_KWH_DC
+    )
+    known_charge_cost = min(published) / plant.eta_grid_to_battery
+    replacement_price = min(
+        max(0.0, avoided_import) * 0.65,
+        max(0.0, known_charge_cost - 0.10),
     )
     return (
         replacement_price * support_fraction,
-        "pre_pv_demand_scaled_terminal_proxy_unverified",
+        "discounted_post_horizon_demand_proxy_v2_unverified",
         demand,
     )
 
@@ -300,6 +309,8 @@ def evaluate_preview(
         pv_version=inputs.pv_forecast_version,
         source_load_method=inputs.load_method,
         load_risk_policy=result.load_risk_policy,
+        robust_policy=result.robust_policy,
+        tou_feasibility=validate_tou_projection(plant, quarters, dispatches, candidate),
         load_modeled_quarters=inputs.load_modeled_quarters,
         pv_temporal_model=inputs.pv_temporal_model,
         pv_temporal_modeled_quarters=inputs.pv_temporal_modeled_quarters,
@@ -351,7 +362,8 @@ def evaluate_preview(
                 "voltage_source": voltage_source,
                 "coverage": inputs.coverage_status,
                 "terminal_value_basis": terminal_basis,
-                "source_release": "1.16.19",
+                "source_release": "2.0.0",
+                "robust_policy": result.robust_policy,
                 "load_risk_accuracy": load_risk_accuracy,
                 "load_risk_policy": result.load_risk_policy,
                 "grid_charge_already_active": grid_charge_already_active,
