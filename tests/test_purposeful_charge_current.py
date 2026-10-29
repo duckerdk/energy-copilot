@@ -31,7 +31,7 @@ async def test_soc99_keeps_existing_one_and_seven_amp_limits():
 
 
 @pytest.mark.asyncio
-async def test_pv_deferred_only_with_export_now_and_later_charging_then_restored():
+async def test_forecast_export_never_caps_real_pv_charging():
     now = datetime(2026, 10, 27, 12, tzinfo=timezone.utc)
     ctrl, service = setup_controller()
     ctrl.arm()
@@ -47,7 +47,8 @@ async def test_pv_deferred_only_with_export_now_and_later_charging_then_restored
         }
     )
     assert await ctrl.apply(plan, now, soc_pct=70, voltage_v=55) == "applied"
-    assert float(service.states.get(CHARGE_CURRENT).state) == 1
+    assert float(service.states.get(CHARGE_CURRENT).state) == 50
+    assert not any(call[2]["entity_id"] == CHARGE_CURRENT for call in service.calls)
     current["pv_to_export_dc_kwh"] = 0.0
     current["pv_to_battery_dc_kwh"] = 0.2
     assert (
@@ -55,6 +56,7 @@ async def test_pv_deferred_only_with_export_now_and_later_charging_then_restored
         == "applied"
     )
     assert float(service.states.get(CHARGE_CURRENT).state) == 50
+    assert not any(call[2]["entity_id"] == CHARGE_CURRENT for call in service.calls)
 
 
 @pytest.mark.asyncio
