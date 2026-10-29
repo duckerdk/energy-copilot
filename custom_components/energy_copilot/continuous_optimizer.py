@@ -45,6 +45,9 @@ def optimize_continuous(
     audit_forbid_first_action=None,
     audit_force_first_pv_curtail=False,
     audit_forbid_grid_charge_prefix=0,
+    grid_charge_excluded=None,
+    minimum_pv_headroom=None,
+    peak_entry_reward=None,
 ):
     """Optimize continuous battery energy (kWh) without an SOC lattice.
 
@@ -75,6 +78,16 @@ def optimize_continuous(
         raise InfeasibleCandidate("audit:invalid_grid_charge_prefix")
     if not quarters:
         raise InfeasibleCandidate("horizon:empty")
+    excluded = frozenset(grid_charge_excluded or ())
+    headroom_min = minimum_pv_headroom or {}
+    carry_reward = peak_entry_reward or {}
+    if any(not isinstance(i, int) or not 0 <= i < len(quarters) for i in excluded):
+        raise InfeasibleCandidate("continuous:invalid_grid_exclusion")
+    for key, value in (*headroom_min.items(), *carry_reward.items()):
+        if not isinstance(key, int) or not 0 <= key < len(quarters):
+            raise InfeasibleCandidate("continuous:invalid_risk_quarter")
+        if not math.isfinite(value) or value < 0:
+            raise InfeasibleCandidate("continuous:invalid_risk_value")
     if plant.initial_soc_pct < MIN_SOC:
         raise InfeasibleCandidate("soc:below_minimum")
     terminal_price = min(q.buy_dkk_per_kwh for q in quarters)
@@ -162,8 +175,13 @@ def optimize_continuous(
             )
         ):
             max_grid = 0.0
-        # SOC gate limits carried + newly charged energy, not merely carry.
-        if headroom and headroom[i].target_dc_kwh > 1e-8:
+        # Each candidate may reserve *physical* capacity against optimistic
+        # PV (not an always-on SOC target). Compare it against unrestricted
+        # candidates with risk-priced scores in robust_strategy.
+        hard_reserve = headroom_min.get(i, 0.0)
+        if hard_reserve > 0:
+            add_edge(before(i), after(i), max(0.0, usable - hard_reserve), 0.0)
+        elif headroom and headroom[i].target_dc_kwh > 1e-8:
             safe_occupancy = max(0.0, usable - headroom[i].target_dc_kwh)
             add_edge(before(i), after(i), safe_occupancy, 0.0)
             add_edge(
@@ -174,7 +192,10 @@ def optimize_continuous(
             )
         else:
             add_edge(before(i), after(i), usable, 0.0)
-        add_edge(after(i), before(i + 1), usable, 0.0)
+        # A risk-reserve candidate has an *entry* value before the price
+        # spike, then releases all battery energy to the optimizer in peak
+        # quarters. This reward is NOT part of the physical bill/objective.
+        add_edge(after(i), before(i + 1), usable, -carry_reward.get(i, 0.0))
         discharge_edges.append(
             add_edge(
                 after(i),
@@ -206,6 +227,7 @@ def optimize_continuous(
                 if (
                     (i == 0 and audit_forbid_first_action == "grid_charge")
                     or i < audit_forbid_grid_charge_prefix
+                    or i in excluded
                 )
                 else max_grid,
                 q.buy_dkk_per_kwh / plant.eta_grid_to_battery,

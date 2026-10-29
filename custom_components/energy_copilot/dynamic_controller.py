@@ -123,6 +123,7 @@ class DynamicDeyeController:
         discharge = float(row["battery_to_home_dc_kwh"])
         pv_charge = float(row.get("pv_to_battery_dc_kwh", 0))
         risk = metadata.get("load_risk_policy") or {}
+        robust = metadata.get("robust_policy") or {}
         risk_campaign = (
             risk.get("status") == "applied"
             and risk.get("charge_start_utc", "") <= at
@@ -150,6 +151,13 @@ class DynamicDeyeController:
         return {
             "reason": reason,
             "action": action,
+            "robust_strategy": robust.get("selection"),
+            "robust_risk_reduction_dkk": robust.get("estimated_risk_reduction_dkk"),
+            "robust_nominal_objective_dkk": robust.get("nominal_objective_dkk"),
+            "robust_selected_objective_dkk": robust.get("selected_objective_dkk"),
+            "robust_scenario_weights_calibrated": (
+                robust.get("scenarios", {}).get("weights_are_calibrated_probabilities")
+            ),
             "plan_id": f"{metadata.get('forecast_version', 'unknown')}:{at}",
             "quarter_start_utc": at,
             "observed_at_utc": now.isoformat(),
@@ -322,6 +330,12 @@ class DynamicDeyeController:
                     raise CommandRejected("controller:invalid_measurements")
                 if not 20 <= soc_pct <= 100 or voltage_v <= 0:
                     raise CommandRejected("controller:outside_policy")
+                projection = getattr(preview, "tou_feasibility", None)
+                if (
+                    isinstance(projection, dict)
+                    and projection.get("status") == "not_representable"
+                ):
+                    raise CommandRejected("controller:plan_not_representable_by_tou")
                 row = self._current_quarter(preview, now)
                 if row is None:
                     if self.status != "waiting_for_quarter":

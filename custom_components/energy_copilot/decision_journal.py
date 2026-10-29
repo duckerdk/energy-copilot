@@ -420,6 +420,15 @@ def readable_event(entry):
             parts.append(f"Koszt zakupu w kwadransie: {purchase}.")
         if wear and abs(float(entry["degradation_cost_dkk"])) >= 0.005:
             parts.append(f"Degradacja w kwadransie: {wear}.")
+        if event in {"planned", "decision"}:
+            strategy = entry.get("robust_strategy")
+            if strategy:
+                improvement = _number(entry.get("robust_risk_reduction_dkk"), "DKK", 3)
+                parts.append(
+                    f"Scenariusze 2.0: {strategy}; "
+                    f"szacowana poprawa wyniku z ryzykiem: {improvement}. "
+                    "Wagi nie są empirycznym prawdopodobieństwem."
+                )
         if event == "planned":
             parts.append("Uzasadnienie: " + _economic_evidence(entry))
             policy_reason = entry.get("economic_policy_reason")

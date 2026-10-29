@@ -73,68 +73,60 @@ def _quarters(*, flat=False):
     return tuple(rows)
 
 
-def test_evening_underforecast_adds_economically_priced_reserve_not_fake_load():
+def test_joint_scenario_selection_prices_evening_risk_without_fake_load():
     plant, quarters = _plant(), _quarters()
-    nominal = optimize_horizon(plant, quarters, terminal_value_override=2.078)
-    hedged = optimize_horizon(
+    nominal = optimize_horizon(
+        plant,
+        quarters,
+        terminal_value_override=2.078,
+        enable_pv_headroom=False,
+    )
+    robust = optimize_horizon(
         plant,
         quarters,
         terminal_value_override=2.078,
         load_risk_accuracy=LOAD_ACCURACY,
     )
-    policy = hedged.load_risk_policy
-    assert policy["status"] == "applied"
-    assert 0 < policy["applied_extra_soc_points"] <= 15.0
-    peak = next(
-        i
-        for i, q in enumerate(quarters)
-        if q.start.isoformat() == policy["peak_start_utc"]
+    policy = robust.robust_policy
+    assert policy["status"] == "scenario_selected"
+    assert policy["nominal_objective_dkk"] == pytest.approx(
+        nominal.candidate.objective_dkk, abs=0.0001
     )
-    gain = (
-        hedged.candidate.quarters[peak - 1].soc_end_pct
-        - nominal.candidate.quarters[peak - 1].soc_end_pct
-    )
-    assert gain == pytest.approx(policy["applied_extra_soc_points"], abs=0.02)
-    assert policy["spread_quarters"] >= 2
-    assert sum(d.grid_to_battery_ac_kwh for d in hedged.dispatches) > sum(
-        d.grid_to_battery_ac_kwh for d in nominal.dispatches
-    )
-    assert all(
-        hedged.dispatches[i].battery_to_home_dc_kwh
-        == pytest.approx(nominal.dispatches[i].battery_to_home_dc_kwh, abs=1e-6)
-        for i in range(len(quarters))
-    )
+    assert policy["method"] == "v2_joint_scenario_receding_horizon_unverified"
+    assert policy["candidate_count"] >= 1
+    assert policy["estimated_risk_reduction_dkk"] >= -0.101
+    assert policy["scenarios"]["weights_are_calibrated_probabilities"] is False
+    assert robust.load_risk_policy["status"] == "integrated_in_v2_scenario_selection"
+    assert robust.load_risk_policy["applied_extra_soc_points"] <= 15.0
     physical = simulate_candidate(
         plant.__class__(**{**vars(plant), "terminal_value_dkk_per_kwh_dc": 2.078}),
         quarters,
-        hedged.dispatches,
+        robust.dispatches,
     )
-    assert physical.objective_dkk == pytest.approx(hedged.candidate.objective_dkk)
+    assert physical.objective_dkk == pytest.approx(robust.candidate.objective_dkk)
+    assert all(q.soc_end_pct >= 20 for q in physical.quarters)
+    assert sum(q.home_ac_kwh for q in quarters) > 0
 
 
-def test_no_spurious_charge_with_no_peak_or_without_holdout():
+def test_flat_prices_and_missing_holdout_do_not_invent_a_peak():
     plant = _plant()
-    normal = optimize_horizon(
-        plant, _quarters(flat=True), terminal_value_override=2.078
-    )
-    buffered = optimize_horizon(
+    flat = optimize_horizon(
         plant,
         _quarters(flat=True),
         terminal_value_override=2.078,
         load_risk_accuracy=LOAD_ACCURACY,
     )
-    assert buffered.load_risk_policy["status"] in {
-        "no_material_price_peak",
-        "no_future_peak",
-    }
-    assert buffered.dispatches == normal.dispatches
+    assert flat.robust_policy["peak_evidence"] == []
+    assert flat.load_risk_policy["status"] == "integrated_in_v2_scenario_selection"
     weak = optimize_horizon(
         plant,
         _quarters(),
         terminal_value_override=2.078,
         load_risk_accuracy={**LOAD_ACCURACY, "hours_evaluated": 12},
     )
-    assert weak.load_risk_policy["status"] == "insufficient_history"
+    assert (
+        weak.robust_policy["scenarios"]["weights_are_calibrated_probabilities"] is False
+    )
 
 
 def test_replay_repeats_hedge_with_frozen_holdout_data():

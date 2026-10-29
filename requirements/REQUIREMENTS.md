@@ -42,25 +42,30 @@ Minimalizować **całkowity koszt energii w DKK w pełnym horyzoncie opublikowan
 ## Oczekiwany wynik integracji
 Natywne encje HA, config/options flow, prognoza PV i zużycia, plan dla opublikowanych cen, wyjaśnienie decyzji i wariantów, przewidywane koszty/straty, stany `planned/applied/confirmed`, dziennik wszystkich decyzji, dashboard i UI zatwierdzania eksportu baterii. Raporty oszczędności rozróżniają wynik modelowany, backtest i rzeczywisty. Wymagania techniczne: [HA_CONTRACT.md](HA_CONTRACT.md), [OPTIMIZATION.md](OPTIMIZATION.md), [VALIDATION.md](VALIDATION.md).
 
-## Prognoza zużycia — decyzja użytkownika 22.10.2026
+## Prognoza zużycia — aktualna polityka 45 dni
 Budować prognozę zużycia domu na następne **7 dni** z **ostatnich 45 dni danych HA**, a nie z 365. **Ostatnie 7 dni mają najwyższą wagę, dni 8–14 wagę średnią, 15–45 mniejszą**; uwzględnić bieżącą zmianę nawyków także wtedy, gdy długa mediana pozostaje bez zmian. Rozróżniać dni robocze, wolne i święta, zachować **wykres w HA**. Nie mylić produkcji PV, zakupu z sieci, ładowania/rozładowania baterii ani fizycznego zużycia. Nie zmieniać zakresu uprawnień do sterowania.
 
+## Polityka 2.0.0: wspólna optymalizacja PV, SOC i zakupu przed szczytem — 29.10.2026
 
-## Dynamiczny zapas SOC na błąd prognozy — decyzja użytkownika 29.10.2026
+**Ta polityka zastępuje wszystkie sprzeczne reguły 1.16.19 o osobnym buforze
+SOC, osobnej karze za PV, sztywnym pustym oknie i premiowaniu końcowego SOC.**
 
-- **Nie stosować stałego +10% ani wymuszenia 100% SOC.** Przed drogimi godzinami rozważyć **dynamiczny dodatkowy zapas 0–15 punktów procentowych SOC** wyłącznie przy potwierdzonym ryzyku niedoszacowania zużycia i ekonomicznej opłacalności wcześniejszego ładowania.
-- Ryzyko obliczać z ostatniego, odseparowanego 7-dniowego holdoutu modelu 45-dniowego, szczególnie ze znaku błędu i 75. percentyla niedoszacowań w godzinach 16–22. Nie udawać, że błąd MAE jest prognozowaną dodatkową energią. Bez wystarczających danych, istotnego szczytu cen lub wykonalnego taniego okna: **brak dodatkowego ładowania** i jasny powód w diagnostyce.
-- Nadmiarową energię kupować wyłącznie w rozciągniętym na kilka kwadransów oknie, po uwzględnieniu sprawności, degradacji, wartości końcowej SOC i możliwości wykorzystania PV. Wymóg ten nie daje dodatkowych uprawnień do manipulowania prądami: nadal tylko przesunięcie lub rozciągnięcie ładowania.
-- Wyraźnie rozdzielać bazową prognozę domu, przyjęty zapas na niepewność, rzeczywiste dodatkowe ładowanie i szacowaną wartość unikniętego ryzyka. Pokazywać prawdziwy plan SOC, nie sztucznie podniesioną linię na wykresie. Pierwsza implementacja korzysta z jawnie oznaczonego, niekalibrowanego współczynnika ostrożności 0,65 i wymaga weryfikacji na żywym HA.
+- Planer na **pełnym wspólnym horyzoncie opublikowanych cen** porównuje koszt rzeczywistego zakupu teraz, poczekania na produkcję PV, późniejszego zakupu przed drogim szczytem, przechowania energii i jej sprzedaży (tylko nadwyżki PV). Nie ustala sztywnej godziny 14:00, celu 100% ani 90% SOC.
+- **Wartość czekania na PV:** uwzględnia cenę późniejszego doładowania i jego wykonalność przy 50 A, prognozowaną produkcję, niedoszacowanie PV oraz możliwe przeszacowanie zużycia. Wcześniejszy zakup nie może zajmować pojemności, której koszt alternatywny w scenariuszu wyższej PV przewyższa oszczędność na cenie zakupu.
+- **Wspólne scenariusze, nie osobne poprawki:** (a) bazowa prognoza, (b) wyższa PV i niższe zużycie, (c) niższa dostępność energii i wyższy pobór w szczycie. Co-Pilot wybiera pomiędzy **fizycznie zweryfikowanymi harmonogramami** przy jawnie podanych, początkowo niekalibrowanych wagach ryzyka. Nie dopisuje fałszywych Wh do wykresu domu ani PV. Po każdym kwadransie replanuje według rzeczywistego SOC; potencjalne scenariusze nie są gwarancją produkcji.
+- **Zapas bezpieczeństwa:** dodatkowe **0–15 punktów procentowych SOC** wynika z błędu prognozy zużycia w siedmiodniowym holdoucie, a nie ze sztywnej reguły. Planer rozważa równocześnie wolne miejsce na PV — bez bezwzględnego zakazu osiągania 100% i bez ograniczania użycia energii podczas szczytu.
+- **Bez automatycznych mikrocykli:** ocenę korzyści finansowej rozpoczynania ładowania przeprowadza się dla **całej kampanii w całym horyzoncie**, także dla późniejszych kwadransów. Granica nowej operacji wynosi 0,10 DKK poprawy wyniku skorygowanego o ryzyko; dla już trwającej operacji 0,05 DKK. Przy niepewnej/znikomej korzyści preferować brak dodatkowego ładowania. Nie jest to zaokrąglenie energii ani cen.
+- **Koniec horyzontu:** nie traktować nieopublikowanej przyszłej ceny jako pewnej. Dyskontować wartość energii pozostałej w baterii, uzależnić od rzeczywistego prognozowanego popytu przed następną PV i nie przyznawać premii, która sama zachęca do zakupów i dobijania 100% tuż przed końcem opublikowanych cen.
+- **Realizowalność i raportowanie:** każdy wariant przechodzi niezależny model AC/DC i SOC 20–100%, a projekcja na sześć TOU sprawdza kwadransowe zmiany nastaw w kroku SOC 1%. Plan kwadransowy i teoretyczna wykonalność zapisów **nie dowodzą** uzyskania przepływu na rzeczywistym Deye. Pokazywać prognozy, przyjęte wagi, dodatkowy zapas, koszty wariantów, koszt ryzyka i przyczyny wyboru.
+- **Nadrzędna reguła prądów:** żadnej zmiany prądów poza celowym **przesunięciem lub rozciągnięciem ładowania w czasie**. Opis przepływu w planie nie jest nastawą prądu. Zakaz odczytu i zapisu nastawy maksymalnego prądu rozładowania pozostaje bezwzględny.
 
 ## Pełnohoryzontowy planer energii — decyzja użytkownika 22.10.2026
 
 - Obliczać **cały nieprzerwany okres dostępnych, opublikowanych cen zakupu i sprzedaży**, przy dostępnej prognozie PV i zużycia, a nie pary 15/30-minutowe. Krok kwadransowy pozostaje tylko rozdzielczością bilansu i SOC.
 - Wybierać godziny ładowania z sieci, gdy zabraknie korzystnej energii PV, i używać energii baterii podczas droższych godzin. **Dopuszczać kupowanie prądu z sieci mimo niepustej baterii**, jeżeli zachowanie energii na później zmniejsza koszt planu.
 - Uwzględniać całe prognozowane PV: pokrywanie domu, magazynowanie nadwyżek, ewentualny eksport nadwyżek i pozostawianie pojemności na zapowiedziane PV. Pozwalać na kilka kolejnych godzin ładowania, rozładowania i powtarzające się cykle, a także świadomy brak cyklu.
-- Ograniczenia fizyczne, polityka ceny zakupu/sprzedaży, degradacja 0,40 DKK/kWh DC, SOC min. 20%, eksport wyłącznie PV i sześć TOU pozostają obowiązujące. Model zużycia podlega nowszej decyzji 29.10.2026: **45 dni historii, większa waga ostatnich 7 i 14 dni** oraz bufor ryzyka opisany powyżej.
-- Najpierw wdrożyć model w nieegzekwowalnym `dry_run`, wyraźnie rozdzielić fizyczny harmonogram 15-minutowy od harmonogramu wykonywalnego przez sześć okien TOU. Nie sugerować w HA możliwych do wykonania oszczędności, dopóki nie ma walidacji TOU i rzeczywistego baseline Deye.
-
+- Ograniczenia fizyczne, polityka ceny zakupu/sprzedaży, degradacja 0,40 DKK/kWh DC, SOC min. 20%, eksport wyłącznie PV i sześć TOU pozostają obowiązujące. Model zużycia opiera się na 45 dniach; nie przywracać starego modelu 365-dniowego.
+- Oddzielać weryfikację planu fizycznego od kwadransowej projekcji na sześć TOU. `dry_run` nie wykonuje zapisów. Nie sugerować w HA możliwych do wykonania oszczędności, dopóki nie ma walidacji TOU i rzeczywistego baseline Deye.
 
 ## Potwierdzone zachowanie falownika — 23.10.2026
 

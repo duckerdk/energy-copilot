@@ -633,3 +633,21 @@ async def test_soc_99_suppresses_cosmetic_grid_topup():
     assert service.states.get(GRID_CHARGE).state == "off"
     assert float(service.states.get(tou_entities(4)["soc"]).state) == 99
     assert not any(c[2]["entity_id"] == GRID_CURRENT for c in service.calls)
+
+
+@pytest.mark.asyncio
+async def test_executor_blocks_nonrepresentable_six_tou_projection_without_writes():
+    now = datetime(2026, 10, 30, 12, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    controller.arm()
+    plan = preview(now, charge=0.2, discharge=0, grid_a=12)
+    plan.tou_feasibility = {
+        "status": "not_representable",
+        "reason": "invalid_grid_target",
+        "hardware_execution_verified": False,
+    }
+    assert await controller.apply(plan, now, soc_pct=55, voltage_v=52) == "blocked"
+    assert controller.reason == (
+        "CommandRejected:controller:plan_not_representable_by_tou"
+    )
+    assert not service.calls

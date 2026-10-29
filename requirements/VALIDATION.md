@@ -29,8 +29,13 @@
 | LOAD-01 | historia Recorder z zamaskowanym zerem składowej | Odrzucenie slota z uczenia i backtestu |
 | LOAD-03 | Historia 90 dni i zmiana obciążenia w ostatnich 7–14 dniach | Trenować tylko z ostatnich 45 dni, wyższa waga ostatnich 14; wyraźny wpływ na prognozę godzinową |
 | LOAD-04 | Holdout poprzedniego tygodnia z systematycznym wieczornym niedoszacowaniem | Zmierzone bias oraz P75 dodatnich błędów, bez użycia danych z okresu testowego w uczeniu |
-| LOAD-05 | Wysokie ceny i niedoszacowanie; dostępne tanie okno 2+ kwadransów | Dynamiczny zapas 0–15 pp, rzeczywiste ładowanie, pełna walidacja bilansu, bez fałszywego poboru domu; brak wymuszonych 100% |
-| LOAD-06 | Płaskie ceny, za mało historii, brak bezpiecznego okna | Zero dodatkowego ładowania i jawny powód; zachować nominalny plan i brak nieuzasadnionych zmian prądu |
+| LOAD-05 | Przyjęty wzorzec cen 29–30.10: szczyt po tanich godzinach, możliwa PV i ryzyko niedoszacowania zużycia | Porównać pełne warianty (bazowy, czekanie na PV, rezerwa, wariant wspólny), rzeczywiste planowane kWh i SOC; nie blokować scenariusza przez 26 Wh PV |
+| LOAD-06 | Płaskie ceny, za mało holdoutu lub brak czasu na doładowanie | Bez fikcyjnego przyszłego szczytu, bez nadmiernej rezerwy i bez ślepego dobijania 100% |
+| LOAD-07 | Wysoki SOC przed oknem PV, tani zakup wcześniej i nieco droższy przed szczytem | Porównanie wartości oczekiwania na PV, ograniczenia 50 A i kosztu opóźnienia; pozostawienie miejsca, jeśli ekonomicznie korzystne |
+| LOAD-08 | Późniejszy zakup z zyskiem poniżej 0,10 DKK dla całej kampanii | Wykluczyć mikrocykl także wtedy, gdy nie jest w pierwszym kwadransie; przy trwającym ładowaniu próg 0,05 DKK |
+| LOAD-09 | Duży popyt poza końcem opublikowanych cen | Zdyskontowana wartość terminalna nie wymusza doładowania do 100% bez opublikowanych cen; brak sztucznej taryfy |
+| LOAD-10 | Plan 96 kwadransów przy sześciu TOU | Zweryfikowana struktura 6 slotów i odczytywalne cele 1%; jawny status `modeled_quarterly_rewrites_only` oraz `hardware_execution_verified=false` |
+| LOAD-11 | HA Replay z niezmienionymi danymi i wersją solvera 2.0.0 | Równe wyniki kwadransowe, numeryczne SOC/kWh/koszt, decyzja scenariuszowa i jawna polityka nowej wersji; żadnego dodatkowego importu cen |
 | LOAD-02 | ważne liczbowe ujemne home, pozostałe źródła poprawne | `max(0, home)` w bieżących danych i całce odcinkowej; kwadrans zachowany, jawne agregaty czasu/liczby/kWh korekt |
 | MTR-08 | Świeży dom zgodny / rozbieżny z sumą PV/grid/battery | Alert `derived_sum_time_uncertain` przy rozbieżności |
 | MTR-09 | Wszystkie wymagane i opcjonalne role bez zmian przez 1–48 h | Zachowane z oryginalnym znacznikiem, bez sztucznego heartbeat; nieudostępniona/nieważna wartość odrzucana |

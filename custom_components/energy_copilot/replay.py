@@ -117,7 +117,11 @@ def build_replay(plant, quarters, result, *, metadata=None):
             for q in quarters
         ],
         "pv_headroom_policy": (
-            "risk_aware_v1" if result.pv_headroom_enabled else "disabled"
+            "joint_scenarios_v2"
+            if result.robust_policy is not None
+            else "risk_aware_v1"
+            if result.pv_headroom_enabled
+            else "disabled"
         ),
         "pv_underprediction_kwh": result.pv_underprediction_kwh,
         "expected": _result_output(result),
@@ -198,7 +202,7 @@ def _inputs(payload):
     ):
         raise ValueError("replay:missing_expected_result")
     policy = payload.get("pv_headroom_policy", "disabled")
-    if policy not in ("risk_aware_v1", "disabled"):
+    if policy not in ("risk_aware_v1", "joint_scenarios_v2", "disabled"):
         raise ValueError("replay:unsupported_headroom_policy")
     upside_raw = payload.get("pv_underprediction_kwh")
     upside = None if upside_raw is None else _finite(upside_raw, "pv_upside")
@@ -219,7 +223,7 @@ def simulate_replay(payload):
         grid_charge_already_active=metadata.get("grid_charge_already_active", False),
         terminal_value_override=terminal,
         pv_underprediction_kwh=upside,
-        enable_pv_headroom=policy == "risk_aware_v1",
+        enable_pv_headroom=policy != "disabled",
         load_risk_accuracy=metadata.get("load_risk_accuracy"),
     )
     actual = _result_output(result)

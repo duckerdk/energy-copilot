@@ -17,7 +17,7 @@ async function fetchSource(filename) {
 async function initialize() {
   importScripts(PYODIDE_CDN + "pyodide.js");
   const py = await loadPyodide({ indexURL: PYODIDE_CDN });
-  const [engine, planner, optimizer, continuous, replay, headroom, economics] = await Promise.all([
+  const [engine, planner, optimizer, continuous, replay, headroom, economics, robust, tou] = await Promise.all([
     fetchSource("engine.py"),
     fetchSource("planner.py"),
     fetchSource("horizon_optimizer.py"),
@@ -25,6 +25,8 @@ async function initialize() {
     fetchSource("replay.py"),
     fetchSource("pv_headroom.py"),
     fetchSource("economic_policy.py"),
+    fetchSource("robust_strategy.py"),
+    fetchSource("tou_projection.py"),
   ]);
   py.FS.mkdirTree("/lab/core");
   py.FS.writeFile("/lab/engine.py", engine);
@@ -35,6 +37,8 @@ async function initialize() {
   py.FS.writeFile("/lab/core/replay.py", replay);
   py.FS.writeFile("/lab/core/pv_headroom.py", headroom);
   py.FS.writeFile("/lab/core/economic_policy.py", economics);
+  py.FS.writeFile("/lab/core/robust_strategy.py", robust);
+  py.FS.writeFile("/lab/core/tou_projection.py", tou);
   py.runPython("import json\nimport sys\nsys.path.insert(0, '/lab')\nfrom engine import simulate_scenario, simulate_replay");
   self.postMessage({ kind: "ready" });
   return py;
