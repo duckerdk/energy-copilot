@@ -1,3 +1,4 @@
+# Retry after repairing regression tests for forecast-independent PV charging.
 name: Bootstrap HACS v1.16.17
 on:
   push:
