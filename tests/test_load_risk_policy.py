@@ -87,6 +87,9 @@ def test_joint_scenario_selection_prices_evening_risk_without_fake_load():
     )
     policy = robust.robust_policy
     assert policy["status"] == "scenario_selected"
+    assert policy["nominal_objective_dkk"] == pytest.approx(
+        nominal.candidate.objective_dkk, abs=0.0001
+    )
     assert policy["method"] == "v2_joint_scenario_receding_horizon_unverified"
     assert policy["candidate_count"] >= 1
     assert policy["estimated_risk_reduction_dkk"] >= -0.101
