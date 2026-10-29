@@ -50,9 +50,7 @@ def periods(early_kwh, expensive_kwh):
 
 
 def total_before_peak(result):
-    return sum(
-        q.grid_import_kwh for q in result.candidate.quarters[:4]
-    )
+    return sum(q.grid_import_kwh for q in result.candidate.quarters[:4])
 
 
 def discharged_before_peak(result):
@@ -92,7 +90,5 @@ def test_two_kwh_buy_at_four_cannot_be_justified_by_one_kwh_demand_at_six():
     )
     assert total_before_peak(plan) < 0.4
     assert discharged_before_peak(plan) > 1.8
-    assert sum(
-        q.grid_import_kwh for q in plan.candidate.quarters[4:]
-    ) < 0.3
+    assert sum(q.grid_import_kwh for q in plan.candidate.quarters[4:]) < 0.3
     assert plan.robust_policy["status"] == "scenario_selected"
