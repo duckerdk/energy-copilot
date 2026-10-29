@@ -197,9 +197,7 @@ def forecast_seven_days(
         raise PlanningInputError("load:timezone_missing")
     now = now.astimezone(UTC)
     if include_current:
-        start = now.replace(
-            minute=now.minute // 15 * 15, second=0, microsecond=0
-        )
+        start = now.replace(minute=now.minute // 15 * 15, second=0, microsecond=0)
     else:
         start = now.replace(second=0, microsecond=0)
         if start < now or start.minute % 15:
