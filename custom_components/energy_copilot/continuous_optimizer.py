@@ -160,11 +160,12 @@ def optimize_continuous(
         )
         interval_hours = (q.end - q.start).total_seconds() / 3600.0
         max_charge = (
-            plant.battery_voltage_v * plant.charge_limit_a / 1000.0
-            * interval_hours
+            plant.battery_voltage_v * plant.charge_limit_a / 1000.0 * interval_hours
         )
         max_grid = (
-            plant.battery_voltage_v * plant.grid_charge_limit_a / 1000.0
+            plant.battery_voltage_v
+            * plant.grid_charge_limit_a
+            / 1000.0
             * interval_hours
         )
         # Unusually high feed-in prices can incentivize buying grid AC while
