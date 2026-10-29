@@ -8,7 +8,6 @@ from custom_components.energy_copilot.horizon_optimizer import optimize_horizon
 from custom_components.energy_copilot.planner import Plant, Quarter, simulate_candidate
 from custom_components.energy_copilot.replay import build_replay, simulate_replay
 
-
 START = datetime(2026, 10, 29, 10, 30, tzinfo=UTC)
 LOAD_ACCURACY = {
     "hours_evaluated": 168,
