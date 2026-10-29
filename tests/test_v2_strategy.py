@@ -139,8 +139,7 @@ def test_v2_compares_waiting_for_pv_against_early_network_purchase():
     # scored scenario beats the nominal alternative on the full horizon.
     assert r["estimated_risk_reduction_dkk"] >= 0.1
     assert any(
-        "wait_for_pv" in option["strategy"]
-        for option in r["alternative_scores_dkk"]
+        "wait_for_pv" in option["strategy"] for option in r["alternative_scores_dkk"]
     )
     assert _charge_in_hours(baseline, quarters, {11, 12, 13}) >= 0.0
 
