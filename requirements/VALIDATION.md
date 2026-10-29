@@ -27,6 +27,10 @@
 | PVF-01 | brak/nieznana odpowiedź Forecast.Solar | Diagnostyka, bez wymyślonej prognozy |
 | PVF-02 | pełny SOC, Solar Sell OFF, słoneczna pogoda | Brak nauki błędu prognozy z ograniczonej produkcji PV |
 | LOAD-01 | historia Recorder z zamaskowanym zerem składowej | Odrzucenie slota z uczenia i backtestu |
+| LOAD-03 | Historia 90 dni i zmiana obciążenia w ostatnich 7–14 dniach | Trenować tylko z ostatnich 45 dni, wyższa waga ostatnich 14; wyraźny wpływ na prognozę godzinową |
+| LOAD-04 | Holdout poprzedniego tygodnia z systematycznym wieczornym niedoszacowaniem | Zmierzone bias oraz P75 dodatnich błędów, bez użycia danych z okresu testowego w uczeniu |
+| LOAD-05 | Wysokie ceny i niedoszacowanie; dostępne tanie okno 2+ kwadransów | Dynamiczny zapas 0–15 pp, rzeczywiste ładowanie, pełna walidacja bilansu, bez fałszywego poboru domu; brak wymuszonych 100% |
+| LOAD-06 | Płaskie ceny, za mało historii, brak bezpiecznego okna | Zero dodatkowego ładowania i jawny powód; zachować nominalny plan i brak nieuzasadnionych zmian prądu |
 | LOAD-02 | ważne liczbowe ujemne home, pozostałe źródła poprawne | `max(0, home)` w bieżących danych i całce odcinkowej; kwadrans zachowany, jawne agregaty czasu/liczby/kWh korekt |
 | MTR-08 | Świeży dom zgodny / rozbieżny z sumą PV/grid/battery | Alert `derived_sum_time_uncertain` przy rozbieżności |
 | MTR-09 | Wszystkie wymagane i opcjonalne role bez zmian przez 1–48 h | Zachowane z oryginalnym znacznikiem, bez sztucznego heartbeat; nieudostępniona/nieważna wartość odrzucana |
