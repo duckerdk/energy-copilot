@@ -265,8 +265,19 @@ def select_strategy(
     # Replan purchases later if they can still fill the battery before peak.
     # No fixed 14:00 cutoff: each window is derived from the actual price
     # peak and the 50 A charging rate, and each variant is independently priced.
+    from zoneinfo import ZoneInfo
+
+    local_zone = ZoneInfo("Europe/Copenhagen")
     for peak in peaks:
-        preceding_pv = [i for i in range(peak.start) if quarters[i].pv_dc_kwh > 0.01]
+        # Waiting for today's PV must NOT erase cheap grid charging from
+        # previous nights/days, which may be needed for overnight demand.
+        peak_day = quarters[peak.start].start.astimezone(local_zone).date()
+        preceding_pv = [
+            i
+            for i in range(peak.start)
+            if quarters[i].start.astimezone(local_zone).date() == peak_day
+            and quarters[i].pv_dc_kwh > 0.01
+        ]
         if not preceding_pv:
             continue
         first = preceding_pv[0]
@@ -325,14 +336,16 @@ def select_strategy(
                 high = mid
         if best is not None:
             candidates.append(("load_uncertainty_reserve", *best))
-        if hard_reserve:
-            attempt(
-                "joint_load_and_pv_options",
-                {
-                    "minimum_pv_headroom": hard_reserve,
-                    "peak_entry_reward": {peak.start - 1: min(peak.price_dkk_kwh, 4.0)},
-                },
-            )
+            if hard_reserve:
+                # Use the same bounded demand-risk reward as the pure load
+                # candidate, not an unconstrained incentive to reach 100%.
+                attempt(
+                    "joint_load_and_pv_options",
+                    {
+                        "minimum_pv_headroom": hard_reserve,
+                        "peak_entry_reward": best[1]["peak_entry_reward"],
+                    },
+                )
 
     ordered = sorted(
         (
