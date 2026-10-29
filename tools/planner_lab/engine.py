@@ -124,9 +124,6 @@ def simulate_scenario(payload):
     capacity = _number(payload.get("battery_capacity_kwh", 10.24), "Pojemność", 0.1, 250)
     voltage = _number(payload.get("battery_voltage_v", 51.2), "Napięcie", 1, 1500)
     max_charge = _number(payload.get("charge_limit_a", 50), "Limit ładowania", 0, 50)
-    max_discharge = _number(
-        payload.get("discharge_limit_a", 100), "Limit rozładowania", 0, 100
-    )
     max_grid = _number(
         payload.get("grid_charge_limit_a", 50), "Limit ładowania sieciowego", 0, 50
     )
@@ -142,7 +139,6 @@ def simulate_scenario(payload):
         initial_soc_pct=soc,
         battery_voltage_v=voltage,
         charge_limit_a=max_charge,
-        discharge_limit_a=max_discharge,
         grid_charge_limit_a=max_grid,
         eta_pv_to_ac=efficiency,
         eta_pv_to_battery=efficiency,
