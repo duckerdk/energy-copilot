@@ -57,6 +57,12 @@ Przy tej samej energii i równoważnym koszcie w horyzoncie wybierać **łagodni
 
 **Kontrakt wykonawczy:** ani wyniki scenariuszy, ani kolumna szacowanego prądu nie upoważniają do samowolnego przestawiania prądów. Jedynymi powodami zmian są świadome przesunięcie lub rozciągnięcie ładowania. TOU ma sześć stałych przedziałów; wykonawca aktualizuje bieżący slot co kwadrans. `tou_feasibility` to tylko statyczna projekcja komend, **nie** potwierdzenie fizycznej wykonalności i nie status `executable=true`.
 
+### Korekta 2.0.1 — bieżący SOC i koszt ryzyka
+- Każdy nowy plan HA zaczyna się od **zaobserwowanego SOC**, a pierwszy przedział może obejmować tylko pozostające sekundy aktywnego kwadransa. Kolejne przedziały są pełnymi kwadransami. Model ogranicza kWh ładowania proporcjonalnie do rzeczywistej długości pierwszego przedziału, bez wytwarzania fikcyjnego czasu ładowania.
+- Bieżące poprawne pomiary W domu i PV korygują oszacowanie w pierwszych trzech przedziałach wagami 0,65 / 0,30 / 0,15; odchylenie ograniczone do ±3 kW. Dalszy horyzont korzysta z prognoz 45-dniowej i Forecast.Solar. Każdy plan jest nadal przeliczany dla całej dostępnej krzywej cen.
+- Funkcja straty za niedoszacowanie zużycia **nie może zależeć bezpośrednio od najmniejszego nominalnego SOC w szczycie**. Dodatkowy scenariusz zużycia pobiera energię powyżej minimum 20%; gdy jej zabraknie, kosztuje import przy cenie konkretnego kwadransa, a brakująca energia końcowa jest wyceniana raz. Wariant importu i przechowania energii musi przejść porównanie z wariantem rozładowania **w ramach rzeczywistej przyszłej prognozy zużycia**.
+- Jednoznaczna decyzja `battery_discharge` oznacza wykonawczo TOU SOC **20%** w aktywnym kwadransie; `grid_import` można wybrać tylko w ramach rzeczywiście korzystnego wariantu pełnohoryzontowego. Zmiana decyzji po wzroście SOC działa w tym samym kwadransie. Poziom SOC planowany na koniec kwadransa nie jest progiem ograniczającym rozładowanie.
+
 ## Wynik
 Dla każdego slotu: UTC, ceny i wersja danych, prognoza PV i zużycia, SOC początek/koniec, przepływy PV/dom/bateria/sieć, zamierzony Grid Charge/TOU/Solar Sell oraz **wyłącznie celowe czasowe ograniczenia prądu ładowania** (przesunięcie/rozciągnięcie), koszty wariantów, degradacja, niepewność i status wykonalności. Plan jest **intencją**, nie potwierdzonym przepływem. Executor: [EXECUTION.md](EXECUTION.md), testy: [VALIDATION.md](VALIDATION.md).
 
