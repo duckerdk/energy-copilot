@@ -4,7 +4,11 @@ on:
   push:
     branches: [main]
     paths:
-      - custom_components/energy_copilot/manifest.json
+      - 'custom_components/energy_copilot/**'
+      - 'tests/**'
+      - 'scripts/build_release.py'
+      - 'requirements-test.txt'
+      - '.github/workflows/publish-version-on-main.yml'
   workflow_dispatch:
 
 permissions:
@@ -41,6 +45,14 @@ jobs:
           TAG="v${VERSION}"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           if gh release view "$TAG" >/dev/null 2>&1; then
+            if ! git rev-parse --verify "refs/tags/${TAG}^{commit}" >/dev/null 2>&1; then
+              echo "Published release has no matching local tag: $TAG" >&2
+              exit 1
+            fi
+            if ! git diff --quiet "$TAG" "$GITHUB_SHA" -- custom_components/energy_copilot; then
+              echo "Integration changed after $TAG without a manifest version bump." >&2
+              exit 1
+            fi
             echo "Release already exists; verifying its artifacts."
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
@@ -49,6 +61,10 @@ jobs:
               TAG_COMMIT="$(git rev-parse "refs/tags/${TAG}^{commit}")"
               if ! git merge-base --is-ancestor "$TAG_COMMIT" "$GITHUB_SHA"; then
                 echo "Existing tag is not an ancestor of main: $TAG" >&2
+                exit 1
+              fi
+              if ! git diff --quiet "$TAG_COMMIT" "$GITHUB_SHA" -- custom_components/energy_copilot; then
+                echo "Orphan release tag contains different integration code; use a new version." >&2
                 exit 1
               fi
             else
@@ -89,4 +105,8 @@ jobs:
                   | [.assets[].name] as $assets
                   | select((["energy_copilot.zip", "SHA256SUMS", "BUILD_INFO.json"] - $assets) | length == 0)
                   | .tagName' | grep -Fx "$TAG"
-          echo "Verified complete published release: $TAG"
+          mkdir -p /tmp/energy-copilot-verified
+          gh release download "$TAG" --pattern "energy_copilot.zip" --pattern "SHA256SUMS" --pattern "BUILD_INFO.json" --dir /tmp/energy-copilot-verified
+          (cd /tmp/energy-copilot-verified && sha256sum -c SHA256SUMS)
+          test "$(python -c 'import json; print(json.load(open("/tmp/energy-copilot-verified/BUILD_INFO.json"))["tag"])')" = "$TAG"
+          echo "Verified complete published release and ZIP checksum: $TAG"
