@@ -93,3 +93,73 @@ async def test_grid_charge_switches_on_without_rewriting_existing_positive_limit
     assert not any(
         c[2]["entity_id"] in {CHARGE_CURRENT, GRID_CURRENT} for c in service.calls
     )
+
+
+@pytest.mark.asyncio
+async def test_restart_restores_only_proven_legacy_pv_deferral_cap():
+    now = datetime(2026, 10, 29, 8, tzinfo=timezone.utc)
+    ctrl, service = setup_controller()
+    service.states.items[CHARGE_CURRENT].state = "1"
+
+    class Journal:
+        available = True
+
+        def __init__(self):
+            self.entries = [
+                {
+                    "event": "applied",
+                    "command_changes": [
+                        {"entity_id": CHARGE_CURRENT, "before": "50", "after": 1.0}
+                    ],
+                }
+            ]
+
+        def record(self, event, **details):
+            self.entries.append({"event": event, **details})
+
+    ctrl.journal = Journal()
+    ctrl.arm()
+    plan = preview(now, charge=0, discharge=0, grid_a=0)
+    plan.replay_snapshot["expected"]["quarters"][0]["pv_to_battery_dc_kwh"] = 0.4
+    assert await ctrl.apply(plan, now, soc_pct=59, voltage_v=52) == "applied"
+    assert float(service.states.get(CHARGE_CURRENT).state) == 50
+    assert sum(c[2]["entity_id"] == CHARGE_CURRENT for c in service.calls) == 1
+    assert any(
+        x.get("charging_current_policy") == "restore_after_legacy_pv_deferral"
+        for x in ctrl.journal.entries
+    )
+    next_quarter = now + timedelta(minutes=15)
+    await ctrl.apply(
+        preview(next_quarter, charge=0, discharge=0, grid_a=0),
+        next_quarter,
+        soc_pct=59,
+        voltage_v=52,
+    )
+    assert sum(c[2]["entity_id"] == CHARGE_CURRENT for c in service.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_unknown_one_amp_setting_is_not_overwritten_without_ownership_evidence():
+    now = datetime(2026, 10, 29, 8, tzinfo=timezone.utc)
+    ctrl, service = setup_controller()
+    service.states.items[CHARGE_CURRENT].state = "1"
+    ctrl.arm()
+    plan = preview(now, charge=0, discharge=0, grid_a=0)
+    plan.replay_snapshot["expected"]["quarters"][0]["pv_to_battery_dc_kwh"] = 0.4
+    assert await ctrl.apply(plan, now, soc_pct=59, voltage_v=52) == "applied"
+    assert service.states.get(CHARGE_CURRENT).state == "1"
+    assert not any(c[2]["entity_id"] == CHARGE_CURRENT for c in service.calls)
+
+
+@pytest.mark.asyncio
+async def test_grid_current_does_not_change_just_to_match_forecast():
+    now = datetime(2026, 10, 29, 8, tzinfo=timezone.utc)
+    ctrl, service = setup_controller()
+    service.states.items[GRID_CURRENT].state = "7"
+    ctrl.arm()
+    plan = preview(now, charge=0.10, discharge=0, grid_a=15)
+    assert await ctrl.apply(plan, now, soc_pct=60, voltage_v=52) == "applied"
+    assert float(service.states.get(GRID_CURRENT).state) == 7
+    assert not any(
+        c[2]["entity_id"] in {CHARGE_CURRENT, GRID_CURRENT} for c in service.calls
+    )
