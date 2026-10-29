@@ -148,11 +148,18 @@ def simulate_candidate(
             raise InfeasibleCandidate("time:timezone_required")
         if q.start.utcoffset() != timedelta(0) or q.end.utcoffset() != timedelta(0):
             raise InfeasibleCandidate("time:utc_required")
+        duration = q.end - q.start
+        # Only the FIRST interval may be a remaining fraction of the active
+        # quarter. A live replan starts at the latest observation, not the
+        # next 15-minute boundary, but future intervals remain complete.
         if (
-            q.end - q.start != QUARTER
-            or q.start.second
-            or q.start.microsecond
-            or q.start.minute % 15
+            duration <= timedelta(0)
+            or duration > QUARTER
+            or (index and duration != QUARTER)
+            or (index and (q.start.second or q.start.microsecond or q.start.minute % 15))
+            or q.end.second
+            or q.end.microsecond
+            or q.end.minute % 15
         ):
             raise InfeasibleCandidate("time:quarter_alignment")
         if index and q.start != quarters[index - 1].end:
@@ -203,7 +210,7 @@ def simulate_candidate(
         discharge_dc = d.battery_to_home_dc_kwh
         if charge_dc > EPS and discharge_dc > EPS:
             raise InfeasibleCandidate("battery:simultaneous_charge_discharge")
-        quarter_hours = QUARTER.total_seconds() / 3600
+        quarter_hours = duration.total_seconds() / 3600
         max_charge = (
             plant.battery_voltage_v * plant.charge_limit_a / 1000 * quarter_hours
         )
