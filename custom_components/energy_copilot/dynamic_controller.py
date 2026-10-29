@@ -11,7 +11,6 @@ from zoneinfo import ZoneInfo
 
 from .deye_commands import (
     CHARGE_CURRENT,
-    DISCHARGE_CURRENT,
     GRID_CHARGE,
     GRID_CURRENT,
     SOLAR_SELL,
@@ -46,11 +45,40 @@ class DynamicDeyeController:
         self._command_changes = []
         self._attempted_command = None
         self._last_tou_block_quarter = None
-        self._pv_throttle_previous_a = None
 
     def _audit(self, event, **details):
         if self.journal is not None:
             self.journal.record(event, **details)
+
+    def _legacy_charge_restore(self, observed_a):
+        """Recover a previous PV-deferral limit using persisted OWN writes.
+
+        A missing journal or any later controller write prevents guessing.
+        Do not replace an observed operator setting other than that exact
+        legacy 1 A limit with proven 1 A provenance.
+        """
+        if abs(observed_a - 1.0) > 1e-6:
+            return None
+        if self.journal is None or not self.journal.available:
+            return None
+        for event in reversed(self.journal.entries):
+            for change in reversed(event.get("command_changes") or []):
+                if change.get("entity_id") != CHARGE_CURRENT:
+                    continue
+                try:
+                    before = float(change["before"])
+                    after = float(change["after"])
+                except (ValueError, TypeError, KeyError):
+                    return None
+                if (
+                    abs(after - 1.0) < 1e-6
+                    and isfinite(before)
+                    and 1.0 < before <= 50.0
+                    and event.get("event") == "applied"
+                ):
+                    return before
+                return None
+        return None
 
     def _decision(self, preview, row, now, soc_pct):
         replay = preview.replay_snapshot or {}
@@ -308,15 +336,6 @@ class DynamicDeyeController:
                     raise CommandRejected("controller:simultaneous_flow")
                 if soc_pct <= 20.1 and discharge > 1e-7:
                     raise CommandRejected("controller:minimum_soc")
-                # This inverter stops PV after several minutes with 0 A
-                # discharge current. Never write that global limit; if a legacy
-                # or external setting is 0 A, refuse automatic control and
-                # require manual correction rather than silently hiding it.
-                discharge_setting = float(
-                    self.adapter._present(DISCHARGE_CURRENT).state
-                )
-                if not isfinite(discharge_setting) or discharge_setting <= 0:
-                    raise CommandRejected("controller:discharge_current_zero")
                 tou_state = self.adapter._present(TIME_OF_USE).state
                 if tou_state != "on":
                     reason = f"controller:tou_not_enabled:observed={tou_state}"
@@ -358,7 +377,11 @@ class DynamicDeyeController:
                     now.astimezone(ZoneInfo("Europe/Copenhagen")).hour // 4 + 1
                 )
                 charge_enabled = charge > 1e-7 and grid_a > 1e-7
-                if charge > 1e-7 and not charge_enabled:
+                # 99% is a completed grid-charge objective; leave remaining
+                # headroom for natural PV rather than a cosmetic grid top-up.
+                if soc_pct >= 99.0:
+                    charge_enabled = False
+                if charge > 1e-7 and grid_a <= 1e-7:
                     raise CommandRejected("controller:charge_plan_without_grid_current")
                 projected_soc = float(row["soc_end_pct"])
                 if (
@@ -459,18 +482,19 @@ class DynamicDeyeController:
                 current_grid_a = float(grid_state.state)
                 settings = []
                 charge_policy = "unchanged_no_rate_control_needed"
-                if self._pv_throttle_previous_a is not None:
-                    # Restore a cap changed by an earlier controller run.
-                    restore = self._pv_throttle_previous_a
-                    if abs(current_charge_a - 1.0) < 1e-6:
-                        settings.append((CHARGE_CURRENT, restore))
-                    self._pv_throttle_previous_a = None
+                restore = self._legacy_charge_restore(current_charge_a)
+                if restore is not None:
+                    settings.append((CHARGE_CURRENT, restore))
                     charge_policy = "restore_after_legacy_pv_deferral"
 
-                if spreading_grid or (charge_enabled and current_grid_a < 1.0):
-                    # Restrict grid current for an explicit multi-quarter
-                    # campaign, or enable a planned charge from a legacy 0 A
-                    # limit. Otherwise preserve the operator's current cap.
+                # A new current write is justified ONLY by a deliberate
+                # time-spreading campaign. Grid-charge enablement alone is
+                # not a third reason to adjust an arbitrary current.
+                if charge_enabled and current_grid_a < 1.0 and not spreading_grid:
+                    raise CommandRejected("controller:grid_charge_limit_requires_campaign")
+                if spreading_grid:
+                    # Deliberately spread charging over several equally cheap
+                    # quarters. Never track forecast current outside a campaign.
                     desired_grid_a = self.adapter.quantize_number(
                         GRID_CURRENT,
                         max(1.0, min(50.0, ceil(grid_a))),
@@ -497,13 +521,7 @@ class DynamicDeyeController:
                                 ),
                             )
                         )
-                    charge_policy = (
-                        "spread_grid_charge_over_low_price_window"
-                        if spreading_grid
-                        else "enable_planned_grid_charge_from_zero"
-                    )
-                # The existing inverter/BMS discharge-current cap is preserved.
-                # Read-only preflight above detects 0 A; no write is permitted.
+                    charge_policy = "spread_grid_charge_over_low_price_window"
                 # Stop grid charging first, then update active TOU settings.
                 # Never alter window start/end times or non-active SOC settings.
                 if (
@@ -562,7 +580,6 @@ class DynamicDeyeController:
                         target_tou_grid_charge=charge_enabled,
                         observed_tou_grid_charge=self.observed_tou_grid_charge,
                         grid_limit_a=float(self.adapter._present(GRID_CURRENT).state),
-                        discharge_limit_a=None,
                         charge_limit_a=float(
                             self.adapter._present(CHARGE_CURRENT).state
                         ),
