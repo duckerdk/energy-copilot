@@ -1,22 +1,26 @@
-name: Publish HACS release after version change
+name: Publish verified HACS release
 
 on:
   push:
     branches: [main]
     paths:
-      - custom_components/energy_copilot/manifest.json
-      - .github/workflows/publish-version-on-main.yml
+      - 'custom_components/energy_copilot/**'
+      - 'tests/**'
+      - 'scripts/build_release.py'
+      - 'requirements-test.txt'
+      - '.github/workflows/publish-version-on-main.yml'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: energy-copilot-version-publish
+  group: energy-copilot-release
   cancel-in-progress: false
 
 jobs:
   publish:
+    if: github.repository == 'duckerdk/energy-copilot'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,7 +30,12 @@ jobs:
         with:
           python-version: "3.14"
           cache: pip
-      - name: Determine exact version and avoid republishing
+      - run: pip install -r requirements-test.txt
+      - run: ruff check custom_components tests scripts/build_release.py
+      - run: ruff format --check custom_components tests scripts/build_release.py
+      - run: pytest --cov=custom_components.energy_copilot --cov-report=term-missing
+      - run: python scripts/check_docs.py
+      - name: Locate immutable source and verify release state
         id: version
         env:
           GH_TOKEN: ${{ github.token }}
@@ -36,37 +45,68 @@ jobs:
           TAG="v${VERSION}"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           if gh release view "$TAG" >/dev/null 2>&1; then
+            if ! git rev-parse --verify "refs/tags/${TAG}^{commit}" >/dev/null 2>&1; then
+              echo "Published release has no matching local tag: $TAG" >&2
+              exit 1
+            fi
+            if ! git diff --quiet "$TAG" "$GITHUB_SHA" -- custom_components/energy_copilot; then
+              echo "Integration changed after $TAG without a manifest version bump." >&2
+              exit 1
+            fi
+            echo "Release already exists; verifying its artifacts."
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
+            if git rev-parse --verify "refs/tags/${TAG}^{commit}" >/dev/null 2>&1; then
+              TAG_COMMIT="$(git rev-parse "refs/tags/${TAG}^{commit}")"
+              if ! git merge-base --is-ancestor "$TAG_COMMIT" "$GITHUB_SHA"; then
+                echo "Existing tag is not an ancestor of main: $TAG" >&2
+                exit 1
+              fi
+              if ! git diff --quiet "$TAG_COMMIT" "$GITHUB_SHA" -- custom_components/energy_copilot; then
+                echo "Orphan release tag contains different integration code; use a new version." >&2
+                exit 1
+              fi
+            else
+              git config user.name github-actions
+              git config user.email github-actions@users.noreply.github.com
+              git tag "$TAG" "$GITHUB_SHA"
+              git push origin "refs/tags/$TAG"
+              TAG_COMMIT="$GITHUB_SHA"
+            fi
+            echo "commit=${TAG_COMMIT}" >> "$GITHUB_OUTPUT"
           fi
-      - name: Validate integration before tagging
+      - name: Build reproducible package from tagged source
         if: steps.version.outputs.exists == 'false'
-        run: |
-          set -euo pipefail
-          pip install -r requirements-test.txt
-          ruff check custom_components tests scripts/build_release.py
-          ruff format --check custom_components tests scripts/build_release.py
-          pytest --cov=custom_components.energy_copilot --cov-report=term-missing
-          python scripts/check_docs.py
-      - name: Create immutable version tag and checked package
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          TAG_COMMIT: ${{ steps.version.outputs.commit }}
+        run: python scripts/build_release.py --tag "$TAG" --commit "$TAG_COMMIT" --output /tmp/energy-copilot-release
+      - name: Publish once
         if: steps.version.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -euo pipefail
-          if git rev-parse --verify "refs/tags/${TAG}" >/dev/null 2>&1; then
-            test "$(git rev-parse "refs/tags/${TAG}^{commit}")" = "$GITHUB_SHA"
-          else
-            gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
-              -f "ref=refs/tags/${TAG}" -f "sha=${GITHUB_SHA}"
-            git fetch origin "refs/tags/${TAG}:refs/tags/${TAG}"
-          fi
-          python scripts/build_release.py --tag "$TAG" --commit "$GITHUB_SHA" --output /tmp/energy-copilot-release
           gh release create "$TAG" \
             /tmp/energy-copilot-release/energy_copilot.zip \
             /tmp/energy-copilot-release/SHA256SUMS \
             /tmp/energy-copilot-release/BUILD_INFO.json \
-            --verify-tag --title "Energy Co-Pilot $TAG" \
-            --notes "Verified Energy Co-Pilot release from commit $GITHUB_SHA."
+            --verify-tag --generate-notes --title "Energy Co-Pilot $TAG"
+      - name: Verify published release and required assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" --json isDraft,assets,tagName \
+            --jq 'select(.isDraft == false and .tagName == env.TAG)
+                  | [.assets[].name] as $assets
+                  | select((["energy_copilot.zip", "SHA256SUMS", "BUILD_INFO.json"] - $assets) | length == 0)
+                  | .tagName' | grep -Fx "$TAG"
+          mkdir -p /tmp/energy-copilot-verified
+          gh release download "$TAG" --pattern "energy_copilot.zip" --pattern "SHA256SUMS" --pattern "BUILD_INFO.json" --dir /tmp/energy-copilot-verified
+          (cd /tmp/energy-copilot-verified && sha256sum -c SHA256SUMS)
+          test "$(python -c 'import json; print(json.load(open("/tmp/energy-copilot-verified/BUILD_INFO.json"))["tag"])')" = "$TAG"
+          echo "Verified complete published release and ZIP checksum: $TAG"

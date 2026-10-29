@@ -1,6 +1,6 @@
 # Energy Co-Pilot
 
-Natywna integracja Home Assistant `custom_components/energy_copilot`. **Wersja v1.16.14:** decyzje uwzględniają materialny koszt całego taniego okna (0,10 DKK dla rozpoczęcia ładowania z sieci, 0,05 DKK dla kontynuacji, 0,01 DKK ekonomiczny remis). SOC 99% uznaje się za zrealizowany cel ładowania z sieci; nadwyżka PV może naturalnie doprowadzić do 100%. Rozkładanie ładowania na kilkugodzinne tanie okno zamiast BOOST oraz brak automatycznej manipulacji prądami 1 A/7 A bez celu — tylko świadome odroczenie PV lub sterowanie rozłożonym ładowaniem sieciowym. **Poprzednio, v1.16.13:** bezpieczne sterowanie Deye: rozładowanie wyłącznie przez progi SOC w TOU, bez jakichkolwiek zapisów `Maximum Battery Discharge Current`; limity ładowania PV i z sieci od 1 do 50 A (nigdy 0 A), dobierane z planowanej energii i napięcia. Przy istniejącym 0 A rozładowania automatyka nie zapisuje nic do falownika, wymagana ręczna korekta. **Poprzednio, v1.16.12:** diagnostyczne porównanie wybranej akcji z alternatywną optymalizacją całego horyzontu (bez tej akcji w najbliższym kwadransie); korekty planów w tym samym kwadransie pokazują wyłącznie zmienione wartości. Bez zmian w sterowaniu Deye. **Poprzednio, v1.16.11:** audyt decyzji i wykonania: wpisy w **Aktywności** znów powiązane z urządzeniem; przyczyny zmian stanu planera i blokad, informacja o planowanym kwadransie, dokładny rejestr rzeczywiście zmienionych nastaw lub brak poleceń. Wpisy o blokadzie powtarzane najwyżej raz na kwadrans, nawet gdy błąd się utrzymuje. ARM i techniczne archiwum z poprzednich wersji pozostają bez zmian. Obecnie dostępne: odczyt pomiarów/cen, Forecast.Solar, Recorder, prognoza domu na 7 dni oraz **ciągła optymalizacja w trybie `dry_run`**. W trybach `monitor` i `dry_run` integracja **nie zapisuje nastaw falownika**. Tryb `automatic` udostępnia przełącznik **Automatic control ARM / STOP** (domyślnie włączony po starcie/reload integracji). Steruje bezpośrednio limitami prądu ładowania i rozładowania, Grid Charge i Solar Sell na podstawie bieżącego kwadransa planu; nie modyfikuje tabeli sześciu TOU. Ta funkcja jest eksperymentalna i wymaga odpowiedniej konfiguracji bazowej Deye.
+Natywna integracja Home Assistant `custom_components/energy_copilot`. Aktualną wersję określa [manifest.json](custom_components/energy_copilot/manifest.json), a wersje dostępne w HACS — [GitHub Releases](https://github.com/duckerdk/energy-copilot/releases). Planer pracuje na opublikowanych cenach i prognozach, a zapis nastaw odbywa się tylko w trybie `automatic`. `monitor` i `dry_run` nie wysyłają poleceń. Zasady sterowania i bezpieczeństwa: [REQUIREMENTS](requirements/REQUIREMENTS.md) oraz [EXECUTION](requirements/EXECUTION.md).
 
 Zatwierdzone reguły, cele i uprawnienia: [REQUIREMENTS.md](requirements/REQUIREMENTS.md). Jedynym źródłem produkcji w integracji jest `sensor.pv_sum`; nie stosuje się PV1/PV2.
 
@@ -10,9 +10,9 @@ Zatwierdzone reguły, cele i uprawnienia: [REQUIREMENTS.md](requirements/REQUIRE
 
 W tabeli można zmienić godzinowe ceny spot, prognozę PV, pobór domu, SOC, pojemność, napięcie, ograniczenia prądowe i sprawność na 24–72 h. Obliczenia wykorzystują **ciągły solver scenariuszy z `engine.py` i oryginalny fizyczny walidator z `planner.py`**. Ceny zakupu: spot + migawka taryf N1 z 20.10.2026 (nie aktualizuje się automatycznie); sprzedaż: spot. Przykładowe dobowe zużycie bazuje na godzinowej historii HA 19–20.10.2026 i powtarza się w scenariuszach dłuższych. Możliwy import/eksport scenariuszy JSON/CSV oraz eksport wyników kwartalnych. **Import plików HA:** w Planner Lab użyj „Import cen HA (.txt)” dla eksportu `raw_today/raw_tomorrow` oraz „Import Forecast.Solar (.txt)” dla `watts`/`wh_period`. Ceny z pliku są interpretowane jako **spot** (zakup wyliczany oddzielnie z historycznych taryf N1). PV przeliczane jest z **Wh okresu zakończonego w podanym czasie** na godzinową średnią kW z zachowaniem energii, także przy niepełnych godzinach wschodu i zachodu. Zera przed wschodem/po zachodzie w obrębie doby są przyjmowane tylko przy potwierdzonych zerowych W na obu krańcach. Daty i DST są dopasowywane po UTC, po imporcie dwóch plików wykorzystywany jest ich **wspólny** horyzont. Zużycie domu pozostaje edytowalne (domyślnie archiwalny profil przykładowy). Pliki nie opuszczają przeglądarki. Strona nie steruje falownikiem ani nie udowadnia fizycznej wykonalności sześciu TOU.
 
-## Replay HA — dokładne odtworzenie obliczeń w przeglądarce (v1.14.0)
+## Replay HA — odtworzenie obliczeń w przeglądarce
 
-1. Po zainstalowaniu Energy Co-Pilot v1.14.0 ustaw `dry_run` i upewnij się, że status planowania to `preview`.
+1. W aktualnej wersji Energy Co-Pilot ustaw `dry_run` i upewnij się, że status planowania to `preview`.
 2. W HA otwórz **Ustawienia → Urządzenia i usługi → Energy Co-Pilot → Pobierz diagnostykę**. Nowa diagnostyka JSON zawiera `data.planner_replay` — dokładnie te wartości, które zostały podane do optymalizatora w jednym przebiegu: parametry baterii, początkowy SOC, wszystkie kwadranse PV/dom, **rzeczywiste ceny zakupu i sprzedaży**, zezwolenie na eksport PV, użyta wycena końcowego SOC oraz pełne wynikowe przepływy.
 3. Wejdź w [Planner Lab](https://duckerdk.github.io/energy-copilot/planner-lab/), sekcja **Replay HA**, kliknij **Wczytaj diagnostykę HA (.json)**, wybierz nowy plik i kliknij **Porównaj HA i Lab**.
 4. **Po imporcie dane HA automatycznie stają się edytowalnym scenariuszem 15-minutowym**, a Lab oblicza nowy plan bez ręcznego wprowadzania cen, PV czy zużycia. Możesz zmieniać kwadranse, osobno ceny zakupu i sprzedaży, SOC, napięcie, prądy, sprawności i wycenę końcową. **Oblicz plan na danych HA** uruchamia ponownie ten sam produkcyjny solver, a wykresy i podsumowanie przedstawiają wynik na danych HA lub zmodyfikowanym scenariuszu. `Przywróć oryginalne dane HA` resetuje zmiany; `Zapisz zmieniony scenariusz JSON` umożliwia późniejszy import.
@@ -100,7 +100,7 @@ Karta ApexCharts nie jest częścią samej integracji Energy Co-Pilot. Prognoza 
 | [REQUIREMENTS](requirements/REQUIREMENTS.md) | Decyzje użytkownika, ograniczenia, zakres autonomii |
 | [HA_CONTRACT](requirements/HA_CONTRACT.md) | Encje HA, wartości, jednostki, Forecast.Solar |
 | [OPTIMIZATION](requirements/OPTIMIZATION.md) | Model przepływów i cel kosztowy |
-| [EXECUTION](requirements/EXECUTION.md) | Przyszłe wykonanie TOU, STOP i bezpieczeństwo |
+| [EXECUTION](requirements/EXECUTION.md) | Wykonanie TOU, STOP i bezpieczeństwo |
 | [VALIDATION](requirements/VALIDATION.md) | Testy automatyczne i kryteria odbioru |
 | [OPEN_ITEMS](requirements/OPEN_ITEMS.md) | Wyłącznie aktualne zadania do wykonania |
 | [AGENTS](AGENTS.md) | Zasady pracy Codexa |
@@ -116,46 +116,8 @@ python3.14 -m venv .venv
 .venv/bin/python scripts/check_docs.py
 ```
 
-`main` publikuje nowe wydanie HACS **tylko po zmianie wersji manifestu i udanym CI**. GitHub Release zawiera `energy_copilot.zip`, `BUILD_INFO.json` i `SHA256SUMS`. Scalenie zmian w samej dokumentacji **nie tworzy nowego wydania**.
+**Jedyny workflow publikujący:** [publish-version-on-main.yml](.github/workflows/publish-version-on-main.yml). Uruchamia się po zmianie `manifest.json` na `main`; dla istniejącego taga bez wydania można go uruchomić ręcznie (`workflow_dispatch`). Zawsze wykonuje testy, buduje pakiet z niezmiennego taga i weryfikuje publiczne wydanie oraz aktywa `energy_copilot.zip`, `BUILD_INFO.json`, `SHA256SUMS`. **Merge i zielone CI nie oznaczają wydania.** Wersja musi być nowa; nie wolno przesuwać istniejącego taga. Dokumentacja sama nie podnosi wersji. Procedura i kryterium GOTOWE: [AGENTS.md](AGENTS.md).
 
+## Status i pochodzenie wydań
 
-## v1.15.0 — dynamiczny bufor PV i poprawa jednostek prognozy
-
-- **Dynamiczny bufor SOC (#24):** produkcyjny optymalizator ciągły wycenia pozostawienie miejsca w baterii dla możliwej dodatkowej produkcji PV w najbliższych dwóch godzinach, gdy **Solar Sell OFF**. Jest to jawnie oznaczona, ograniczona hipoteza, a **nie** twarda granica SOC (100% pozostaje dozwolone, jeśli przemawia za tym rachunek ekonomiczny). Model korzysta z bazowego rozkładu PV, prognozy zużycia, cen późniejszego zakupu, sprawności i kosztu degradacji. Dopuszcza obserwowaną dodatnią rozbieżność prognozy PV po co najmniej 16 kompletnych kwadransach; pomiary PV mogą być ograniczone przez falownik, więc wartości nie potwierdzają nieograniczonej produkcji. Brak wiarygodnych danych uruchamia oznaczoną heurystykę względnej niepewności PV; wynik jest przedmiotem walidacji na rzeczywistym HA.
-- **Harmonogram i diagnostyka:** `pv_headroom_target_dc_kwh` / `pv_headroom_target_pct` są publikowane z godzinami planu. `pv_headroom_max_dc_kwh`, `pv_headroom_source` i `pv_headroom_cost_premium_dkk` pokazują maksymalny planowany bufor, źródło niepewności i modelowany **koszt pozostawienia miejsca względem wariantu bez bufora**. Ten koszt nie jest fakturą ani oszczędnością, a oczekiwana dodatkowa produkcja może się nie pojawić. Brak sztywnego limitu SOC.
-- **Poprawa #26:** prognoza PV i domu jest porównywana do całki chwilowej mocy **W × s / 3 600 000 = kWh**. MAE i bias w diagnostyce są odtąd kWh na kwadrans, nie Wh błędnie opisane jako kWh. Dane zbierane tylko w pamięci zostają wyzerowane po restarcie HA przy aktualizacji.
-- **Replay HA:** diagnostyka v1.15.0 przechowuje w eksporcie również wejściową statystykę niepewności i wersję polityki bufora. Planner Lab pobiera dokładnie ten sam moduł Python i odtwarza decyzje. Starsze pliki Replay z v1.14.0 są liczone bez bufora, ponieważ wówczas funkcja nie istniała.
-- Nie zmieniono `Load First`, blokady eksportu baterii, progu Solar Sell 0,40 DKK/kWh, ani trybu pracy `dry_run`. Nowa wycena wolnego miejsca dotyczy **symulowanego planu**, a nie zapisu nastaw Deye.
-
-
-## v1.16.0 — eksperymentalne sterowanie dynamiczne Deye
-
-- W trybie `automatic` kontroler używa tego samego planu kwadransowego co `dry_run`. Do zapisu korzysta wyłącznie z istniejących usług `number.set_value` i `switch.turn_on/off` HA.
-- Przełącznik ARM/STOP startuje ON w trybie `automatic` po starcie/reload. W `monitor` i `dry_run` pozostaje OFF. Manualny STOP blokuje następne zapisy do restartu lub ręcznego ARM. Przełączenie na STOP blokuje kolejne komendy, **nie jest awaryjnym wyłącznikiem falownika** i nie zmienia ostatnich parametrów Deye.
-- Zapis: limity ładowania/rozładowania, limit Grid Charge, przełącznik Grid Charge, Solar Sell. Stan po zapisie jest odczytywany i potwierdzany; po błędzie zapisów dalsza automatyka jest blokowana do ponownego uruchomienia integracji.
-- Algorytm nie ingeruje w Load First, ustawienia ochronne BMS ani okna TOU. Wymaga od użytkownika bezpiecznej wyjściowej konfiguracji TOU, a zachowanie fizyczne ustawień jest przedmiotem walidacji na falowniku.
-- **Uwaga:** plan 15-minutowy pozostaje prognozą; HA nie może dowieść, że falownik wykonał dokładnie oczekiwany przepływ na podstawie samego odczytu nastawy. Nie utożsamiać `applied` z fizycznie zmierzonym wynikiem.
-
-
-### v1.16.1 — aktywny slot TOU
-
-W trybie `automatic` istniejące okna Deye mają stałe początki: 00:00, 04:00, 08:00, 12:00, 16:00, 20:00 (format HA: 0, 400, 800, 1200, 1600, 2000). Energy Co-Pilot odczytuje i weryfikuje wszystkie sześć początków przed pierwszym zapisem. Zmienia **wyłącznie** `number.sun12k_time_point_N_capacity` i `switch.sun12k_time_point_N_charge_enable` aktywnego okna (czas `Europe/Copenhagen`) oraz wcześniej obsługiwane globalne limity prądu i przełączniki. Nie przesuwa czasów TOU i nie wysyła surowych ramek Modbus.
-
-W kwartale ładowania Grid Charge: aktywny cel SOC jest obliczany z końca kwadransa optymalizatora (co najmniej bieżący SOC, maksymalnie 100%), ładowanie slotu włączone, globalny Grid Charge włączany dopiero po zapisaniu limitów. W pozostałych kwadransach zezwolenie ładowania slotu jest wyłączane i jego SOC wraca do 20%; rozładowanie ogranicza planowany prąd. Rejestry/encje innych okien nie są modyfikowane.
-
-Od v1.16.8 uruchomienie trybu `automatic` włącza ARM automatycznie. Niezgodny harmonogram TOU lub brak encji blokuje sterowanie przed wysłaniem komend. Wydanie wymaga uruchomienia przez użytkownika i sprawdzenia diagnostyki.
-
-
-### v1.16.5 — previous-day estimated savings and icon
-
-An **Actual Saving Yesterday** sensor estimates the previous full Europe/Copenhagen calendar day's energy cost difference in DKK from Home Assistant Recorder historical grid import/export, signed battery power and historical buy/sell price states. It compares the measured grid bill proxy with a counterfactual no-battery grid balance using an assumed 95% battery conversion efficiency. The value may be negative and is **not** an invoiced saving, a direct measurement of the no-battery scenario or evidence of savings attributable exclusively to Energy Co-Pilot. Missing or invalid historical data produces `unknown` with a reason instead of an invented amount. Requires Recorder retention for yesterday and valid DKK/kWh histories for both price entities.
-
-Brand asset: `custom_components/energy_copilot/brand/icon.png` (supported by Home Assistant 2026.3+). The HACS catalog may independently cache a placeholder logo.
-
-
-### Sterowanie Deye od v1.16.13
-
-- `Maximum Battery Discharge Current` jest **tylko odczytywany do kontroli bezpieczeństwa**. Integracja nigdy go nie zapisuje, również przy STOP, błędach i odzyskiwaniu. Zastane 0 A blokuje nowe polecenia (może po kilku minutach zatrzymać MPPT/PV w tym Deye); użytkownik musi przywrócić bezpieczną dodatnią wartość poza integracją.
-- Próg SOC w aktywnym TOU jest dolną granicą rozładowania. Przy braku rozładowania podąża za aktualnym SOC, a gdy rozładowanie jest zaplanowane, wynika z planowanego końcowego SOC. Przy `Grid Charge=ON` próg jest celem ładowania, wyliczonym tylko z planowanej energii **z sieci**, nie z przyszłej energii PV.
-- Maksymalny prąd ładowania baterii ustalany jest dynamicznie w granicach 1–50 A z energii PV i/lub sieci w bieżącym kwadransie i zmierzonego napięcia. Gdy sprzedaż PV ma priorytet i nie zaplanowano ładowania, limit wynosi 1 A; w przeciwnym razie bez planowanego ładowania pozostawia się możliwość ładowania PV (do 50 A). Prąd ładowania z sieci jest zmieniany tylko na potrzeby ładowania, a pozostawiona przez starszą wersję wartość 0 A jest przywracana do 1 A. Bez ładowania stan `Grid Charge=OFF` oraz flaga aktywnego TOU blokują pobór z sieci.
-- Historia zdarzenia 28.10.2026: przy SOC 99% planer **zrewidował** początkowy plan `grid_import` na `grid_charge` 0,108 kWh do SOC 100%; wykonawca włączył Grid Charge zgodnie z tą rewizją. Nie była to samowolna akcja wykonawcy. Polityka optymalnego bufora PV wymaga dalszej walidacji; nowa implementacja **nie zmienia algorytmu planera**.
+Aktualny numer wersji sprawdzaj w manifeście, a opublikowane paczki i historię zmian w [GitHub Releases](https://github.com/duckerdk/energy-copilot/releases). Po instalacji w HA porównaj `installed_version`, `installed_build.tag` i `installed_build.integrity` w diagnostyce. Dziennik zmian utrzymują tagi i wydania — README opisuje **aktualny kontrakt**, nie chronologię dawnych napraw.
