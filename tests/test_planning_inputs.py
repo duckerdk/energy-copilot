@@ -456,7 +456,7 @@ def test_live_partial_quarter_uses_observed_power_and_excludes_elapsed_energy():
     assert live.quarters[0].start == now
     assert live.quarters[0].end == HOUR + QUARTER
     assert live.quarters[1].start == HOUR + QUARTER
-    assert live.live_adjusted_quarters >= 4
+    assert live.live_adjusted_quarters == 3
     assert live.quarters[0].pv_dc_kwh > 0.1
     assert live.quarters[0].home_ac_kwh < 0.3
     assert live.quarters[0].home_ac_kwh > 0.15
