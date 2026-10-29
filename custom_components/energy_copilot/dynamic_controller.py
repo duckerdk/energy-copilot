@@ -429,23 +429,9 @@ class DynamicDeyeController:
                     .get("expected", {})
                     .get("quarters", ())
                 )
-                pv_charge = float(row.get("pv_to_battery_dc_kwh") or 0)
-                if not isfinite(pv_charge) or pv_charge < -1e-9:
-                    raise CommandRejected("controller:invalid_pv_charge")
-                future_charge = any(
-                    float(q.get("grid_to_battery_ac_kwh") or 0) > 1e-7
-                    or float(q.get("pv_to_battery_dc_kwh") or 0) > 1e-7
-                    for q in expected_quarters
-                    if q.get("start", "") > at
-                )
-                export_now = float(row.get("pv_to_export_dc_kwh") or 0) > 0.01
-                defer_pv = (
-                    soc_pct < 99.0
-                    and planned_sell
-                    and export_now
-                    and pv_charge <= 1e-7
-                    and future_charge
-                )
+                # Forecast dispatch is descriptive, not a hard PV charge cap.
+                # Do not throttle the shared battery charge current to force
+                # forecast PV export: real surplus may exceed the forecast.
                 # A grid-charge campaign intentionally spread over several
                 # similarly cheap quarters is the other valid current policy.
                 current_input = next(
@@ -473,21 +459,13 @@ class DynamicDeyeController:
                 current_grid_a = float(grid_state.state)
                 settings = []
                 charge_policy = "unchanged_no_rate_control_needed"
-                if defer_pv:
-                    if current_charge_a > 1.0 + 1e-6:
-                        # Remember the original cap for restoration when
-                        # the deliberate PV deferral ends.
-                        if self._pv_throttle_previous_a is None:
-                            self._pv_throttle_previous_a = current_charge_a
-                        settings.append((CHARGE_CURRENT, 1.0))
-                    charge_policy = "defer_pv_storage_for_export_then_charge_later"
-                elif self._pv_throttle_previous_a is not None and soc_pct < 99.0:
+                if self._pv_throttle_previous_a is not None:
+                    # Restore a cap changed by an earlier controller run.
                     restore = self._pv_throttle_previous_a
                     if abs(current_charge_a - 1.0) < 1e-6:
                         settings.append((CHARGE_CURRENT, restore))
-                    # A manual override must not be overwritten.
                     self._pv_throttle_previous_a = None
-                    charge_policy = "restore_after_pv_deferral"
+                    charge_policy = "restore_after_legacy_pv_deferral"
 
                 if spreading_grid or (charge_enabled and current_grid_a < 1.0):
                     # Restrict grid current for an explicit multi-quarter
