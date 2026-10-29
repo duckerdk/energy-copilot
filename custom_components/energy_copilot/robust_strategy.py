@@ -382,6 +382,16 @@ def select_strategy(
                     "benefit_dkk": round(benefit, 5),
                 }
             )
+    # The risk-aware candidate may be economically equivalent to charging
+    # over a long cheap window at full speed. Preserve the established
+    # intentional time-spreading policy when the cost difference is negligible.
+    from .economic_policy import spread_grid_charge_over_cheap_window
+
+    smoothed = spread_grid_charge_over_cheap_window(plant, quarters, chosen)
+    if _score(plant, quarters, smoothed, peaks, upside)[0] <= (
+        _score(plant, quarters, chosen, peaks, upside)[0] + 0.05
+    ):
+        chosen = smoothed
     physical = _score(plant, quarters, chosen, peaks, upside)
     baseline_score = nominal[0]
     peak_evidence = []
