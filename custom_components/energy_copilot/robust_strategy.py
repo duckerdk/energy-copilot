@@ -73,18 +73,21 @@ def _peaks(plant, quarters, accuracy):
             count = int(accuracy.get("peak_hours_evaluated") or 0)
             overall = int(accuracy.get("hours_evaluated") or 0)
             bias = float(accuracy.get("peak_bias_kwh_per_hour") or 0)
-            p75 = float(accuracy.get("peak_positive_underprediction_p75_kwh_per_hour") or 0)
-        except (TypeError, ValueError):
+            p75 = float(
+                accuracy.get("peak_positive_underprediction_p75_kwh_per_hour") or 0
+            )
+        except TypeError, ValueError:
             count = overall = 0
             bias = p75 = 0.0
         risk = 0.0
         if count >= 16 and overall >= 96 and all(isfinite(x) for x in (bias, p75)):
             h = min(8.0, (end - start) / 4.0)
-            risk = (max(0.0, -bias) * h + 0.5 * max(0.0, p75) * sqrt(h))
+            risk = max(0.0, -bias) * h + 0.5 * max(0.0, p75) * sqrt(h)
             risk /= plant.eta_battery_to_ac
             risk = min(
-                risk, plant.battery_capacity_dc_kwh * MAX_EXTRA_LOAD_RESERVE_SOC_PP / 100
-                + (plant.battery_capacity_dc_kwh * 0.2)
+                risk,
+                plant.battery_capacity_dc_kwh * MAX_EXTRA_LOAD_RESERVE_SOC_PP / 100
+                + (plant.battery_capacity_dc_kwh * 0.2),
             )
         result.append(Peak(start, end, high, cheap, risk))
     return tuple(result[:3])
@@ -98,7 +101,7 @@ def _pv_option(plant, quarters, accuracy, pv_underprediction):
     """
     try:
         mae = float((accuracy or {}).get("mae_kwh_per_hour") or 0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         mae = 0.0
     mae = min(2.0, max(0.0, mae)) if isfinite(mae) else 0.0
     empirical = (
@@ -112,9 +115,12 @@ def _pv_option(plant, quarters, accuracy, pv_underprediction):
             extra.append(0.0)
             continue
         nominal = max(0.0, q.pv_dc_kwh - q.home_ac_kwh / plant.eta_pv_to_ac)
-        upside = max(0.0, q.pv_dc_kwh * 1.45 + empirical
-                     - max(0.0, q.home_ac_kwh - 0.5 * mae / 4)
-                     / plant.eta_pv_to_ac)
+        upside = max(
+            0.0,
+            q.pv_dc_kwh * 1.45
+            + empirical
+            - max(0.0, q.home_ac_kwh - 0.5 * mae / 4) / plant.eta_pv_to_ac,
+        )
         extra.append(max(0.0, upside - nominal) * plant.eta_pv_to_battery)
     return tuple(extra)
 
@@ -151,7 +157,13 @@ def _score(plant, quarters, candidate, peaks, upside):
 
     pv_loss = 0.0
     for i, (q, d, outcome, extra) in enumerate(
-        zip(quarters, candidate.dispatches, candidate.candidate.quarters, upside, strict=True)
+        zip(
+            quarters,
+            candidate.dispatches,
+            candidate.candidate.quarters,
+            upside,
+            strict=True,
+        )
     ):
         if extra <= 0:
             continue
@@ -173,8 +185,7 @@ def _score(plant, quarters, candidate, peaks, upside):
         )
         value = max(
             0.0,
-            future_high * plant.eta_battery_to_ac
-            - DEGRADATION_DKK_PER_KWH_DC - sale
+            future_high * plant.eta_battery_to_ac - DEGRADATION_DKK_PER_KWH_DC - sale,
         )
         pv_loss += PV_UPSIDE_WEIGHT * lost * value
 
@@ -195,7 +206,8 @@ def _charge_groups(quarters, dispatches):
             and i - groups[-1][-1] <= 4
             and abs(
                 quarters[i].buy_dkk_per_kwh - quarters[groups[-1][-1]].buy_dkk_per_kwh
-            ) <= 0.02
+            )
+            <= 0.02
         ):
             groups[-1].append(i)
         else:
@@ -254,10 +266,7 @@ def select_strategy(
     # No fixed 14:00 cutoff: each window is derived from the actual price
     # peak and the 50 A charging rate, and each variant is independently priced.
     for peak in peaks:
-        preceding_pv = [
-            i for i in range(peak.start)
-            if quarters[i].pv_dc_kwh > 0.01
-        ]
+        preceding_pv = [i for i in range(peak.start) if quarters[i].pv_dc_kwh > 0.01]
         if not preceding_pv:
             continue
         first = preceding_pv[0]
@@ -283,7 +292,9 @@ def select_strategy(
         minimum_soc = min(
             q.soc_end_pct for q in base.candidate.quarters[peak.start : peak.end]
         )
-        available = max(0.0, (minimum_soc - MIN_SOC) * plant.battery_capacity_dc_kwh / 100)
+        available = max(
+            0.0, (minimum_soc - MIN_SOC) * plant.battery_capacity_dc_kwh / 100
+        )
         required = min(
             plant.battery_capacity_dc_kwh * MAX_EXTRA_LOAD_RESERVE_SOC_PP / 100,
             max(0.0, peak.risk_dc_kwh - available),
@@ -319,9 +330,7 @@ def select_strategy(
                 "joint_load_and_pv_options",
                 {
                     "minimum_pv_headroom": hard_reserve,
-                    "peak_entry_reward": {
-                        peak.start - 1: min(peak.price_dkk_kwh, 4.0)
-                    },
+                    "peak_entry_reward": {peak.start - 1: min(peak.price_dkk_kwh, 4.0)},
                 },
             )
 
@@ -364,7 +373,11 @@ def select_strategy(
                 {
                     "start_utc": quarters[group[0]].start.isoformat(),
                     "energy_ac_kwh": round(
-                        sum(picked[2].dispatches[i].grid_to_battery_ac_kwh for i in group), 4
+                        sum(
+                            picked[2].dispatches[i].grid_to_battery_ac_kwh
+                            for i in group
+                        ),
+                        4,
                     ),
                     "benefit_dkk": round(benefit, 5),
                 }
@@ -406,7 +419,9 @@ def select_strategy(
         "load_risk_cost_dkk": physical[1],
         "pv_upside_risk_cost_dkk": physical[2],
         "peak_evidence": peak_evidence,
-        "pv_option_reserved_max_dc_kwh": round(max(hard_reserve.values(), default=0), 4),
+        "pv_option_reserved_max_dc_kwh": round(
+            max(hard_reserve.values(), default=0), 4
+        ),
         "minor_charges_rejected": dropped,
         "alternative_scores_dkk": [
             {
