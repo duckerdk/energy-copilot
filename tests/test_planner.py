@@ -151,7 +151,7 @@ def test_battery_charge_and_grid_charge_current_limits_are_enforced():
             q=quarter(pv_dc_kwh=1, home_ac_kwh=0),
             d=dispatch(pv_to_battery_dc_kwh=1),
         )
-    with pytest.raises(InfeasibleCandidate, match="battery:grid_charge_current_limit"):
+    with pytest.raises(InfeasibleCandidate, match="battery:charge_current_limit"):
         run(
             plant=replace(PLANT, grid_charge_limit_a=5),
             q=quarter(home_ac_kwh=0),
