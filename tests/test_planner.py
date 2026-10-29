@@ -390,3 +390,23 @@ def test_zero_charge_target_has_no_unnecessary_cycling():
     r = simulate_candidate(PLANT, slots, spread)
     assert all(q.charge_current_a == 0 for q in r.quarters)
     assert r.final_soc_pct == 50
+
+
+
+def test_partial_live_quarter_scales_current_limits_by_remaining_seconds():
+    remaining = quarter(
+        start=START + timedelta(minutes=14),
+        end=START + timedelta(minutes=15),
+        home_ac_kwh=0.0,
+    )
+    with pytest.raises(
+        InfeasibleCandidate, match="battery:grid_charge_current_limit"
+    ):
+        run(q=remaining, d=dispatch(grid_to_battery_ac_kwh=0.20))
+    legal = run(q=remaining, d=dispatch(grid_to_battery_ac_kwh=0.04))
+    assert legal.quarters[0].grid_import_kwh == pytest.approx(0.04)
+    assert legal.quarters[0].grid_charge_current_a < 50.0
+    # A partial interval is legal only as the first entry, and must end
+    # at a true 15-minute boundary.
+    with pytest.raises(InfeasibleCandidate, match="time:quarter_alignment"):
+        run(q=quarter(end=START + timedelta(minutes=14)))
