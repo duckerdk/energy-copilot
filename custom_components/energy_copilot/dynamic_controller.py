@@ -83,6 +83,10 @@ class DynamicDeyeController:
     def _decision(self, preview, row, now, soc_pct):
         replay = preview.replay_snapshot or {}
         at = row["start"]
+        start_dt = datetime.fromisoformat(at.replace("Z", "+00:00"))
+        logical_quarter = start_dt.replace(
+            minute=start_dt.minute // 15 * 15, second=0, microsecond=0
+        ).isoformat()
         source = next(
             (item for item in replay.get("quarters", ()) if item.get("start") == at),
             {},
@@ -158,8 +162,9 @@ class DynamicDeyeController:
             "robust_scenario_weights_calibrated": (
                 robust.get("scenarios", {}).get("weights_are_calibrated_probabilities")
             ),
-            "plan_id": f"{metadata.get('forecast_version', 'unknown')}:{at}",
-            "quarter_start_utc": at,
+            "plan_id": f"{metadata.get('forecast_version', 'unknown')}:{logical_quarter}",
+            "quarter_start_utc": logical_quarter,
+            "live_plan_sample_utc": at,
             "observed_at_utc": now.isoformat(),
             "forecast_version": metadata.get("forecast_version"),
             "load_risk_extra_soc_points": (
@@ -354,6 +359,11 @@ class DynamicDeyeController:
                     return self.status
                 at = row["start"]
                 boundary = datetime.fromisoformat(at.replace("Z", "+00:00"))
+                logical_quarter = boundary.replace(
+                    minute=boundary.minute // 15 * 15,
+                    second=0,
+                    microsecond=0,
+                ).isoformat()
                 if boundary > now:
                     await asyncio.sleep((boundary - now).total_seconds())
                     if not self.armed or self.halted:
@@ -397,7 +407,7 @@ class DynamicDeyeController:
                     return self.status
                 decision = self._decision(preview, row, now, soc_pct)
                 decision_key = (
-                    at,
+                    logical_quarter,
                     decision["action"],
                     charge,
                     discharge,
@@ -588,11 +598,11 @@ class DynamicDeyeController:
                 self.observed_tou_grid_charge = self.adapter._present(
                     slot["grid_charge"]
                 ).state
-                self.last_plan_start = at
+                self.last_plan_start = logical_quarter
                 self.status = "applied"
                 self.reason = None
                 application_key = (
-                    at,
+                    logical_quarter,
                     target_soc,
                     charge_enabled,
                     tuple(settings),
@@ -611,7 +621,7 @@ class DynamicDeyeController:
                             if self._command_changes
                             else "settings_already_match"
                         ),
-                        quarter_start_utc=at,
+                        quarter_start_utc=logical_quarter,
                         state=self.status,
                         target_tou_soc=target_soc,
                         observed_tou_soc=self.observed_tou_soc,
