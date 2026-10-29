@@ -323,7 +323,6 @@ def _setting_change(change):
             "Limit ładowania baterii",
             "A",
         ),
-        "number.sun12k_maximum_battery_discharge_current": ("Limit rozładowania", "A"),
         "number.sun12k_maximum_battery_grid_charge_current": (
             "Limit ładowania z sieci",
             "A",
@@ -476,7 +475,6 @@ def readable_event(entry):
         if slot is not None:
             parts.append(f"Okno TOU {slot}.")
         soc = _number(entry.get("observed_tou_soc"), "%", 0)
-        discharge = _number(entry.get("discharge_limit_a"), "A", 0)
         grid = _number(entry.get("grid_limit_a"), "A", 0)
         max_charge = _number(entry.get("charge_limit_a"), "A", 0)
         charge = entry.get("observed_tou_grid_charge")
@@ -488,8 +486,6 @@ def readable_event(entry):
             parts.append(f"Limit ładowania baterii: {max_charge}.")
         if entry.get("discharge_control") == "tou_soc_floor":
             parts.append("Rozładowanie sterowane wyłącznie progiem SOC TOU.")
-        if discharge:
-            parts.append(f"Limit rozładowania: {discharge}.")
         if charge is not None:
             parts.append(f"Ładowanie z sieci w TOU: {charge}.")
         return " ".join(parts)
