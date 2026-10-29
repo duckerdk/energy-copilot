@@ -24,7 +24,7 @@ PLANT = Plant(
     initial_soc_pct=50.0,
     battery_voltage_v=51.2,
     charge_limit_a=50.0,
-    discharge_limit_a=100.0,
+
     grid_charge_limit_a=50.0,
     eta_pv_to_ac=0.95,
     eta_pv_to_battery=0.95,
@@ -118,7 +118,6 @@ def test_pv_export_not_implicitly_authorized_by_price():
     "field,value,reason",
     [
         ("charge_limit_a", 51, "charge_limit_a:policy_limit"),
-        ("discharge_limit_a", 101, "discharge_limit_a:policy_limit"),
         ("grid_charge_limit_a", 51, "grid_charge_limit_a:policy_limit"),
         ("initial_soc_pct", 19.99, "initial_soc:policy_limit"),
         ("eta_battery_to_ac", 1.01, "eta_battery_to_ac:outside_0_to_1"),
@@ -161,12 +160,12 @@ def test_battery_charge_and_grid_charge_current_limits_are_enforced():
         )
 
 
-def test_discharge_current_limit_is_enforced():
-    with pytest.raises(InfeasibleCandidate, match="battery:discharge_current_limit"):
-        run(
-            q=quarter(home_ac_kwh=3),
-            d=dispatch(battery_to_home_dc_kwh=1.5),
-        )
+def test_discharge_uses_soc_and_home_energy_not_a_current_setting():
+    result = run(
+        q=quarter(home_ac_kwh=3),
+        d=dispatch(battery_to_home_dc_kwh=1.5),
+    )
+    assert result.final_soc_pct == pytest.approx((5.12 - 1.5) / 10.24 * 100)
 
 
 def test_simultaneous_battery_charge_and_discharge_is_forbidden():
