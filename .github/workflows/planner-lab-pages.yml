@@ -9,6 +9,7 @@ on:
       - custom_components/energy_copilot/horizon_optimizer.py
       - custom_components/energy_copilot/continuous_optimizer.py
       - custom_components/energy_copilot/pv_headroom.py
+      - custom_components/energy_copilot/economic_policy.py
       - custom_components/energy_copilot/replay.py
       - .github/workflows/planner-lab-pages.yml
   workflow_dispatch:
@@ -37,7 +38,7 @@ jobs:
           set -euo pipefail
           mkdir -p _site/planner-lab
           cp tools/planner_lab/index.html tools/planner_lab/worker.js tools/planner_lab/engine.py tools/planner_lab/data_import.js tools/planner_lab/replay_scenario.js _site/planner-lab/
-          cp custom_components/energy_copilot/planner.py custom_components/energy_copilot/horizon_optimizer.py custom_components/energy_copilot/continuous_optimizer.py custom_components/energy_copilot/pv_headroom.py custom_components/energy_copilot/replay.py _site/planner-lab/
+          cp custom_components/energy_copilot/planner.py custom_components/energy_copilot/horizon_optimizer.py custom_components/energy_copilot/continuous_optimizer.py custom_components/energy_copilot/pv_headroom.py custom_components/energy_copilot/economic_policy.py custom_components/energy_copilot/replay.py _site/planner-lab/
           touch _site/.nojekyll
           printf '%s\n' '<!doctype html><html lang="pl"><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=./planner-lab/"><title>Planner Lab</title><a href="./planner-lab/">Otwórz Planner Lab</a></html>' > _site/index.html
 
