@@ -433,18 +433,32 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                     (row for row in sources if row.get("start") == first["start"]),
                     {},
                 )
+                # Live replanning shifts the first timestamp every poll;
+                # fingerprint the actual 15-minute control period instead.
+                current_start = datetime.fromisoformat(
+                    first["start"].replace("Z", "+00:00")
+                )
+                quarter_start = current_start.replace(
+                    minute=current_start.minute // 15 * 15,
+                    second=0,
+                    microsecond=0,
+                ).isoformat()
+
+                def stable(key, digits=2):
+                    value = first.get(key)
+                    return round(float(value), digits) if value is not None else None
+
                 fingerprint = (
-                    first["start"],
-                    first.get("grid_to_battery_ac_kwh"),
-                    first.get("battery_to_home_dc_kwh"),
-                    first.get("pv_to_battery_dc_kwh"),
-                    first.get("grid_import_kwh"),
-                    first.get("grid_export_kwh"),
-                    first.get("soc_end_pct"),
+                    quarter_start,
+                    stable("grid_to_battery_ac_kwh"),
+                    stable("battery_to_home_dc_kwh"),
+                    stable("pv_to_battery_dc_kwh"),
+                    stable("grid_import_kwh"),
+                    stable("grid_export_kwh"),
+                    stable("soc_start_pct", 1),
+                    stable("soc_end_pct", 1),
                     current_input.get("buy_dkk_per_kwh"),
                     current_input.get("sell_dkk_per_kwh"),
-                    current_input.get("pv_dc_kwh"),
-                    current_input.get("home_ac_kwh"),
                     self.planning_preview.pv_version,
                 )
                 if fingerprint != self._last_preview_decision_fingerprint:
