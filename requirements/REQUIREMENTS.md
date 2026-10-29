@@ -58,7 +58,7 @@ Budować prognozę zużycia domu na następne **7 dni** z **ostatnich 45 dni dan
 - Obliczać **cały nieprzerwany okres dostępnych, opublikowanych cen zakupu i sprzedaży**, przy dostępnej prognozie PV i zużycia, a nie pary 15/30-minutowe. Krok kwadransowy pozostaje tylko rozdzielczością bilansu i SOC.
 - Wybierać godziny ładowania z sieci, gdy zabraknie korzystnej energii PV, i używać energii baterii podczas droższych godzin. **Dopuszczać kupowanie prądu z sieci mimo niepustej baterii**, jeżeli zachowanie energii na później zmniejsza koszt planu.
 - Uwzględniać całe prognozowane PV: pokrywanie domu, magazynowanie nadwyżek, ewentualny eksport nadwyżek i pozostawianie pojemności na zapowiedziane PV. Pozwalać na kilka kolejnych godzin ładowania, rozładowania i powtarzające się cykle, a także świadomy brak cyklu.
-- Ograniczenia fizyczne, polityka ceny zakupu/sprzedaży, degradacja 0,40 DKK/kWh DC, SOC min. 20%, eksport wyłącznie PV i sześć TOU pozostają obowiązujące. Model zużycia v1.11.0 **bez zmian**.
+- Ograniczenia fizyczne, polityka ceny zakupu/sprzedaży, degradacja 0,40 DKK/kWh DC, SOC min. 20%, eksport wyłącznie PV i sześć TOU pozostają obowiązujące. Model zużycia podlega nowszej decyzji 29.10.2026: **45 dni historii, większa waga ostatnich 7 i 14 dni** oraz bufor ryzyka opisany powyżej.
 - Najpierw wdrożyć model w nieegzekwowalnym `dry_run`, wyraźnie rozdzielić fizyczny harmonogram 15-minutowy od harmonogramu wykonywalnego przez sześć okien TOU. Nie sugerować w HA możliwych do wykonania oszczędności, dopóki nie ma walidacji TOU i rzeczywistego baseline Deye.
 
 
