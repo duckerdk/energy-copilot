@@ -44,6 +44,7 @@ class Preview:
     pv_version: str | None = None
     source_load_method: str | None = None
     load_modeled_quarters: int = 0
+    live_adjusted_quarters: int = 0
     pv_temporal_model: str | None = None
     pv_temporal_modeled_quarters: int = 0
     reference_cost_dkk: float | None = None
@@ -207,6 +208,7 @@ def evaluate_preview(
     pv_underprediction_kwh: float | None = None,
     grid_charge_already_active: bool = False,
     load_risk_accuracy: dict | None = None,
+    live_partial: bool = False,
 ) -> Preview:
     """Optimize the complete published input horizon, but never actuate Deye."""
     if mode != "dry_run":
@@ -245,6 +247,7 @@ def evaluate_preview(
             allow_prefix=True,
             pv_temporal_model="uniform_power_unverified",
             load_projection=projection,
+            live_partial=live_partial,
         )
         quarters = inputs.quarters
         terminal_value, terminal_basis, unpriced_load = _terminal_proxy(
@@ -310,6 +313,7 @@ def evaluate_preview(
         robust_policy=result.robust_policy,
         tou_feasibility=validate_tou_projection(plant, quarters, dispatches, candidate),
         load_modeled_quarters=inputs.load_modeled_quarters,
+        live_adjusted_quarters=inputs.live_adjusted_quarters,
         pv_temporal_model=inputs.pv_temporal_model,
         pv_temporal_modeled_quarters=inputs.pv_temporal_modeled_quarters,
         reference_cost_dkk=reference.objective_dkk,
@@ -360,7 +364,9 @@ def evaluate_preview(
                 "voltage_source": voltage_source,
                 "coverage": inputs.coverage_status,
                 "terminal_value_basis": terminal_basis,
-                "source_release": "2.0.0",
+                "source_release": "2.0.1",
+                "live_partial": live_partial,
+                "live_adjusted_quarters": inputs.live_adjusted_quarters,
                 "robust_policy": result.robust_policy,
                 "load_risk_accuracy": load_risk_accuracy,
                 "load_risk_policy": result.load_risk_policy,
