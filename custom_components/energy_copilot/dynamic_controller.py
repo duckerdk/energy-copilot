@@ -302,8 +302,9 @@ class DynamicDeyeController:
                 raise CommandRejected("controller:naive_timestamp")
             source = source_by_start.get(row["start"], {})
             end = datetime.fromisoformat(
-                source.get("end", (at + timedelta(minutes=15)).isoformat())
-                .replace("Z", "+00:00")
+                source.get("end", (at + timedelta(minutes=15)).isoformat()).replace(
+                    "Z", "+00:00"
+                )
             )
             if at <= now < end:
                 self._pending_quarter = None
