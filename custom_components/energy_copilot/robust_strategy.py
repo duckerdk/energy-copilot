@@ -10,7 +10,7 @@ Each real quarter is replanned using its latest measured SOC and forecasts.
 """
 
 from dataclasses import dataclass, replace
-from math import ceil, isfinite, sqrt
+from math import isfinite, sqrt
 
 from .continuous_optimizer import optimize_continuous
 from .planner import DEGRADATION_DKK_PER_KWH_DC, MIN_SOC, InfeasibleCandidate
