@@ -352,6 +352,7 @@ def evaluate_preview(
                 "terminal_value_basis": terminal_basis,
                 "source_release": "1.16.19",
                 "load_risk_accuracy": load_risk_accuracy,
+                "load_risk_policy": result.load_risk_policy,
                 "grid_charge_already_active": grid_charge_already_active,
                 "economic_policy_reason": result.economic_policy_reason,
                 "economic_policy_benefit_dkk": result.economic_policy_benefit_dkk,
