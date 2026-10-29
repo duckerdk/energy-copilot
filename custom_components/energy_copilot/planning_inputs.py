@@ -44,6 +44,7 @@ class PlanningInput:
     pv_temporal_model: str = "exact_source_periods"
     pv_temporal_modeled_quarters: int = 0
     load_modeled_quarters: int = 0
+    live_adjusted_quarters: int = 0
     # Incomplete physical calibration and Deye's six TOUs forbid execution.
     actionable: bool = False
     coverage_status: str = "complete"
@@ -210,6 +211,7 @@ def build_planning_input(
     pv_export_enabled: bool = False,
     allow_prefix: bool = False,
     pv_temporal_model: str | None = None,
+    live_partial: bool = False,
 ) -> PlanningInput:
     """Prepare all complete future 15-minute quarters up to published price end.
 
@@ -247,9 +249,12 @@ def build_planning_input(
             raise PlanningInputError("price:published_gap", left)
         _finite_price(price.buy)
         _finite_price(price.sell)
-    start = now.replace(second=0, microsecond=0)
-    if start < now or start.minute % 15:
-        start += timedelta(minutes=(15 - start.minute % 15))
+    aligned = now.replace(
+        minute=now.minute // 15 * 15, second=0, microsecond=0
+    )
+    start = now if live_partial else aligned
+    if not live_partial and start < now:
+        start += QUARTER
     if not first <= start < last:
         raise PlanningInputError("price:missing_current_future_quarter", start)
     projection = load_projection or project_previous_utc_day_load(snapshot)
@@ -265,11 +270,16 @@ def build_planning_input(
     )
     quarters = []
     modeled_pv_quarters = 0
+    live_adjusted_quarters = 0
     first_gap = None
     price_index = 0
     cursor = start
     while cursor < last:
-        right = cursor + QUARTER
+        base_start = cursor.replace(
+            minute=cursor.minute // 15 * 15, second=0, microsecond=0
+        )
+        right = base_start + QUARTER
+        fraction = (right - cursor).total_seconds() / QUARTER.total_seconds()
         while (
             price_index < len(prices)
             and _utc(prices[price_index].end, "price") <= cursor
@@ -290,20 +300,54 @@ def build_planning_input(
             else:
                 pv_energy = _exact_quarter_energy(pv_periods, cursor, right, "pv")
                 modeled_pv = False
-            load_energy = _exact_quarter_energy(load_periods, cursor, right, "load")
+            if fraction < 1.0 - 1e-10:
+                # Only the remaining energy of the current quarter is
+                # controllable: elapsed household consumption is excluded.
+                load_energy = (
+                    _exact_quarter_energy(load_periods, base_start, right, "load")
+                    * fraction
+                )
+            else:
+                load_energy = _exact_quarter_energy(load_periods, cursor, right, "load")
         except PlanningInputError as error:
             if not allow_prefix or not quarters:
                 raise
             first_gap = error
             break
         modeled_pv_quarters += int(modeled_pv)
+        forecast_pv_dc_kwh = pv_energy * multiplier
+        if live_partial:
+            # Bounded live power nowcast; use real PV and house demand in
+            # the remaining active quarter, then fade the correction.
+            index = len(quarters)
+            weight = (0.65, 0.30, 0.15)[index] if index < 3 else 0.0
+            if weight:
+                hours = (right - cursor).total_seconds() / 3600.0
+                measured_pv = snapshot.measurements.get("pv")
+                measured_home = snapshot.measurements.get("home")
+                if measured_pv is not None:
+                    forecast_rate = forecast_pv_dc_kwh / hours
+                    live_rate = max(0.0, measured_pv.value / 1000.0)
+                    adjusted_rate = forecast_rate + weight * max(
+                        -3.0, min(3.0, live_rate - forecast_rate)
+                    )
+                    forecast_pv_dc_kwh = max(0.0, adjusted_rate * hours)
+                    live_adjusted_quarters += 1
+                if measured_home is not None:
+                    forecast_rate = load_energy / hours
+                    live_rate = max(0.0, measured_home.value / 1000.0)
+                    adjusted_rate = forecast_rate + weight * max(
+                        -3.0, min(3.0, live_rate - forecast_rate)
+                    )
+                    load_energy = max(0.0, adjusted_rate * hours)
+                    live_adjusted_quarters += 1
         quarters.append(
             Quarter(
                 cursor,
                 right,
                 _finite_price(price.buy),
                 _finite_price(price.sell),
-                pv_energy * multiplier,
+                forecast_pv_dc_kwh,
                 load_energy,
                 pv_export_enabled,
             )
@@ -324,6 +368,7 @@ def build_planning_input(
         ),
         pv_temporal_modeled_quarters=modeled_pv_quarters,
         load_modeled_quarters=projection.modeled_quarters,
+        live_adjusted_quarters=live_adjusted_quarters,
         coverage_status="partial" if first_gap is not None else "complete",
         first_missing_code=first_gap.code if first_gap is not None else None,
         first_missing_at=first_gap.at if first_gap is not None else None,
