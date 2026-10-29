@@ -21,7 +21,7 @@ def _result(cost):
 
 
 def _plant(soc=25):
-    return Plant(10.24, soc, 51.2, 50, 100, 50, 0.95, 0.95, 0.95, 0.95, 0)
+    return Plant(10.24, soc, 51.2, 50, 50, 0.95, 0.95, 0.95, 0.95, 0)
 
 
 def _quarters(prices, *, load=0.6):
