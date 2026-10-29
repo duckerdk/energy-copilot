@@ -76,7 +76,9 @@ def _quarters(*, flat=False):
 def test_joint_scenario_selection_prices_evening_risk_without_fake_load():
     plant, quarters = _plant(), _quarters()
     nominal = optimize_horizon(
-        plant, quarters, terminal_value_override=2.078,
+        plant,
+        quarters,
+        terminal_value_override=2.078,
         enable_pv_headroom=False,
     )
     robust = optimize_horizon(
@@ -105,6 +107,7 @@ def test_joint_scenario_selection_prices_evening_risk_without_fake_load():
     assert all(q.soc_end_pct >= 20 for q in physical.quarters)
     assert sum(q.home_ac_kwh for q in quarters) > 0
 
+
 def test_flat_prices_and_missing_holdout_do_not_invent_a_peak():
     plant = _plant()
     flat = optimize_horizon(
@@ -121,7 +124,10 @@ def test_flat_prices_and_missing_holdout_do_not_invent_a_peak():
         terminal_value_override=2.078,
         load_risk_accuracy={**LOAD_ACCURACY, "hours_evaluated": 12},
     )
-    assert weak.robust_policy["scenarios"]["weights_are_calibrated_probabilities"] is False
+    assert (
+        weak.robust_policy["scenarios"]["weights_are_calibrated_probabilities"] is False
+    )
+
 
 def test_replay_repeats_hedge_with_frozen_holdout_data():
     plant, quarters = _plant(), _quarters()
