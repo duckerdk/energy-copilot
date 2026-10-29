@@ -327,7 +327,9 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self.load_forecast = None
         if self.load_model is not None:
             try:
-                self.load_forecast = forecast_seven_days(self.load_model, snapshot.at)
+                self.load_forecast = forecast_seven_days(
+                    self.load_model, snapshot.at, include_current=True
+                )
                 self.load_forecast_error = None
             except PlanningInputError as err:
                 self.load_forecast_error = err.code
