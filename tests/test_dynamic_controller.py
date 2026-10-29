@@ -7,7 +7,6 @@ import pytest
 
 from custom_components.energy_copilot.deye_commands import (
     CHARGE_CURRENT,
-    DISCHARGE_CURRENT,
     GRID_CHARGE,
     GRID_CURRENT,
     SOLAR_SELL,
@@ -25,8 +24,7 @@ class States:
             )
             for entity, value in [
                 (CHARGE_CURRENT, "50"),
-                (DISCHARGE_CURRENT, "100"),
-                (GRID_CURRENT, "0"),
+                (GRID_CURRENT, "12"),
                 (GRID_CHARGE, "off"),
                 (SOLAR_SELL, "off"),
                 (TIME_OF_USE, "on"),
@@ -122,7 +120,7 @@ async def test_dynamic_controller_executes_one_quarter_once():
     controller.arm()
     result = await controller.apply(preview(now), now, soc_pct=50, voltage_v=51)
     assert result == "applied"
-    assert any(c[2]["entity_id"] == GRID_CURRENT for c in service.calls)
+    assert not any(c[2]["entity_id"] == GRID_CURRENT for c in service.calls)
     assert any(c[2]["entity_id"] == GRID_CHARGE for c in service.calls)
     assert any(c[2]["entity_id"] == SOLAR_SELL for c in service.calls)
     count = len(service.calls)
@@ -138,7 +136,7 @@ async def test_dynamic_controller_executes_one_quarter_once():
 @pytest.mark.asyncio
 async def test_dynamic_controller_failure_latches_stop():
     now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
-    controller, service = setup_controller(fail_on=GRID_CURRENT)
+    controller, service = setup_controller(fail_on=GRID_CHARGE)
     controller.arm()
     result = await controller.apply(preview(now), now, soc_pct=50, voltage_v=51)
     assert result == "recovery_required"
@@ -203,8 +201,6 @@ async def test_tou_discharge_sets_floor_without_grid_charging():
     slot = tou_entities(4)
     assert float(service.states.get(slot["soc"]).state) == 20
     assert service.states.get(slot["grid_charge"]).state == "off"
-    assert float(service.states.get(DISCHARGE_CURRENT).state) == 100
-    assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
 
 
 @pytest.mark.asyncio
@@ -238,27 +234,6 @@ async def test_soc_target_rounds_up_to_entity_step_without_failure():
     assert service.states.get(target).state == "52.0"
 
 
-@pytest.mark.asyncio
-async def test_discharge_current_is_never_touched_even_with_nonstandard_device_step():
-    now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
-    controller, service = setup_controller()
-    service.states.items[DISCHARGE_CURRENT] = SimpleNamespace(
-        state="100", attributes={"min": 0, "max": 100, "step": 5}
-    )
-    controller.arm()
-    assert (
-        await controller.apply(
-            preview(now, charge=0.0, discharge=0.3, grid_a=0),
-            now,
-            soc_pct=80,
-            voltage_v=51,
-        )
-        == "applied"
-    )
-    assert float(service.states.get(DISCHARGE_CURRENT).state) == 100.0
-    assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
-    assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
-
 
 @pytest.mark.asyncio
 async def test_soc_target_noninteger_step_is_rounded_up():
@@ -289,28 +264,7 @@ async def test_discharge_is_not_throttled_to_forecast_household_load():
         )
         == "applied"
     )
-    assert float(service.states.get(DISCHARGE_CURRENT).state) == 100.0
 
-
-@pytest.mark.asyncio
-async def test_device_lower_discharge_cap_is_respected():
-    now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
-    controller, service = setup_controller()
-    service.states.items[DISCHARGE_CURRENT] = SimpleNamespace(
-        state="20", attributes={"min": 0, "max": 80, "step": 5}
-    )
-    controller.arm()
-    assert (
-        await controller.apply(
-            preview(now, charge=0.0, discharge=0.1, grid_a=0.0),
-            now,
-            soc_pct=75,
-            voltage_v=52,
-        )
-        == "applied"
-    )
-    assert float(service.states.get(DISCHARGE_CURRENT).state) == 20
-    assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
 
 
 @pytest.mark.asyncio
@@ -361,7 +315,6 @@ async def test_next_quarter_is_latched_and_applied_after_planner_rolls_forward()
     )
     assert result == "applied"
     assert controller.last_plan_start == "2026-10-27T20:45:00+00:00"
-    assert float(service.states.get(DISCHARGE_CURRENT).state) == 100.0
 
 
 @pytest.mark.asyncio
@@ -383,8 +336,6 @@ async def test_next_quarter_cache_is_refreshed_before_boundary():
         )
         == "applied"
     )
-    assert float(service.states.get(DISCHARGE_CURRENT).state) == 100.0
-    assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
 
 
 @pytest.mark.asyncio
@@ -458,9 +409,6 @@ async def test_applied_reports_real_changes_and_next_quarter_noop():
     assert applied[0]["commands_sent"] == len(service.calls)
     assert applied[0]["commands_sent"] >= 1
     assert any(c["entity_id"] == SOLAR_SELL for c in applied[0]["command_changes"])
-    assert not any(
-        c["entity_id"] == DISCHARGE_CURRENT for c in applied[0]["command_changes"]
-    )
     initial_calls = list(service.calls)
     later = now + timedelta(minutes=15)
     next_plan = preview(later, charge=0, discharge=0.1, grid_a=0)
@@ -559,7 +507,7 @@ async def test_waiting_records_next_quarter_boundary():
 
 
 @pytest.mark.asyncio
-async def test_preserve_battery_with_tou_safeguard_and_no_discharge_current_write():
+async def test_preserve_battery_with_tou_safeguard():
     now = datetime(2026, 10, 27, 12, tzinfo=timezone.utc)
     controller, service = setup_controller()
     controller.arm()
@@ -567,9 +515,7 @@ async def test_preserve_battery_with_tou_safeguard_and_no_discharge_current_writ
     assert await controller.apply(plan, now, soc_pct=99, voltage_v=58) == "applied"
     assert service.states.get(tou_entities(4)["soc"]).state == "99.0"
     assert service.states.get(GRID_CHARGE).state == "off"
-    assert service.states.get(GRID_CURRENT).state == "0"
-    assert float(service.states.get(DISCHARGE_CURRENT).state) == 100
-    assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
+    assert service.states.get(GRID_CURRENT).state == "12"
     assert not any(
         c[2]["entity_id"] == GRID_CURRENT and c[2].get("value") == 0
         for c in service.calls
@@ -587,7 +533,6 @@ async def test_tou_preservation_follows_pv_rising_soc_and_never_enables_grid_cha
     await controller.apply(plan, now + timedelta(minutes=1), soc_pct=73, voltage_v=55)
     assert float(service.states.get(tou_entities(4)["soc"]).state) == 73
     assert service.states.get(GRID_CHARGE).state == "off"
-    assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
 
 
 @pytest.mark.asyncio
@@ -605,7 +550,6 @@ async def test_grid_charging_only_to_grid_component_not_pv_predicted_soc():
     assert float(service.states.get(tou_entities(4)["soc"]).state) == 71
     assert service.states.get(GRID_CHARGE).state == "on"
     assert float(service.states.get(GRID_CURRENT).state) >= 1
-    assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
 
 
 @pytest.mark.asyncio
@@ -635,7 +579,6 @@ async def test_pv_forecast_does_not_change_global_charge_current_without_a_goal(
     await controller.apply(plan, now, soc_pct=70, voltage_v=60)
     assert float(service.states.get(CHARGE_CURRENT).state) == 50
     assert not any(c[2]["entity_id"] == CHARGE_CURRENT for c in service.calls)
-    assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
 
 
 @pytest.mark.asyncio
@@ -653,37 +596,6 @@ async def test_solar_sell_alone_does_not_trigger_1a_throttle():
     assert service.states.get(SOLAR_SELL).state == "on"
     assert not any(c[2]["entity_id"] == CHARGE_CURRENT for c in service.calls)
 
-
-@pytest.mark.asyncio
-async def test_existing_zero_discharge_current_blocks_without_any_writes():
-    now = datetime(2026, 10, 27, 12, tzinfo=timezone.utc)
-    controller, service = setup_controller()
-    service.states.items[DISCHARGE_CURRENT].state = "0"
-    controller.arm()
-    assert (
-        await controller.apply(
-            preview(now, charge=0, discharge=0, grid_a=0),
-            now,
-            soc_pct=70,
-            voltage_v=52,
-        )
-        == "blocked"
-    )
-    assert controller.reason.endswith("controller:discharge_current_zero")
-    assert controller.armed
-    assert not service.calls
-    # Correcting the parameter outside the integration allows recovery.
-    service.states.items[DISCHARGE_CURRENT].state = "100"
-    assert (
-        await controller.apply(
-            preview(now, charge=0, discharge=0, grid_a=0),
-            now,
-            soc_pct=70,
-            voltage_v=52,
-        )
-        == "applied"
-    )
-    assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
 
 
 @pytest.mark.asyncio
@@ -707,11 +619,10 @@ async def test_soc_99_without_grid_plan_disables_stale_grid_charge():
     assert service.states.get(GRID_CHARGE).state == "off"
     assert service.states.get(slot["grid_charge"]).state == "off"
     assert service.states.get(slot["soc"]).state == "99.0"
-    assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
 
 
 @pytest.mark.asyncio
-async def test_soc_99_grid_charge_is_plan_driven_not_executor_invention():
+async def test_soc_99_suppresses_cosmetic_grid_topup():
     now = datetime(2026, 10, 27, 12, tzinfo=timezone.utc)
     controller, service = setup_controller()
     controller.arm()
@@ -722,7 +633,6 @@ async def test_soc_99_grid_charge_is_plan_driven_not_executor_invention():
     }
     plan.replay_snapshot["expected"]["quarters"][0]["soc_end_pct"] = 100.0
     assert await controller.apply(plan, now, soc_pct=99, voltage_v=57.87) == "applied"
-    assert service.states.get(GRID_CHARGE).state == "on"
-    assert float(service.states.get(tou_entities(4)["soc"]).state) == 100
-    assert 1 <= float(service.states.get(GRID_CURRENT).state) <= 50
-    assert not any(c[2]["entity_id"] == DISCHARGE_CURRENT for c in service.calls)
+    assert service.states.get(GRID_CHARGE).state == "off"
+    assert float(service.states.get(tou_entities(4)["soc"]).state) == 99
+    assert not any(c[2]["entity_id"] == GRID_CURRENT for c in service.calls)
