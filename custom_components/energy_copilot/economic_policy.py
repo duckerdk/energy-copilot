@@ -152,11 +152,9 @@ def hedge_load_forecast_risk(plant, quarters, plan, accuracy):
         peak_hours = int(accuracy.get("peak_hours_evaluated") or 0)
         bias = float(accuracy["peak_bias_kwh_per_hour"])
         p75 = float(accuracy["peak_positive_underprediction_p75_kwh_per_hour"])
-    except (ValueError, TypeError, KeyError):
+    except ValueError, TypeError, KeyError:
         return evidence("insufficient_history")
-    if hours < 96 or peak_hours < 16 or not all(
-        isfinite(v) for v in (bias, p75)
-    ):
+    if hours < 96 or peak_hours < 16 or not all(isfinite(v) for v in (bias, p75)):
         return evidence("insufficient_history")
     if len(quarters) < 8:
         return evidence("horizon_too_short")
@@ -176,31 +174,23 @@ def hedge_load_forecast_risk(plant, quarters, plan, accuracy):
     if start is None or start < 2:
         return evidence("no_charge_window")
     end = start
-    while (
-        end < len(quarters)
-        and end - start < 32
-        and prices[end] >= price_threshold
-    ):
+    while end < len(quarters) and end - start < 32 and prices[end] >= price_threshold:
         end += 1
     duration = (end - start) / 4.0
     if duration < 1.0:
         return evidence("peak_too_short")
 
     peak_prices = sorted(prices[start:end])
-    representative_peak = peak_prices[min(
-        len(peak_prices) - 1, int(0.75 * len(peak_prices))
-    )]
+    representative_peak = peak_prices[
+        min(len(peak_prices) - 1, int(0.75 * len(peak_prices)))
+    ]
     # Negative bias = consumption was higher than forecast. The P75 error
     # captures non-systematic deviations without multiplying every hour's
     # worst-case error linearly across the entire evening.
-    risk_ac = max(0.0, -bias) * duration + 0.5 * max(0.0, p75) * sqrt(
-        duration
-    )
+    risk_ac = max(0.0, -bias) * duration + 0.5 * max(0.0, p75) * sqrt(duration)
     capacity = plant.battery_capacity_dc_kwh
     risk_dc = risk_ac / plant.eta_battery_to_ac
-    nominal_min = min(
-        q.soc_end_pct for q in plan.candidate.quarters[start:end]
-    )
+    nominal_min = min(q.soc_end_pct for q in plan.candidate.quarters[start:end])
     existing_buffer_dc = max(0.0, (nominal_min - 20.0) * capacity / 100.0)
     peak_soc = plan.candidate.quarters[start - 1].soc_end_pct
     planned_extra_dc = min(
@@ -241,9 +231,7 @@ def hedge_load_forecast_risk(plant, quarters, plan, accuracy):
     if len(eligible) < 2:
         return evidence("no_idle_prepeak_window", **details)
     cheapest = min(prices[i] for i in eligible)
-    cheap = [
-        i for i in eligible if prices[i] <= cheapest + 0.01 + 1e-8
-    ]
+    cheap = [i for i in eligible if prices[i] <= cheapest + 0.01 + 1e-8]
     blocks = []
     for i in cheap:
         if blocks and blocks[-1][-1] + 1 == i:
@@ -254,11 +242,12 @@ def hedge_load_forecast_risk(plant, quarters, plan, accuracy):
     if not blocks:
         return evidence("no_contiguous_spread_window", **details)
     chosen = min(
-        blocks, key=lambda block: (
+        blocks,
+        key=lambda block: (
             sum(prices[i] for i in block) / len(block),
             -len(block),
             -block[-1],
-        )
+        ),
     )
     dc_per_quarter_max = (
         plant.battery_voltage_v
@@ -272,13 +261,7 @@ def hedge_load_forecast_risk(plant, quarters, plan, accuracy):
     # One energy unit charged now can avoid buying at the 75th-percentile
     # evening price, with a non-calibrated 0.65 risk weight. Existing
     # terminal-energy credit is already in the nominal objective.
-    risk_value_dc = (
-        0.65
-        * (
-            representative_peak * plant.eta_battery_to_ac
-            - 0.40
-        )
-    )
+    risk_value_dc = 0.65 * (representative_peak * plant.eta_battery_to_ac - 0.40)
     if risk_value_dc <= cheapest / plant.eta_grid_to_battery + 0.01:
         return evidence("reserve_not_economic", **details)
 
@@ -293,9 +276,7 @@ def hedge_load_forecast_risk(plant, quarters, plan, accuracy):
         for i in chosen:
             dispatches[i] = replace(
                 dispatches[i],
-                grid_to_battery_ac_kwh=(
-                    per_quarter_dc / plant.eta_grid_to_battery
-                ),
+                grid_to_battery_ac_kwh=(per_quarter_dc / plant.eta_grid_to_battery),
             )
         accepted = simulate_candidate(calibrated, quarters, tuple(dispatches))
         return accepted, tuple(dispatches)
@@ -317,12 +298,8 @@ def hedge_load_forecast_risk(plant, quarters, plan, accuracy):
         return evidence("no_physical_headroom", **details)
     candidate, dispatches = feasible
     stored_dc = extra_dc * low
-    extra_nominal_cost = (
-        candidate.objective_dkk - plan.candidate.objective_dkk
-    )
-    risk_premium_dkk = (
-        risk_value_dc - plan.terminal_value_dkk_per_kwh_dc
-    ) * stored_dc
+    extra_nominal_cost = candidate.objective_dkk - plan.candidate.objective_dkk
+    risk_premium_dkk = (risk_value_dc - plan.terminal_value_dkk_per_kwh_dc) * stored_dc
     if extra_nominal_cost > risk_premium_dkk + 0.01:
         return evidence("reserve_not_economic", **details)
 
@@ -335,9 +312,7 @@ def hedge_load_forecast_risk(plant, quarters, plan, accuracy):
             **details,
             "status": "applied",
             "applied_extra_soc_points": round(stored_dc * 100 / capacity, 2),
-            "extra_grid_charge_ac_kwh": round(
-                stored_dc / plant.eta_grid_to_battery, 4
-            ),
+            "extra_grid_charge_ac_kwh": round(stored_dc / plant.eta_grid_to_battery, 4),
             "extra_nominal_objective_dkk": round(extra_nominal_cost, 4),
             "estimated_avoided_risk_dkk": round(risk_premium_dkk, 4),
             "charge_start_utc": quarters[chosen[0]].start.isoformat(),
