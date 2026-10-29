@@ -651,3 +651,35 @@ async def test_executor_blocks_nonrepresentable_six_tou_projection_without_write
         "CommandRejected:controller:plan_not_representable_by_tou"
     )
     assert not service.calls
+
+
+
+@pytest.mark.asyncio
+async def test_live_soc_revision_releases_discharge_immediately_in_active_quarter():
+    now = datetime(2026, 10, 29, 12, 5, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    controller.arm()
+    before = preview(now, charge=0.0, discharge=0.0, grid_a=0.0)
+    before.replay_snapshot["expected"]["quarters"][0]["start"] = now.isoformat()
+    assert (
+        await controller.apply(before, now + timedelta(seconds=1), soc_pct=83, voltage_v=52)
+        == "applied"
+    )
+    slot = tou_entities(4)
+    assert float(service.states.get(slot["soc"]).state) == 83.0
+
+    # Same quarter, measured SOC is 96%, and the reoptimized decision now
+    # discharges. Executor must NOT keep the old 83% protection floor.
+    updated = preview(now + timedelta(minutes=1), charge=0.0, discharge=0.18, grid_a=0.0)
+    updated.replay_snapshot["expected"]["quarters"][0]["start"] = (
+        now + timedelta(minutes=1)
+    ).isoformat()
+    assert (
+        await controller.apply(
+            updated, now + timedelta(minutes=1, seconds=1), soc_pct=96, voltage_v=52
+        )
+        == "applied"
+    )
+    assert float(service.states.get(slot["soc"]).state) == 20.0
+    assert controller.target_tou_soc == 20
+    assert controller.last_plan_start == now.replace(minute=0).isoformat()
