@@ -182,9 +182,7 @@ def _stress_import_cost(plant, quarters, candidate, peak):
 
     # A stressed trajectory ending with less stored energy incurs a
     # replacement-value loss; do not treat it as an imaginary grid purchase.
-    extra_import_cost += (
-        energy_debt_dc * candidate.terminal_value_dkk_per_kwh_dc
-    )
+    extra_import_cost += energy_debt_dc * candidate.terminal_value_dkk_per_kwh_dc
     return max(0.0, extra_import_cost)
 
 
@@ -192,8 +190,7 @@ def _score(plant, quarters, candidate, peaks, upside):
     """Nominal cost plus two independently reported scenario loss estimates."""
     capacity = plant.battery_capacity_dc_kwh
     load_loss = LOAD_RISK_WEIGHT * sum(
-        _stress_import_cost(plant, quarters, candidate, peak)
-        for peak in peaks
+        _stress_import_cost(plant, quarters, candidate, peak) for peak in peaks
     )
 
     pv_loss = 0.0
