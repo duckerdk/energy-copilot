@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import partial
 
 from homeassistant.core import HomeAssistant, callback
