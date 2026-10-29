@@ -156,7 +156,9 @@ def simulate_candidate(
             duration <= timedelta(0)
             or duration > QUARTER
             or (index and duration != QUARTER)
-            or (index and (q.start.second or q.start.microsecond or q.start.minute % 15))
+            or (
+                index and (q.start.second or q.start.microsecond or q.start.minute % 15)
+            )
             or q.end.second
             or q.end.microsecond
             or q.end.minute % 15
