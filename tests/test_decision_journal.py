@@ -373,7 +373,7 @@ async def test_activity_failed_write_has_requested_setting_and_safety_state(hass
         reason="CommandRejected:device:write_unconfirmed",
         phase="device_write_result_uncertain",
         attempted_command={
-            "entity_id": "number.sun12k_maximum_battery_discharge_current",
+            "entity_id": "number.unrecognized_setting",
             "before": "0",
             "after": 100,
         },
@@ -384,7 +384,7 @@ async def test_activity_failed_write_has_requested_setting_and_safety_state(hass
     await hass.async_block_till_done()
     msg = events[0]["message"]
     assert "Falownik nie potwierdził zmiany nastawy" in msg
-    assert "Limit rozładowania 0 A → 100 A" in msg
+    assert "Nastawa 0 → 100" in msg
     assert "Wcześniejsze potwierdzone zmiany: 1" in msg
     assert "ARM wyłączony" in msg
     await journal.async_close()
