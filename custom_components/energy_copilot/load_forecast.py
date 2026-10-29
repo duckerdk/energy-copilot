@@ -14,11 +14,11 @@ from .planner import QUARTER
 from .planning_inputs import LoadProjection, PlanningInputError
 
 LOCAL = ZoneInfo("Europe/Copenhagen")
-LOOKBACK_DAYS = 365
+LOOKBACK_DAYS = 45
 HORIZON_DAYS = 7
 MIN_TRAINING_HOURS = 96
 MIN_TRAINING_DATES = 7
-MODEL_NAME = "historical_hourly_workday_weighted_median_v1_unverified"
+MODEL_NAME = "historical_45d_recency_14d_workday_hybrid_v2_unverified"
 
 
 @dataclass(frozen=True)
@@ -130,6 +130,13 @@ def _weighted_median(samples: list[tuple[float, float]]) -> float:
     return sorted_values[-1][0]
 
 
+def _weighted_mean(samples: list[tuple[float, float]]) -> float:
+    total = sum(weight for _, weight in samples)
+    if total <= 0:
+        raise ValueError("load:invalid_weights")
+    return sum(value * weight for value, weight in samples) / total
+
+
 def _predict_hour(
     model: LoadModel,
     at: datetime,
@@ -140,23 +147,38 @@ def _predict_hour(
     same_weekday = []
     same_type = []
     any_day = []
+    recent_type = []
     for sample in model.by_local_hour[local.hour]:
         historic = sample.start.astimezone(LOCAL)
         age_days = max(0.0, (model.trained_at - sample.start).total_seconds() / 86400)
-        weight = exp(-age_days / 45)
+        # Distinct recency bands make a real change in the last week
+        # visible in the forecast; all samples still belong to the last 45 d.
+        band = 6.0 if age_days <= 7 else 3.0 if age_days <= 14 else 1.0
+        weight = band * exp(-age_days / 30)
         element = (sample.kwh, weight)
         any_day.append(element)
         if _day_type(historic.date(), overrides) == target_type:
             same_type.append(element)
+            if age_days <= 14:
+                recent_type.append(element)
             if historic.weekday() == local.weekday():
                 same_weekday.append(element)
     if len(same_weekday) >= 3 and len(same_type) >= 6:
-        return 0.6 * _weighted_median(same_weekday) + 0.4 * _weighted_median(same_type)
-    if len(same_type) >= 4:
-        return _weighted_median(same_type)
-    if len(any_day) >= 4:
-        return _weighted_median(any_day)
-    raise PlanningInputError("load:hour_profile_missing", at)
+        baseline = (
+            0.35 * _weighted_median(same_weekday)
+            + 0.65 * _weighted_median(same_type)
+        )
+    elif len(same_type) >= 4:
+        baseline = _weighted_median(same_type)
+    elif len(any_day) >= 4:
+        baseline = _weighted_median(any_day)
+    else:
+        raise PlanningInputError("load:hour_profile_missing", at)
+    # Median-only estimators can ignore a new week-long usage pattern.
+    # Blend recent same-day-type hourly energy into the robust baseline.
+    if len(recent_type) >= 3:
+        return max(0.0, 0.7 * _weighted_mean(recent_type) + 0.3 * baseline)
+    return baseline
 
 
 def forecast_seven_days(
@@ -221,6 +243,10 @@ def backtest_recent_load(model: LoadModel, days: int = 7) -> dict:
         "hours_evaluated": 0,
         "mae_kwh_per_hour": None,
         "bias_kwh_per_hour": None,
+        "positive_underprediction_p75_kwh_per_hour": None,
+        "peak_positive_underprediction_p75_kwh_per_hour": None,
+        "peak_bias_kwh_per_hour": None,
+        "peak_hours_evaluated": 0,
         "mape_percent_nonzero_hours": None,
     }
     if not test:
@@ -230,20 +256,39 @@ def backtest_recent_load(model: LoadModel, days: int = 7) -> dict:
     except PlanningInputError:
         return result
     residuals = []
+    peak_residuals = []
     relative = []
     for row in test:
         try:
             predicted = _predict_hour(frozen, row.start, None)
         except PlanningInputError:
             continue
-        residuals.append(predicted - row.kwh)
+        error = predicted - row.kwh
+        residuals.append(error)
+        # Daylight and nighttime must not dilute the evening-risk signal.
+        if 16 <= row.start.astimezone(LOCAL).hour < 22:
+            peak_residuals.append(error)
         if row.kwh >= 0.05:
             relative.append(abs(predicted - row.kwh) / row.kwh)
     if residuals:
+        def positive_p75(errors):
+            values = sorted(max(0.0, -err) for err in errors)
+            return values[min(len(values) - 1, int(0.75 * len(values)))]
+
         result.update(
             hours_evaluated=len(residuals),
             mae_kwh_per_hour=sum(abs(v) for v in residuals) / len(residuals),
             bias_kwh_per_hour=sum(residuals) / len(residuals),
+            positive_underprediction_p75_kwh_per_hour=positive_p75(residuals),
+            peak_positive_underprediction_p75_kwh_per_hour=(
+                positive_p75(peak_residuals) if len(peak_residuals) >= 16 else None
+            ),
+            peak_bias_kwh_per_hour=(
+                sum(peak_residuals) / len(peak_residuals)
+                if len(peak_residuals) >= 16
+                else None
+            ),
+            peak_hours_evaluated=len(peak_residuals),
             mape_percent_nonzero_hours=(
                 100 * sum(relative) / len(relative) if relative else None
             ),
