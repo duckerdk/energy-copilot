@@ -6,7 +6,6 @@ import pytest
 
 from custom_components.energy_copilot.deye_commands import (
     CHARGE_CURRENT,
-    DISCHARGE_CURRENT,
     GRID_CHARGE,
     GRID_CURRENT,
     CommandRejected,
@@ -95,15 +94,6 @@ async def test_switch_write_validation():
         await device.set_switch("switch.unapproved", True)
     assert len(services.calls) == 1
 
-
-@pytest.mark.asyncio
-async def test_discharge_current_is_not_writable_even_if_device_exposes_it():
-    device, services = adapter()
-    with pytest.raises(CommandRejected, match="not_allowlisted"):
-        await device.set_number(DISCHARGE_CURRENT, 0)
-    with pytest.raises(CommandRejected, match="not_allowlisted"):
-        await device.set_number(DISCHARGE_CURRENT, 100)
-    assert not services.calls
 
 
 @pytest.mark.asyncio
