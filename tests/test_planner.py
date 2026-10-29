@@ -24,7 +24,6 @@ PLANT = Plant(
     initial_soc_pct=50.0,
     battery_voltage_v=51.2,
     charge_limit_a=50.0,
-
     grid_charge_limit_a=50.0,
     eta_pv_to_ac=0.95,
     eta_pv_to_battery=0.95,
