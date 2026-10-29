@@ -123,7 +123,10 @@ def test_no_spurious_charge_with_no_peak_or_without_holdout():
         terminal_value_override=2.078,
         load_risk_accuracy=LOAD_ACCURACY,
     )
-    assert buffered.load_risk_policy["status"] in {"no_material_price_peak", "no_future_peak"}
+    assert buffered.load_risk_policy["status"] in {
+        "no_material_price_peak",
+        "no_future_peak",
+    }
     assert buffered.dispatches == normal.dispatches
     weak = optimize_horizon(
         plant,
