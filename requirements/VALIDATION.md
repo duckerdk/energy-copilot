@@ -37,7 +37,7 @@
 | ECON-02 | tanie ładowanie, przyszłe straty+degradacja przewyższają korzyść | Nie uruchamiać dodatkowego cyklu |
 | SOC-01 | plan chce 15% SOC | `not_executable`, minimum 20% |
 | CUR-01 | napięcie 56V, limit 5A/50A | Górne granice 0,28/2,8 kW DC, bez gwarancji przepływu |
-| CUR-02 | próba 51 A ładowania/101 A rozładowania | Odrzucić, nie przycinać |
+| CUR-02 | próba 51 A ładowania | Odrzucić, nie przycinać; żadnego użycia/odczytu nastawy prądu rozładowania |
 | CUR-03 | wymagana energia 0,64 kWh DC, 51,2 V; dostępne 15/30/60 minut | 50/25/12,5 A odpowiednio, bez przekroczenia ograniczeń SOC i prądu |
 | CUR-04 | ta sama cena w dostępnych slotach, wariant 50 A i 25 A | Wybrać niższy prąd przy równym koszcie i tej samej dostarczonej energii; droższy wariant nie wygrywa tylko za łagodniejsze ładowanie |
 | TOU-01 | potrzeba 7 niezależnych okien, falownik ma 6 | Nie raportować idealnego sterowania 7 oknami |
@@ -73,9 +73,9 @@ Każde `decision_id`, `plan_id`, start i ważność, dane wejściowe oraz ich we
 ## Kryteria wydania i odbioru rzeczywistego HA
 
 - Testy automatyczne muszą obejmować planowanie całego opublikowanego horyzontu, limit SOC 20%, ceny/DST, Forecast.Solar, niepełną historię i `unknown/unavailable`, poprawny bilans DC/AC oraz brak eksportu baterii.
-- Testy sterowania muszą weryfikować 6 TOU i aktywny kwadrans, zaokrąglenie SOC do **1%**, brak zapisu `Maximum Battery Discharge Current` w dowolnej wartości, blokadę przy zastanym 0 A i wznowienie dopiero po odczycie poprawnej wartości.
+- Testy sterowania muszą weryfikować 6 TOU i aktywny kwadrans, zaokrąglenie SOC do **1%** oraz **całkowity brak odczytu, zapisu, walidacji, diagnostyki i parametru planera `Maximum Battery Discharge Current`**. Brak tej encji nie blokuje automatyki; sterowanie rozładowaniem pozostaje przez TOU i minimum SOC 20%.
 - Sprawdzić, że szczyt cenowy nie otrzymuje sztucznego limitu rozładowania wynikającego z przydziału energii na jeden kwadrans; próg TOU odpowiada pełnej dopuszczalnej decyzji planera.
-- Zapis prądów ładowania musi mieć jawny cel: przesunięcie PV albo rozłożenie ładowania sieciowego; przy braku takiego celu nie zmieniać dotychczasowych wartości. Testować przy SOC 99%, Solar Sell ON, cenowym remisie i przy naturalnym nadmiarze PV przewyższającym prognozę.
+- Zapis prądów ładowania ma **wyłącznie** cel przesunięcia PV lub rozciągnięcia ładowania w czasie; prognozowany prąd i SOC nie są nastawami. Bez celu brak zapisów, nawet gdy planowane PV wymaga 29 A, a fizyczne nastawy są inne. Po rzeczywistej kampanii nastawa wraca do wcześniejszej wartości mimo restartu (tylko przy wykazanym pochodzeniu i braku późniejszej ręcznej zmiany). Sprawdzać SOC 99%, Solar Sell ON, brak encji prądu rozładowania, historię dawnego ograniczenia 50→1 A oraz naturalną nadwyżkę PV większą od prognozy.
 - Rozróżniać `planned`, `applied`, odczyt nastawy i fizyczny pomiar przepływu; rewizje i blokady nie mogą ginąć na granicy kwadransa. Awaria usługi HA nie może powodować ślepego ponowienia.
 - Raport wydania ma zawierać faktycznie wykonane polecenia testowe i ich wyniki, numer wersji, tag oraz komplet `energy_copilot.zip`, `SHA256SUMS`, `BUILD_INFO.json` w publicznym GitHub Release. Zaliczenie CI nie potwierdza dostępności aktualizacji na konkretnej instalacji HACS.
 - Odbiór na żywym HA (dziennik, poprawność TOU, energia, płynność kwadransów, realna oszczędność) wymaga osobnych obserwacji z instalacji; brak dowodów pozostaje **otwarty**, nie opisany jako zamknięty.
