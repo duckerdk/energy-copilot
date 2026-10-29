@@ -21,7 +21,7 @@ def plant(soc=50):
         initial_soc_pct=soc,
         battery_voltage_v=51.2,
         charge_limit_a=50,
-        discharge_limit_a=100,
+
         grid_charge_limit_a=50,
         eta_pv_to_ac=0.95,
         eta_pv_to_battery=0.95,
