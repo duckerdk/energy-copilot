@@ -41,7 +41,10 @@ def validate_tou_projection(plant, quarters, dispatches, candidate):
                 100,
                 max(
                     ceil(actual.soc_start_pct),
-                    ceil(actual.soc_start_pct + requested_dc * 100 / plant.battery_capacity_dc_kwh),
+                    ceil(
+                        actual.soc_start_pct
+                        + requested_dc * 100 / plant.battery_capacity_dc_kwh
+                    ),
                 ),
             )
         elif discharge:
@@ -49,7 +52,10 @@ def validate_tou_projection(plant, quarters, dispatches, candidate):
         else:
             target = min(100, max(int(MIN_SOC), ceil(actual.soc_start_pct)))
         if grid and target <= actual.soc_start_pct + 1e-6:
-            return {"status": "not_representable", "reason": "grid_target_not_above_soc"}
+            return {
+                "status": "not_representable",
+                "reason": "grid_target_not_above_soc",
+            }
         command = (slot + 1, target, grid)
         if command != last_setting:
             expected_commands += 1
