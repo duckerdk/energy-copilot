@@ -463,7 +463,6 @@ def test_browser_replay_uses_real_ha_solver_and_matches_frozen_output():
         initial_soc_pct=65,
         battery_voltage_v=51.5,
         charge_limit_a=50,
-
         grid_charge_limit_a=50,
         eta_pv_to_ac=0.95,
         eta_pv_to_battery=0.95,
