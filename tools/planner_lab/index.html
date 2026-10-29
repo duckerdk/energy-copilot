@@ -91,7 +91,7 @@ tbody tr:nth-child(2n){background:#1b2938}
 
 <section class="panel" id="replay-panel">
   <h2>Replay HA — dokładne odtworzenie planu</h2>
-  <p class="muted">Wybierz pełną diagnostykę Energy Co-Pilot z HA v1.14.0 (Ustawienia → Urządzenia i usługi → Energy Co-Pilot → Pobierz diagnostykę). Plik musi zawierać <code>data.planner_replay</code>. Lab wykorzysta dokładne kwadranse, SOC, napięcie, ceny zakupu/sprzedaży, prognozę domu, PV i wartość końcową zapisane podczas jednego przebiegu HA. Niczego nie przelicza z taryf N1 lub eksportowanych godzinowych plików. Plik jest przetwarzany lokalnie w przeglądarce.</p>
+  <p class="muted">Wybierz pełną diagnostykę Energy Co-Pilot z aktualnej wersji HA (Ustawienia → Urządzenia i usługi → Energy Co-Pilot → Pobierz diagnostykę). Plik musi zawierać <code>data.planner_replay</code>. Lab wykorzysta dokładne kwadranse, SOC, napięcie, ceny zakupu/sprzedaży, prognozę domu, PV i wartość końcową zapisane podczas jednego przebiegu HA. Niczego nie przelicza z taryf N1 lub eksportowanych godzinowych plików. Plik jest przetwarzany lokalnie w przeglądarce.</p>
   <div class="actions">
     <button id="import-replay">Wczytaj diagnostykę HA (.json)</button>
     <input id="replay-file" type="file" accept=".json,application/json">
@@ -589,7 +589,7 @@ async function loadReplayFile(input){
     const bundle=raw?.format==="energy-copilot/ha-scenario/v1"?raw:null;
     const replay=bundle?.original??raw?.data?.planner_replay??raw?.planner_replay??raw;
     if(replay?.schema!=="energy-copilot/ha-replay/v1"||!Array.isArray(replay.quarters)){
-      throw Error("Brak zgodnego snapshotu. Pobierz nową diagnostykę HA po aktualizacji do v1.14.0 w trybie dry_run.");
+      throw Error("Brak zgodnego snapshotu. Pobierz diagnostykę z aktualnej integracji Energy Co-Pilot w trybie dry_run; plik musi zawierać dane planner_replay.");
     }
     const original=ReplayScenario.makeEditable(replay);
     const edited=bundle?ReplayScenario.makeEditable(bundle.scenario):original;
