@@ -281,7 +281,5 @@ def optimize_horizon(
         else:
             result = spread_grid_charge_over_cheap_window(plant, quarters, result)
     if load_risk_accuracy is not None:
-        result = hedge_load_forecast_risk(
-            plant, quarters, result, load_risk_accuracy
-        )
+        result = hedge_load_forecast_risk(plant, quarters, result, load_risk_accuracy)
     return result
