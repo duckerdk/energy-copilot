@@ -72,6 +72,7 @@ class Preview:
     pv_headroom_cost_premium_dkk: float = 0.0
     hourly_plan: tuple[dict, ...] = ()
     replay_snapshot: dict | None = None
+    load_risk_policy: dict | None = None
 
 
 def _hourly_plan(quarters, dispatches, results, headroom=()) -> tuple[dict, ...]:
@@ -198,6 +199,7 @@ def evaluate_preview(
     load_projection=None,
     pv_underprediction_kwh: float | None = None,
     grid_charge_already_active: bool = False,
+    load_risk_accuracy: dict | None = None,
 ) -> Preview:
     """Optimize the complete published input horizon, but never actuate Deye."""
     if mode != "dry_run":
@@ -247,6 +249,7 @@ def evaluate_preview(
             terminal_value_override=terminal_value,
             pv_underprediction_kwh=pv_underprediction_kwh,
             grid_charge_already_active=grid_charge_already_active,
+            load_risk_accuracy=load_risk_accuracy,
         )
         baseline = (
             optimize_horizon(
@@ -295,6 +298,7 @@ def evaluate_preview(
         quarters=len(quarters),
         pv_version=inputs.pv_forecast_version,
         source_load_method=inputs.load_method,
+        load_risk_policy=result.load_risk_policy,
         load_modeled_quarters=inputs.load_modeled_quarters,
         pv_temporal_model=inputs.pv_temporal_model,
         pv_temporal_modeled_quarters=inputs.pv_temporal_modeled_quarters,
@@ -346,7 +350,8 @@ def evaluate_preview(
                 "voltage_source": voltage_source,
                 "coverage": inputs.coverage_status,
                 "terminal_value_basis": terminal_basis,
-                "source_release": "1.16.14",
+                "source_release": "1.16.19",
+                "load_risk_accuracy": load_risk_accuracy,
                 "grid_charge_already_active": grid_charge_already_active,
                 "economic_policy_reason": result.economic_policy_reason,
                 "economic_policy_benefit_dkk": result.economic_policy_benefit_dkk,
