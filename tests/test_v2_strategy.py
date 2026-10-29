@@ -72,20 +72,30 @@ def _input(*, flat=False):
         if flat:
             buy = 2.5
         pv = (
-            0.28 if local_hour in (11, 12, 13)
-            else 0.20 if local_hour in (10, 14)
-            else 0.08 if local_hour in (9, 15)
+            0.28
+            if local_hour in (11, 12, 13)
+            else 0.20
+            if local_hour in (10, 14)
+            else 0.08
+            if local_hour in (9, 15)
             else 0.0
         )
         home = (
-            0.35 if local_hour in (11, 12, 13, 14)
-            else 0.42 if 17 <= local_hour <= 20
+            0.35
+            if local_hour in (11, 12, 13, 14)
+            else 0.42
+            if 17 <= local_hour <= 20
             else 0.17
         )
         rows.append(
             Quarter(
-                at, at + timedelta(minutes=15),
-                buy, max(0.0, buy - 0.48), pv, home, True,
+                at,
+                at + timedelta(minutes=15),
+                buy,
+                max(0.0, buy - 0.48),
+                pv,
+                home,
+                True,
             )
         )
     return tuple(rows)
@@ -102,11 +112,15 @@ def _charge_in_hours(plan, quarters, hours):
 def test_v2_compares_waiting_for_pv_against_early_network_purchase():
     plant, quarters = _plant(), _input()
     baseline = optimize_horizon(
-        plant, quarters, terminal_value_override=0,
+        plant,
+        quarters,
+        terminal_value_override=0,
         enable_pv_headroom=False,
     )
     selected = optimize_horizon(
-        plant, quarters, terminal_value_override=0,
+        plant,
+        quarters,
+        terminal_value_override=0,
         load_risk_accuracy=LOAD_RISK,
     )
     r = selected.robust_policy
@@ -129,17 +143,24 @@ def test_v2_compares_waiting_for_pv_against_early_network_purchase():
 def test_v2_does_not_create_a_peak_from_flat_prices():
     plant, quarters = _plant(), _input(flat=True)
     result = optimize_horizon(
-        plant, quarters, terminal_value_override=0,
+        plant,
+        quarters,
+        terminal_value_override=0,
         load_risk_accuracy=LOAD_RISK,
     )
     assert result.robust_policy["peak_evidence"] == []
-    assert result.robust_policy["scenarios"]["weights_are_calibrated_probabilities"] is False
+    assert (
+        result.robust_policy["scenarios"]["weights_are_calibrated_probabilities"]
+        is False
+    )
 
 
 def test_v2_replay_and_six_tou_projection_use_identical_physical_plan():
     plant, quarters = _plant(), _input()
     result = optimize_horizon(
-        plant, quarters, terminal_value_override=0,
+        plant,
+        quarters,
+        terminal_value_override=0,
         load_risk_accuracy=LOAD_RISK,
     )
     projection = validate_tou_projection(
@@ -150,7 +171,9 @@ def test_v2_replay_and_six_tou_projection_use_identical_physical_plan():
     assert projection["hardware_execution_verified"] is False
     assert projection["soc_quantization_percent"] == 1
     replay = build_replay(
-        plant, quarters, result,
+        plant,
+        quarters,
+        result,
         metadata={"load_risk_accuracy": LOAD_RISK},
     )
     assert replay["pv_headroom_policy"] == "joint_scenarios_v2"
