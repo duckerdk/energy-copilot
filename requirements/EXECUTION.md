@@ -41,6 +41,11 @@ Obecny Solar Sell zezwala tylko na nadwyżkę PV. Zmiana TOU lub pozostałych us
 - `tou_feasibility.status=modeled_quarterly_rewrites_only` oznacza poprawność projekcji komend, **nie** pewność fizycznie zrealizowanej energii. `hardware_execution_verified=false` i `executable=false` pozostają do czasu niezależnej walidacji działania falownika. Status `not_representable` jest blokadą nowego polecenia.
 - Wybór przyszłej daty ładowania to plan. Jedyna nowa komenda dotyczy **aktualnego kwadransa**. Nie zapisuj prądów „na podstawie prognozy” — sprawdź osobną intencję celowego przesunięcia/rozciągnięcia ładowania.
 
+### Aktualizacja bieżącego kwadransa (2.0.1)
+- Po istotnej zmianie SOC i nowym planie executor nie utrzymuje poprzednio zapamiętanej decyzji tylko dlatego, że kwadrans już trwa. Plan częściowego bieżącego przedziału jest wykonalny od chwili odczytu i nadpisuje poprzednią decyzję z tego samego kwadransa.
+- Przy wybranym `battery_discharge` SOC aktywnego TOU = **20%**. Bez tej decyzji wysoki próg może ochronić baterię, lecz musi wynikać ze zweryfikowanego planu ekonomicznego, a nie ze sztywnego dawkowania po kilka procent.
+- Dziennik grupuje rewizje według faktycznego 15-minutowego okresu, mimo że plan przeliczany jest częściej; czas pobrania pomiarów pozostaje zachowany osobno. Żadna rewizja planu nie daje prawa do dodatkowej zmiany prądów: ich jedyne powody to przesunięcie lub rozciągnięcie ładowania.
+
 ## Reguły TOU i prądów
 - Parametr `Maximum Battery Discharge Current` **nie istnieje w interfejsie Energy Co-Pilot**: nie czytaj encji, nie zapisuj, nie sprawdzaj wartości, nie blokuj wykonania na jego podstawie, nie podawaj go do planera ani dziennika. Zabezpieczenia sprzętowe pozostają po stronie Deye/BMS; rozładowaniem steruj wyłącznie SOC/TOU.
 - Rozładowanie realizuj progiem SOC aktywnego TOU, bez sztucznego racjonowania energii na kolejne kwadranse. Zaokrąglenie nastaw SOC: **1%**, przy minimum 20%. Brak rozładowania nie może wymuszać progu 100% tylko dlatego, że prognozowany SOC jest wysoki.
