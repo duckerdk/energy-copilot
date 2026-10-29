@@ -6,8 +6,8 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from custom_components.energy_copilot.load_forecast import (
-    HourlyLoad,
     LOOKBACK_DAYS,
+    HourlyLoad,
     backtest_recent_load,
     danish_public_holidays,
     forecast_seven_days,
