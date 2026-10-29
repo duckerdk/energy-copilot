@@ -136,24 +136,65 @@ def _hard_pv_reserve(plant, quarters, upside):
     }
 
 
+def _stress_import_cost(plant, quarters, candidate, peak):
+    """Cost an additional household-demand scenario at the actual quarter prices.
+
+    No penalty is assigned merely because nominal discharge reaches 20% SOC.
+    Inject bounded unexpected AC demand into the peak and follow its physical
+    energy deficit through all subsequent quarters. A battery may cover the
+    extra demand only from energy remaining above the 20% floor after the
+    planned nominal operation. When it cannot, extra grid import is priced
+    when it actually occurs, not at the maximum price in the peak.
+    Remaining battery depletion is valued once at the known terminal proxy.
+    The scenario is an estimate, not a second executable dispatch.
+    """
+    if peak.risk_dc_kwh <= 1e-9:
+        return 0.0
+
+    peak_rows = quarters[peak.start : peak.end]
+    # Allocate risk across the hours where consumption is actually forecast.
+    # A uniform minimum avoids concentrating all stress into one quarter.
+    weights = [max(0.05, q.home_ac_kwh) for q in peak_rows]
+    total_weight = sum(weights)
+    capacity = plant.battery_capacity_dc_kwh
+    energy_debt_dc = 0.0
+    extra_import_cost = 0.0
+    for index in range(peak.start, len(quarters)):
+        if index < peak.end:
+            energy_debt_dc += (
+                peak.risk_dc_kwh * weights[index - peak.start] / total_weight
+            )
+        physical = candidate.candidate.quarters[index]
+        headroom_dc = max(
+            0.0,
+            capacity * (physical.soc_end_pct - MIN_SOC) / 100.0,
+        )
+        # Prefer using spare battery, but never steal energy from the
+        # already scheduled home load or violate minimum SOC.
+        forced_import_dc = max(0.0, energy_debt_dc - headroom_dc)
+        if forced_import_dc > 0:
+            extra_import_cost += (
+                forced_import_dc
+                * plant.eta_battery_to_ac
+                * quarters[index].buy_dkk_per_kwh
+            )
+            energy_debt_dc -= forced_import_dc
+
+    # A stressed trajectory ending with less stored energy incurs a
+    # replacement-value loss; do not treat it as an imaginary grid purchase.
+    extra_import_cost += (
+        energy_debt_dc * candidate.terminal_value_dkk_per_kwh_dc
+    )
+    return max(0.0, extra_import_cost)
+
+
 def _score(plant, quarters, candidate, peaks, upside):
     """Nominal cost plus two independently reported scenario loss estimates."""
     capacity = plant.battery_capacity_dc_kwh
-    load_loss = 0.0
-    for peak in peaks:
-        # Fully available energy in the expensive period is NOT throttled.
-        minimum_soc = min(
-            q.soc_end_pct for q in candidate.candidate.quarters[peak.start : peak.end]
-        )
-        available_dc = max(0.0, (minimum_soc - MIN_SOC) * capacity / 100)
-        shortfall = max(0.0, peak.risk_dc_kwh - available_dc)
-        marginal = max(
-            0.0,
-            peak.price_dkk_kwh * plant.eta_battery_to_ac
-            - DEGRADATION_DKK_PER_KWH_DC
-            - peak.cheap_dkk_kwh / plant.eta_grid_to_battery,
-        )
-        load_loss += LOAD_RISK_WEIGHT * shortfall * marginal
+    load_loss = LOAD_RISK_WEIGHT * sum(
+        _stress_import_cost(plant, quarters, candidate, peak)
+        for peak in peaks
+    )
 
     pv_loss = 0.0
     for i, (q, d, outcome, extra) in enumerate(
