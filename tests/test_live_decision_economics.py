@@ -5,7 +5,6 @@ from datetime import UTC, datetime, timedelta
 from custom_components.energy_copilot.horizon_optimizer import optimize_horizon
 from custom_components.energy_copilot.planner import Plant, Quarter
 
-
 START = datetime(2026, 10, 29, 15, tzinfo=UTC)
 LOW_RISK = {
     "hours_evaluated": 168,
