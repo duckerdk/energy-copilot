@@ -344,6 +344,8 @@ def build_planning_input(
                 hours = (right - cursor).total_seconds() / 3600.0
                 measured_pv = snapshot.measurements.get("pv")
                 measured_home = snapshot.measurements.get("home")
+                if measured_pv is not None or measured_home is not None:
+                    live_adjusted_quarters += 1
                 if measured_pv is not None:
                     forecast_rate = forecast_pv_dc_kwh / hours
                     live_rate = max(0.0, measured_pv.value / 1000.0)
@@ -351,7 +353,6 @@ def build_planning_input(
                         -3.0, min(3.0, live_rate - forecast_rate)
                     )
                     forecast_pv_dc_kwh = max(0.0, adjusted_rate * hours)
-                    live_adjusted_quarters += 1
                 if measured_home is not None:
                     forecast_rate = load_energy / hours
                     live_rate = max(0.0, measured_home.value / 1000.0)
@@ -359,7 +360,6 @@ def build_planning_input(
                         -3.0, min(3.0, live_rate - forecast_rate)
                     )
                     load_energy = max(0.0, adjusted_rate * hours)
-                    live_adjusted_quarters += 1
         quarters.append(
             Quarter(
                 cursor,
