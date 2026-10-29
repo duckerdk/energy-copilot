@@ -218,7 +218,6 @@ def evaluate_preview(
         initial_soc_pct=soc,
         battery_voltage_v=battery_voltage,
         charge_limit_a=50,
-        discharge_limit_a=100,
         grid_charge_limit_a=50,
         eta_pv_to_ac=MODEL_EFFICIENCY,
         eta_pv_to_battery=MODEL_EFFICIENCY,
