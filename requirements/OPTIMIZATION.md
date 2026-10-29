@@ -24,10 +24,10 @@ Przykładowe równanie stanu (przy jawnej definicji stron pomiaru):
 E_next = E + dt * (eta_pv_bat*s_b + eta_grid_bat*g_b
                     - (b_h+b_x)/eta_bat_ac)
 ```
-Sprawności `eta_pv_bat`, `eta_grid_bat`, `eta_bat_ac`, `eta_pv_ac` rozdzielać i kalibrować; nie mieszać W DC z W AC bez konwersji. Początkowe 0,9487/0,97 to założenia, nie pomiary. Ograniczyć SOC **20–100%**, maksymalne prądy zgodnie z REQUIREMENTS i rzeczywiste limity BMS/temperatury/napięcia; wymagania sprzętowe ostrzejsze od polityki mają pierwszeństwo.
+Sprawności `eta_pv_bat`, `eta_grid_bat`, `eta_bat_ac`, `eta_pv_ac` rozdzielać i kalibrować; nie mieszać W DC z W AC bez konwersji. Początkowe 0,9487/0,97 to założenia, nie pomiary. Ograniczyć SOC **20–100%**, dopuszczalne tempo **ładowania** zgodnie z REQUIREMENTS i pozostałe granice sprzętowe BMS/temperatury/napięcia; parametr nastawy maksymalnego prądu rozładowania nie jest wejściem ani ograniczeniem modelu Energy Co-Pilot.
 
 ## Wykonalność przez Deye
-Planner rozważa zarówno prądy, Grid Charge, zezwolenie PV Solar Sell, jak i autonomiczne zmiany **sześciu TOU**. Nie utrzymuj dawnego obowiązkowego „current-first bez zmieniania TOU”. Sam maksymalny prąd nie wymusza zadanej mocy ani osiągnięcia SOC; aktualne napięcie × A daje górne oszacowanie mocy DC. Warunki ładowania z sieci zależą jednocześnie od ogólnego limitu, limitu sieci, globalnego Grid Charge i aktywnego okresu TOU.
+Planner rozważa harmonogram **przesuwania lub rozciągania ładowania**, Grid Charge, zezwolenie PV Solar Sell, jak i autonomiczne zmiany **sześciu TOU**. Obliczony prąd potrzebny do bilansu energii jest wartością prognostyczną, a nie powodem ani poleceniem przestawienia prądu ładowania falownika. Każda zmiana nastawy wymaga osobnej, wyraźnej intencji przesunięcia lub rozciągnięcia ładowania. Nie utrzymuj dawnego obowiązkowego „current-first bez zmieniania TOU”. Sam maksymalny prąd nie wymusza zadanej mocy ani osiągnięcia SOC; aktualne napięcie × A daje górne oszacowanie mocy DC. Warunki ładowania z sieci zależą jednocześnie od ogólnego limitu, limitu sieci, globalnego Grid Charge i aktywnego okresu TOU.
 
 Porównywać:
 1. Realny `baseline_deye` bez zmian Co-Pilot;
@@ -43,7 +43,7 @@ Ceny tylko opublikowane; ich brak poza horyzontem to nie zero. Wartość końcow
 Przy tej samej energii i równoważnym koszcie w horyzoncie wybierać **łagodniejsze ładowanie**: rozłożyć je na dostępne kwadranse i minimalizować sumę kwadratów prądów ładowania, a następnie szczytowy prąd; **50 A to tylko limit**. Dostępne kwadranse musi wyznaczyć planer według opublikowanych cen, rzeczywistego czasu, wymaganego przyrostu SOC i ograniczeń; harmonogram 15-minutowy nie uprawnia do więcej niż sześciu okien TOU. Nie poświęcać istotnej korzyści ekonomicznej dla mniejszego prądu ani nie zakładać, że prąd zadany jest prądem rzeczywistym. Przy niepewnej marginalnej korzyści po degradacji i stratach wybierać brak **dodatkowego** cyklu. W przypadku zbliżonych kosztów preferować mniejszą liczbę zapisów i stabilniejsze nastawy, ale nie odwracać tym ekonomicznie istotnej przewagi. Zewnętrzna walidacja planu po solverze ponownie liczy bilanse, ograniczenia, koszt i zgody, niezależnie od rozwiązania optymalizatora.
 
 ## Wynik
-Dla każdego slotu: UTC, ceny i wersja danych, prognoza PV i zużycia, SOC początek/koniec, przepływy PV/dom/bateria/sieć, zamierzony Grid Charge/TOU/prądy/Solar Sell, koszty wariantów, degradacja, niepewność i status wykonalności. Plan jest **intencją**, nie potwierdzonym przepływem. Executor: [EXECUTION.md](EXECUTION.md), testy: [VALIDATION.md](VALIDATION.md).
+Dla każdego slotu: UTC, ceny i wersja danych, prognoza PV i zużycia, SOC początek/koniec, przepływy PV/dom/bateria/sieć, zamierzony Grid Charge/TOU/Solar Sell oraz **wyłącznie celowe czasowe ograniczenia prądu ładowania** (przesunięcie/rozciągnięcie), koszty wariantów, degradacja, niepewność i status wykonalności. Plan jest **intencją**, nie potwierdzonym przepływem. Executor: [EXECUTION.md](EXECUTION.md), testy: [VALIDATION.md](VALIDATION.md).
 
 ## Implementacja i ograniczenia dowodów
 
