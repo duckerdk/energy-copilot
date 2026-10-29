@@ -6,8 +6,8 @@
 
 - [ ] **Walidacja fizyczna:** porównać bieżący plan SOC/PV/dom/sieć z pomiarami falownika w następujących po sobie kwadransach, również w szczycie cenowym; sprawdzić brak niezamierzonego ograniczenia rozładowania.
 - [ ] **TOU i recovery:** potwierdzić zapis i odczyt aktywnego slotu, zmianę SOC w krokach 1%, granicę kwadransa, restart HA, częściowy zapis oraz status `recovery_required` — bez utraty kwadransów. Nie utożsamiać testów kodu z testem urządzenia.
-- [ ] **Bezpieczeństwo Deye:** przy istniejącym dodatnim prądzie rozładowania integracja nie może zmieniać jego limitu; 0 A wymaga ręcznej korekty, bo w tej instalacji zatrzymuje PV. Potwierdzić brak eksportu baterii przy Solar Sell/TOU, niezależnie od eksportu PV.
-- [ ] **Prądy ładowania:** na rzeczywistej instalacji potwierdzić, że limiter nie dławi nieplanowanie PV, a zmiany są uzasadnione wyłącznie rozłożeniem ładowania z sieci lub przesunięciem ładowania PV.
+- [ ] **Bezpieczeństwo Deye:** potwierdzić w integracji całkowity brak odniesień do nastawy maksymalnego prądu rozładowania (odczytu, zapisu, modelu, diagnostyki). Falownik/BMS odpowiada za sprzętowe limity; osobno potwierdzić brak eksportu baterii przy Solar Sell/TOU.
+- [ ] **Prądy ładowania:** potwierdzić, że jedynym powodem zmiany jest celowe przesunięcie albo rozciągnięcie w czasie ładowania; prognozy prądu i SOC nie są poleceniem. Potwierdzić przywrócenie 50 A z dawnego ograniczenia 1 A po restarcie, z zachowaniem ręcznych ustawień, oraz brak nieplanowanego dławienia PV.
 - [ ] **SOC i PV:** sprawdzić skutki zmian 1.16.17: rzeczywisty nadmiar PV może ładować ponad prognozowany SOC. Odróżnić działanie zaimplementowane od potwierdzonego pomiarem.
 
 ## P1 — jakość prognoz i opłacalność
