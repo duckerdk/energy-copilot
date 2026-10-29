@@ -43,8 +43,15 @@ Minimalizować **całkowity koszt energii w DKK w pełnym horyzoncie opublikowan
 Natywne encje HA, config/options flow, prognoza PV i zużycia, plan dla opublikowanych cen, wyjaśnienie decyzji i wariantów, przewidywane koszty/straty, stany `planned/applied/confirmed`, dziennik wszystkich decyzji, dashboard i UI zatwierdzania eksportu baterii. Raporty oszczędności rozróżniają wynik modelowany, backtest i rzeczywisty. Wymagania techniczne: [HA_CONTRACT.md](HA_CONTRACT.md), [OPTIMIZATION.md](OPTIMIZATION.md), [VALIDATION.md](VALIDATION.md).
 
 ## Prognoza zużycia — decyzja użytkownika 22.10.2026
-Budować prognozę zużycia domu na następne **7 dni** na podstawie historycznych danych HA, z rozróżnieniem dni roboczych, wolnych i świąt, adaptacją do nowszych obserwacji i **wykresem w HA**. Nie mylić produkcji PV, zakupu z sieci, ładowania/rozładowania baterii ani fizycznego zużycia. Nie zmieniać zakresu uprawnień do sterowania.
+Budować prognozę zużycia domu na następne **7 dni** z **ostatnich 45 dni danych HA**, a nie z 365. **Ostatnie 7 dni mają najwyższą wagę, dni 8–14 wagę średnią, 15–45 mniejszą**; uwzględnić bieżącą zmianę nawyków także wtedy, gdy długa mediana pozostaje bez zmian. Rozróżniać dni robocze, wolne i święta, zachować **wykres w HA**. Nie mylić produkcji PV, zakupu z sieci, ładowania/rozładowania baterii ani fizycznego zużycia. Nie zmieniać zakresu uprawnień do sterowania.
 
+
+## Dynamiczny zapas SOC na błąd prognozy — decyzja użytkownika 29.10.2026
+
+- **Nie stosować stałego +10% ani wymuszenia 100% SOC.** Przed drogimi godzinami rozważyć **dynamiczny dodatkowy zapas 0–15 punktów procentowych SOC** wyłącznie przy potwierdzonym ryzyku niedoszacowania zużycia i ekonomicznej opłacalności wcześniejszego ładowania.
+- Ryzyko obliczać z ostatniego, odseparowanego 7-dniowego holdoutu modelu 45-dniowego, szczególnie ze znaku błędu i 75. percentyla niedoszacowań w godzinach 16–22. Nie udawać, że błąd MAE jest prognozowaną dodatkową energią. Bez wystarczających danych, istotnego szczytu cen lub wykonalnego taniego okna: **brak dodatkowego ładowania** i jasny powód w diagnostyce.
+- Nadmiarową energię kupować wyłącznie w rozciągniętym na kilka kwadransów oknie, po uwzględnieniu sprawności, degradacji, wartości końcowej SOC i możliwości wykorzystania PV. Wymóg ten nie daje dodatkowych uprawnień do manipulowania prądami: nadal tylko przesunięcie lub rozciągnięcie ładowania.
+- Wyraźnie rozdzielać bazową prognozę domu, przyjęty zapas na niepewność, rzeczywiste dodatkowe ładowanie i szacowaną wartość unikniętego ryzyka. Pokazywać prawdziwy plan SOC, nie sztucznie podniesioną linię na wykresie. Pierwsza implementacja korzysta z jawnie oznaczonego, niekalibrowanego współczynnika ostrożności 0,65 i wymaga weryfikacji na żywym HA.
 
 ## Pełnohoryzontowy planer energii — decyzja użytkownika 22.10.2026
 
