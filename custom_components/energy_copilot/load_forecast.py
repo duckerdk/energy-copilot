@@ -164,9 +164,8 @@ def _predict_hour(
             if historic.weekday() == local.weekday():
                 same_weekday.append(element)
     if len(same_weekday) >= 3 and len(same_type) >= 6:
-        baseline = (
-            0.35 * _weighted_median(same_weekday)
-            + 0.65 * _weighted_median(same_type)
+        baseline = 0.35 * _weighted_median(same_weekday) + 0.65 * _weighted_median(
+            same_type
         )
     elif len(same_type) >= 4:
         baseline = _weighted_median(same_type)
@@ -271,6 +270,7 @@ def backtest_recent_load(model: LoadModel, days: int = 7) -> dict:
         if row.kwh >= 0.05:
             relative.append(abs(predicted - row.kwh) / row.kwh)
     if residuals:
+
         def positive_p75(errors):
             values = sorted(max(0.0, -err) for err in errors)
             return values[min(len(values) - 1, int(0.75 * len(values)))]
