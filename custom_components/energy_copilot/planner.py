@@ -28,7 +28,6 @@ class Plant:
     initial_soc_pct: float
     battery_voltage_v: float
     charge_limit_a: float
-    discharge_limit_a: float
     grid_charge_limit_a: float
     eta_pv_to_ac: float
     eta_pv_to_battery: float
@@ -111,7 +110,6 @@ def _plant(plant: Plant) -> None:
         raise InfeasibleCandidate("initial_soc:policy_limit")
     for field, maximum in (
         ("charge_limit_a", 50),
-        ("discharge_limit_a", 100),
         ("grid_charge_limit_a", 50),
     ):
         if _nonnegative(getattr(plant, field), field) > maximum:
@@ -209,16 +207,11 @@ def simulate_candidate(
         max_charge = (
             plant.battery_voltage_v * plant.charge_limit_a / 1000 * quarter_hours
         )
-        max_discharge = (
-            plant.battery_voltage_v * plant.discharge_limit_a / 1000 * quarter_hours
-        )
         max_grid_charge = (
             plant.battery_voltage_v * plant.grid_charge_limit_a / 1000 * quarter_hours
         )
         if charge_dc > max_charge + EPS:
             raise InfeasibleCandidate("battery:charge_current_limit")
-        if discharge_dc > max_discharge + EPS:
-            raise InfeasibleCandidate("battery:discharge_current_limit")
         if d.grid_to_battery_ac_kwh * plant.eta_grid_to_battery > max_grid_charge + EPS:
             raise InfeasibleCandidate("battery:grid_charge_current_limit")
         soc_start = energy / capacity * 100
