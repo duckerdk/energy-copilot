@@ -117,8 +117,11 @@ def build_replay(plant, quarters, result, *, metadata=None):
             for q in quarters
         ],
         "pv_headroom_policy": (
-            "joint_scenarios_v2" if result.robust_policy is not None
-            else "risk_aware_v1" if result.pv_headroom_enabled else "disabled"
+            "joint_scenarios_v2"
+            if result.robust_policy is not None
+            else "risk_aware_v1"
+            if result.pv_headroom_enabled
+            else "disabled"
         ),
         "pv_underprediction_kwh": result.pv_underprediction_kwh,
         "expected": _result_output(result),
