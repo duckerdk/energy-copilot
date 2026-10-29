@@ -498,7 +498,7 @@ def test_export_enabled_still_prices_economically_useful_pv_headroom():
     from custom_components.energy_copilot.planner import Plant, Quarter
     from custom_components.energy_copilot.pv_headroom import headroom_schedule
 
-    plant = Plant(10.24, 100, 51.2, 50, 100, 50, 0.95, 0.95, 0.95, 0.95, 0)
+    plant = Plant(10.24, 100, 51.2, 50, 50, 0.95, 0.95, 0.95, 0.95, 0)
     start = datetime(2026, 10, 27, tzinfo=UTC)
     quarters = tuple(
         Quarter(
