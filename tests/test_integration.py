@@ -81,6 +81,8 @@ async def test_setup_poll_unload_and_remove(hass, populated_hass, entry, freezer
         assert "raw_today" not in str(diag)
         freezer.tick(timedelta(seconds=31))
         async_fire_time_changed(hass)
+        # Refresh explicitly: mocked HA timers can coalesce scheduled ticks.
+        await coordinator.async_request_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.at > NOW
         assert not service_calls.called  # No HA service, including inverter commands.
