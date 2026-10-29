@@ -364,6 +364,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
                         pv_underprediction_kwh=self.forecast_accuracy.summary["pv"][
                             "positive_underprediction_p75_kwh_per_quarter"
                         ],
+                        load_risk_accuracy=self.load_backtest,
                         grid_charge_already_active=(
                             self.dynamic_controller.armed
                             and (grid_state := self.hass.states.get(GRID_CHARGE))
