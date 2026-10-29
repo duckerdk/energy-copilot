@@ -10,9 +10,9 @@ from custom_components.energy_copilot.models import (
     ForecastSnapshot,
     HistorySlot,
     InputSnapshot,
-    Sample,
     Issue,
     PriceSlot,
+    Sample,
 )
 from custom_components.energy_copilot.planning_inputs import (
     LoadProjection,
