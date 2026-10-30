@@ -723,7 +723,7 @@ async def test_uncertain_write_already_applied_is_reconciled_not_replayed():
     assert await controller.apply(old, now, soc_pct=78, voltage_v=53) == (
         "recovering"
     )
-    slot = tou_entities(1)["soc"]
+    slot = tou_entities(2)["soc"]
     assert service.states.get(slot).state == "78.0"
     assert controller.armed
     # The next fresh plan wants discharge. Do not replay the 78% instruction.
