@@ -140,28 +140,28 @@ async def test_failed_write_recovers_from_fresh_plan_without_disarming():
     controller, service = setup_controller(fail_on=GRID_CHARGE)
     controller.arm()
     first = preview(now)
-    assert await controller.apply(first, now, soc_pct=50, voltage_v=51) == (
-        "recovering"
-    )
+    result = await controller.apply(first, now, soc_pct=50, voltage_v=51)
+    assert result == "recovering"
     assert controller.armed
     assert not controller.halted
     assert controller.recovery_attempts == 1
     count = len(service.calls)
-    assert await controller.apply(
+    result = await controller.apply(
         first, now + timedelta(seconds=10), soc_pct=50, voltage_v=51
-    ) == "recovering"
+    )
+    assert result == "recovering"
     assert len(service.calls) == count
     # The old charge has been cancelled: only the NEW live dispatch is valid.
     service.fail_on = None
     fresh = preview(now, charge=0.0, discharge=0.1, grid_a=0)
-    assert await controller.apply(
+    result = await controller.apply(
         fresh, now + timedelta(seconds=31), soc_pct=80, voltage_v=51
-    ) == "applied"
+    )
+    assert result == "applied"
     assert controller.recovery_attempts == 0
     assert controller.armed
     assert float(service.states.get(tou_entities(4)["soc"]).state) == 20.0
     assert service.states.get(GRID_CHARGE).state == "off"
-
 
 @pytest.mark.asyncio
 async def test_discharge_rejected_at_minimum_soc():
@@ -713,30 +713,30 @@ async def test_uncertain_write_already_applied_is_reconciled_not_replayed():
 
     async def written_but_no_readback(entity, value):
         nonlocal attempts
-        await original(entity, value)  # Fake inverter accepts the command.
+        await original(entity, value)  # The fake device accepts the command.
         attempts += 1
         if attempts == 1:
             raise CommandRejected("device:write_unconfirmed")
 
     controller.adapter.set_number = written_but_no_readback
     old = preview(now, charge=0, discharge=0, grid_a=0)
-    assert await controller.apply(old, now, soc_pct=78, voltage_v=53) == (
-        "recovering"
-    )
+    result = await controller.apply(old, now, soc_pct=78, voltage_v=53)
+    assert result == "recovering"
     slot = tou_entities(2)["soc"]
     assert service.states.get(slot).state == "78.0"
     assert controller.armed
-    # The next fresh plan wants discharge. Do not replay the 78% instruction.
+
+    # The next fresh plan wants discharge. Never replay the old 78% command.
     controller.adapter.set_number = original
     plan = preview(now, charge=0, discharge=0.25, grid_a=0)
-    assert await controller.apply(
+    result = await controller.apply(
         plan, now + timedelta(seconds=31), soc_pct=75, voltage_v=53
-    ) == "applied"
+    )
+    assert result == "applied"
     assert service.states.get(slot).state == "20.0"
     assert any(
-        e == slot and v == 20.0
+        data["entity_id"] == slot and data.get("value") == 20.0
         for _, _, data in service.calls
-        for e, v in [(data["entity_id"], data.get("value"))]
     )
 
 
@@ -746,23 +746,25 @@ async def test_recovery_backoff_is_bounded_and_stop_cancels_retries():
     controller, service = setup_controller(fail_on=GRID_CHARGE)
     controller.arm()
     plan = preview(now)
-    assert await controller.apply(plan, now, soc_pct=50, voltage_v=51) == (
-        "recovering"
-    )
-    assert await controller.apply(
+    result = await controller.apply(plan, now, soc_pct=50, voltage_v=51)
+    assert result == "recovering"
+    result = await controller.apply(
         plan, now + timedelta(seconds=31), soc_pct=50, voltage_v=51
-    ) == "recovering"
+    )
+    assert result == "recovering"
     assert controller.recovery_attempts == 2
     count = len(service.calls)
-    assert await controller.apply(
+    result = await controller.apply(
         plan, now + timedelta(seconds=60), soc_pct=50, voltage_v=51
-    ) == "recovering"
+    )
+    assert result == "recovering"
     assert len(service.calls) == count
     controller.stop(manual=True)
     service.fail_on = None
-    assert await controller.apply(
+    result = await controller.apply(
         plan, now + timedelta(minutes=5), soc_pct=50, voltage_v=51
-    ) == "stopped"
+    )
+    assert result == "stopped"
     assert not controller.armed
     assert controller.recovery_next_at is None
 
@@ -773,16 +775,19 @@ async def test_preserve_soc_does_not_write_for_sub_two_percent_fluctuations():
     controller, service = setup_controller()
     controller.arm()
     plan = preview(now, charge=0, discharge=0, grid_a=0)
-    assert await controller.apply(plan, now, soc_pct=70, voltage_v=53) == "applied"
+    result = await controller.apply(plan, now, soc_pct=70, voltage_v=53)
+    assert result == "applied"
     target = tou_entities(4)["soc"]
     count = len(service.calls)
     for minute, soc in [(1, 69.8), (2, 70.4), (3, 71.1)]:
-        assert await controller.apply(
+        result = await controller.apply(
             plan, now + timedelta(minutes=minute), soc_pct=soc, voltage_v=53
-        ) == "applied"
+        )
+        assert result == "applied"
     assert float(service.states.get(target).state) == 70
     assert len(service.calls) == count
-    assert await controller.apply(
+    result = await controller.apply(
         plan, now + timedelta(minutes=4), soc_pct=72.3, voltage_v=53
-    ) == "applied"
+    )
+    assert result == "applied"
     assert float(service.states.get(target).state) == 73
