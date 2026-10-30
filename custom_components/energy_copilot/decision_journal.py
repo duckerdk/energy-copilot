@@ -27,6 +27,7 @@ _ACTIVITY_EVENTS = {
     "blocked",
     "recovered",
     "halted",
+    "recovering",
     "failure",
     "plan_status",
     "input_quality",
@@ -74,7 +75,7 @@ _REASON_NAMES = {
     "load:awaiting_statistics": "Oczekiwanie na dane historyczne zużycia domu.",
     "controller:waiting_for_next_quarter": "Oczekiwanie na początek następnego kwadransa.",
     "controller:tou_start_invalid": "Nieprawidłowe godziny okien Time of Use.",
-    "device:write_unconfirmed": "Falownik nie potwierdził zmiany nastawy.",
+    "device:write_unconfirmed": "Odczyt Home Assistant nie potwierdził jeszcze nowej nastawy.",
     "device:entity_unavailable": "Nie można odczytać wymaganej encji falownika.",
     "controller:target_soc_invalid": "Nieprawidłowy docelowy SOC w planie.",
     "controller:discharge_max_invalid": "Nieprawidłowy limit prądu rozładowania.",
@@ -370,248 +371,95 @@ def _setting_change(change):
     return f"{name} {fmt(change['before'])} → {fmt(change['after'])} [{entity}]"
 
 
+def _simple_action(entry):
+    """Brief user-facing explanation from actual prices and planned actions.
+
+    No invented savings: the separate technical audit retains calculations,
+    risk weights, energy flows and the original optimizer evidence.
+    """
+    action = entry.get("action")
+    buy = _number(entry.get("buy_dkk_per_kwh"), digits=2)
+    sell = _number(entry.get("sell_dkk_per_kwh"), digits=2)
+    future = _number(entry.get("later_discharge_buy_dkk_per_kwh"), digits=2)
+    amount = _number(entry.get("grid_charge_ac_kwh"), digits=2)
+    ac_energy = None
+    if entry.get("battery_discharge_dc_kwh") is not None:
+        dc = float(entry["battery_discharge_dc_kwh"])
+        efficiency = float(entry.get("battery_to_ac_efficiency") or 0.95)
+        ac_energy = _number(dc * efficiency, digits=2)
+
+    if action == "grid_charge":
+        if buy and future and entry.get("later_discharge_start_utc"):
+            return (
+                f"Ładuję baterię ({amount or 'planowana ilość'}) po {buy}, "
+                f"żeby wykorzystać ją w droższym okresie ({future})."
+            )
+        return f"Ładuję baterię z sieci po {buy}." if buy else "Ładuję baterię z sieci."
+    if action == "battery_discharge":
+        energy = f" ({ac_energy})" if ac_energy else ""
+        return (
+            f"Zasilam dom z baterii{energy}, bo zakup kosztuje teraz {buy}."
+            if buy
+            else f"Zasilam dom z baterii{energy}."
+        )
+    if action == "grid_import":
+        if buy and future and entry.get("later_discharge_start_utc"):
+            return f"Kupuję teraz po {buy}; zachowuję baterię na później ({future})."
+        return f"Zasilam dom z sieci po {buy}." if buy else "Zasilam dom z sieci."
+    if action == "pv_charge":
+        if sell:
+            return f"Magazynuję nadwyżkę ze słońca zamiast sprzedawać po {sell}."
+        return "Ładuję baterię nadwyżką ze słońca."
+    if action == "pv_sell":
+        return f"Sprzedaję nadwyżkę ze słońca po {sell}." if sell else (
+            "Sprzedaję nadwyżkę energii ze słońca."
+        )
+    return "Nie zmieniam teraz pracy baterii."
+
+
 def readable_event(entry):
-    """A concise Polish statement: decision, cause, inputs and execution result."""
+    """One short useful sentence for HA; detailed evidence stays in diagnostics."""
     event = entry["event"]
     reason = entry.get("reason")
-    quarter = _local_time(entry.get("quarter_start_utc"))
-    if event == "revised":
-        result = _revised_event(entry)
-        previous = entry.get("previous_plan") or {}
-        if previous.get("action") != entry.get("action"):
-            result += " Uzasadnienie: " + _economic_evidence(entry)
-        return result
     if event in {"planned", "decision"}:
-        action = _ACTION_NAMES.get(entry.get("action"), "nieznana akcja planera")
-        parts = [
-            f"{'Plan' if event == 'planned' else 'Decyzja wykonawcy'} na {quarter}: {action}."
-        ]
-        soc = _number(entry.get("soc_observed_pct"), "%", 1)
-        target = _number(entry.get("soc_planned_end_pct"), "%", 1)
-        if soc and target:
-            parts.append(f"SOC: {soc} → planowane {target}.")
-        elif soc:
-            parts.append(f"SOC: {soc}.")
-        buy = _number(entry.get("buy_dkk_per_kwh"), "DKK/kWh")
-        sell = _number(entry.get("sell_dkk_per_kwh"), "DKK/kWh")
-        if buy:
-            parts.append(f"Zakup: {buy}.")
-        if sell:
-            parts.append(f"Sprzedaż: {sell}.")
-        pv = _number(entry.get("pv_forecast_dc_kwh"), "kWh")
-        home = _number(entry.get("home_forecast_ac_kwh"), "kWh")
-        if pv:
-            parts.append(f"Prognoza PV: {pv}/15 min.")
-        if home:
-            parts.append(f"Prognoza domu: {home}/15 min.")
-        energy_key = {
-            "grid_charge": "grid_charge_ac_kwh",
-            "battery_discharge": "battery_discharge_dc_kwh",
-            "pv_charge": "pv_charge_dc_kwh",
-            "grid_import": "planned_grid_import_kwh",
-        }.get(entry.get("action"))
-        if energy_key:
-            energy = _number(entry.get(energy_key), "kWh")
-            if energy:
-                parts.append(f"Energia w planie: {energy}/15 min.")
-        purchase = _number(entry.get("purchase_cost_dkk"), "DKK")
-        wear = _number(entry.get("degradation_cost_dkk"), "DKK")
-        if purchase and abs(float(entry["purchase_cost_dkk"])) >= 0.005:
-            parts.append(f"Koszt zakupu w kwadransie: {purchase}.")
-        if wear and abs(float(entry["degradation_cost_dkk"])) >= 0.005:
-            parts.append(f"Degradacja w kwadransie: {wear}.")
-        if event in {"planned", "decision"}:
-            strategy = entry.get("robust_strategy")
-            if strategy:
-                improvement = _number(entry.get("robust_risk_reduction_dkk"), "DKK", 3)
-                parts.append(
-                    f"Scenariusze 2.0: {strategy}; "
-                    f"szacowana poprawa wyniku z ryzykiem: {improvement}. "
-                    "Wagi nie są empirycznym prawdopodobieństwem."
-                )
-        if event == "planned":
-            parts.append("Uzasadnienie: " + _economic_evidence(entry))
-            policy_reason = entry.get("economic_policy_reason")
-            if policy_reason == "soc_99_satisfies_grid_charge_target":
-                parts.append(
-                    "Nie doładowujemy z sieci: SOC 99% uznano za osiągnięty cel 100%."
-                )
-            elif policy_reason == "grid_charge_below_materiality_threshold":
-                saved = entry.get("economic_policy_benefit_dkk")
-                advantage = (
-                    "poniżej 0,01 DKK (pomijalna)"
-                    if saved is not None and saved < 0.01
-                    else _number(saved, "DKK", 2)
-                )
-                parts.append(
-                    f"Nie uruchamiamy ładowania z sieci: korzyść całego taniego "
-                    f"okna {advantage} jest poniżej progu 0,10 DKK."
-                )
-        elif entry.get("action") in {"battery_discharge", "grid_charge", "grid_import"}:
-            parts.append("Kontekst: " + _decision_evidence(entry))
-        return " ".join(parts)
+        return _simple_action(entry)
+    if event == "revised":
+        before = (entry.get("previous_plan") or {}).get("action")
+        if before != entry.get("action"):
+            return "Zmiana planu: " + _simple_action(entry)
+        return "Plan zaktualizowany: " + _simple_action(entry)
     if event == "applied":
-        changes = entry.get("command_changes")
-        commands = entry.get("commands_sent")
-        slot = entry.get("active_tou_slot")
-        parts = [f"Falownik, kwadrans {quarter}:"]
-        if commands is None:
-            parts.append(
-                "wykonawca zakończył przetwarzanie planu; brak rejestru zmian nastaw."
-            )
-        elif commands == 0:
-            parts.append("nastawy zgodne z planem; nie wysłano poleceń.")
-        else:
-            parts.append(f"zmieniono {commands} nastaw; zapisy potwierdzone odczytem:")
-            parts.append(
-                "; ".join(_setting_change(change) for change in changes or []) + "."
-            )
-        if commands and changes:
-            rate_changes = any(
-                change.get("entity_id")
-                in {
-                    "number.sun12k_maximum_battery_charge_current",
-                    "number.sun12k_maximum_battery_grid_charge_current",
-                }
-                for change in changes
-            )
-            if rate_changes:
-                explanations = {
-                    "defer_pv_storage_for_export_then_charge_later": (
-                        "Przesunięcie ładowania PV: eksport teraz, magazynowanie później."
-                    ),
-                    "restore_after_pv_deferral": (
-                        "Przywrócono wcześniejszy limit po zakończeniu odroczenia PV."
-                    ),
-                    "spread_grid_charge_over_low_price_window": (
-                        "Rozłożenie ładowania z sieci na podobnie tanie kwadranse."
-                    ),
-                    "enable_planned_grid_charge_from_zero": (
-                        "Umożliwienie zaplanowanego ładowania przy zastanym limicie 0 A."
-                    ),
-                }
-                explanation = explanations.get(entry.get("charging_current_policy"))
-                if explanation:
-                    parts.append(explanation)
-        if slot is not None:
-            parts.append(f"Okno TOU {slot}.")
-        soc = _number(entry.get("observed_tou_soc"), "%", 0)
-        grid = _number(entry.get("grid_limit_a"), "A", 0)
-        max_charge = _number(entry.get("charge_limit_a"), "A", 0)
-        charge = entry.get("observed_tou_grid_charge")
-        if soc:
-            parts.append(f"SOC TOU: {soc}.")
-        if grid:
-            parts.append(f"Limit prądu z sieci: {grid}.")
-        if max_charge:
-            parts.append(f"Limit ładowania baterii: {max_charge}.")
-        if entry.get("discharge_control") == "tou_soc_floor":
-            parts.append("Rozładowanie sterowane wyłącznie progiem SOC TOU.")
-        if charge is not None:
-            parts.append(f"Ładowanie z sieci w TOU: {charge}.")
-        return " ".join(parts)
-    if event == "armed":
-        return "Sterowanie automatyczne zostało uzbrojone (ARM). " + _reason(reason)
-    if event == "manual_stop":
-        return "Ręcznie zatrzymano sterowanie automatyczne (STOP)."
-    if event == "stop":
-        return "Sterowanie automatyczne zostało zatrzymane."
-    if event == "waiting":
-        next_time = entry.get("next_quarter_utc")
+        if entry.get("commands_sent", 0) > 0:
+            return "Zastosowałem aktualny plan. Nastawy zostały sprawdzone."
+        return "Nastawy są już zgodne z planem."
+    if event == "recovering":
         return (
-            "Wykonawca oczekuje na następny pełny kwadrans"
-            + (f" ({_local_time(next_time)})" if next_time else "")
-            + ". Nie wysłano nowych poleceń."
-        )
-    if event == "blocked":
-        problems = []
-        missing = entry.get("missing_measurements") or []
-        if missing:
-            problems.append("brak pomiarów: " + ", ".join(missing))
-        actionable = [
-            f"{_ISSUE_NAMES.get(item.get('code'), item.get('code'))} ({item.get('source')})"
-            for item in entry.get("categorized_issues", ())
-            if item.get("category") in {"blocking", "uncertainty"} and item.get("code")
-        ]
-        if actionable:
-            problems.append("problem danych: " + ", ".join(actionable[:5]))
-        elif not entry.get("categorized_issues"):
-            issues = entry.get("issue_codes") or []
-            if issues:
-                problems.append(
-                    "kody danych: "
-                    + ", ".join(_ISSUE_NAMES.get(i, i) for i in issues[:5])
-                )
-        if entry.get("planning_status") == "blocked":
-            problems.append("planer: " + _reason(entry.get("planning_reason")))
-        if entry.get("attempted_command"):
-            problems.append(
-                "nieudany zapis: " + _setting_change(entry["attempted_command"])
-            )
-        completed = entry.get("completed_commands") or []
-        if completed:
-            problems.append(f"wcześniej potwierdzone nastawy: {len(completed)}")
-        suffix = "ARM zachowany, nowe zapisy wstrzymane."
-        if entry.get("phase") == "device_write_result_uncertain":
-            suffix = "Wymagana kontrola nastaw; dalsze polecenia zatrzymane."
-        return (
-            f"Blokada wykonawcy dla kwadransa {quarter}. "
-            + _reason(reason)
-            + (" Szczegóły: " + "; ".join(problems) + "." if problems else "")
-            + " "
-            + suffix
+            "Nie mogę jeszcze potwierdzić zmiany nastawy. "
+            "Sprawdzę ją ponownie i automatycznie wznowię aktualny plan."
         )
     if event == "recovered":
-        return (
-            "Wznowiono wykonywanie planu: pomiary poprawne, plan dostępny, ARM aktywny."
-        )
+        return "Sterowanie wznowione. Realizuję aktualny plan."
+    if event == "armed":
+        return "Sterowanie automatyczne włączone."
+    if event == "manual_stop":
+        return "Sterowanie automatyczne wyłączone ręcznie."
+    if event == "stop":
+        return "Sterowanie automatyczne zatrzymane."
+    if event == "waiting":
+        return "Oczekuję na kolejny kwadrans."
+    if event == "blocked":
+        return "Wstrzymuję zmianę nastaw: " + _reason(reason)
     if event in {"halted", "failure"}:
-        attempted = entry.get("attempted_command")
-        completed = entry.get("completed_commands") or []
-        return (
-            "Zatrzymano sterowanie po błędzie zapisu. "
-            + _reason(reason)
-            + (
-                f" Niepotwierdzona operacja: {_setting_change(attempted)}."
-                if attempted
-                else ""
-            )
-            + (
-                f" Wcześniejsze potwierdzone zmiany: {len(completed)}."
-                if completed
-                else ""
-            )
-            + " Stan: recovery_required; ARM wyłączony."
-        )
+        return "Sterowanie wstrzymane: " + _reason(reason)
     if event == "plan_status":
-        previous = entry.get("previous_planning_status")
-        current = entry.get("planning_status")
-        parts = [f"Planer: {previous or 'start'} → {current or 'brak statusu'}."]
-        if current == "blocked":
-            parts.append("Przyczyna: " + _reason(reason))
-            parts.append("Nowy plan nie został utworzony.")
-        elif current == "preview":
-            parts.append(
-                f"Plan dostępny, pokrycie: {entry.get('coverage') or 'nieznane'}."
-            )
-        return " ".join(parts)
+        if entry.get("planning_status") == "preview":
+            return "Aktualny plan jest gotowy."
+        return "Nie mogę przygotować planu: " + _reason(reason)
     if event == "input_quality":
-        quality = entry.get("quality")
-        previous = entry.get("previous_quality")
-        parts = [
-            f"Dane wejściowe: {previous or 'start'} → {quality or 'brak statusu'}."
-        ]
-        actionable = [
-            f"{_ISSUE_NAMES.get(item.get('code'), item.get('code'))} ({item.get('source')})"
-            for item in entry.get("categorized_issues", ())
-            if item.get("category") in {"blocking", "uncertainty"}
-        ]
-        if actionable:
-            parts.append("Przyczyny: " + ", ".join(actionable[:5]) + ".")
-        elif quality == "valid":
-            parts.append("Wymagane pomiary poprawne.")
-        return " ".join(parts)
-    return "Energy Co-Pilot: odnotowano zdarzenie sterownika. " + _reason(reason)
+        if entry.get("quality") == "valid":
+            return "Pomiary są dostępne."
+        return "Oczekuję na poprawne pomiary."
+    return "Zmieniono stan sterowania: " + _reason(reason)
 
 
 class DecisionJournal:
@@ -674,6 +522,12 @@ class DecisionJournal:
                 event == "input_quality"
                 and entry.get("previous_quality") == entry.get("quality") == "valid"
             ):
+                publish = False
+            if event == "revised" and (
+                entry.get("previous_plan") or {}
+            ).get("action") == entry.get("action"):
+                publish = False
+            if event == "applied" and entry.get("commands_sent") == 0:
                 publish = False
             if publish:
                 registry = er.async_get(self.hass)
