@@ -214,6 +214,7 @@ def test_unpublished_terminal_price_cannot_force_a_full_battery():
 
 def test_micro_charge_filter_distinguishes_elimination_from_relocation():
     """A small cost difference between hours is NOT a new charging campaign."""
+
     def dispatch(amount):
         return SimpleNamespace(grid_to_battery_ac_kwh=amount)
 
@@ -221,9 +222,7 @@ def test_micro_charge_filter_distinguishes_elimination_from_relocation():
     shifted = tuple(dispatch(x) for x in (0.0, 0.0, 0.65, 0.70))
     eliminated = tuple(dispatch(x) for x in (0.0, 0.0, 0.65, 0.0))
     partially_shifted = tuple(dispatch(x) for x in (0.0, 0.0, 0.85, 0.0))
-    assert _relocated_grid_charge_ac_kwh(original, shifted, [1]) == pytest.approx(
-        0.70
-    )
+    assert _relocated_grid_charge_ac_kwh(original, shifted, [1]) == pytest.approx(0.70)
     assert _relocated_grid_charge_ac_kwh(original, eliminated, [1]) == 0
     assert _relocated_grid_charge_ac_kwh(
         original, partially_shifted, [1]
