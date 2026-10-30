@@ -1,7 +1,7 @@
 """M6 Deye Home Assistant command adapter.
 
-Single-change supervised building block. Not wired to config flow or the planner:
-no automatic inverter writes until TOU feasibility and recovery are validated.
+HA state readback and strict write policy. Unknown outcomes are reconciled by
+an independent automatic executor from a fresh plan; never retry here.
 """
 
 import asyncio
@@ -61,23 +61,31 @@ class DeyeCommandAdapter:
             raise CommandRejected("device:entity_unavailable")
         return state
 
+    # These are HA state-cache reads, not device polling. Read only one
+    # affected entity once per two seconds for at most 30 seconds. On a
+    # delayed HA update, an uncertain readback is NOT proof of failed write.
+    CONFIRM_INTERVAL_SECONDS = 2
+    CONFIRM_ATTEMPTS = 16
+
     async def _confirm_number(self, entity_id: str, value: float):
-        for _ in range(40):
+        for attempt in range(self.CONFIRM_ATTEMPTS):
             state = self._present(entity_id)
             try:
                 if abs(float(state.state) - value) < 1e-6:
                     return
-            except ValueError:
+            except (ValueError, TypeError):
                 pass
-            await asyncio.sleep(0.25)
+            if attempt + 1 < self.CONFIRM_ATTEMPTS:
+                await asyncio.sleep(self.CONFIRM_INTERVAL_SECONDS)
         raise CommandRejected("device:write_unconfirmed")
 
     async def _confirm_switch(self, entity_id: str, value: bool):
         expected = "on" if value else "off"
-        for _ in range(40):
+        for attempt in range(self.CONFIRM_ATTEMPTS):
             if self._present(entity_id).state == expected:
                 return
-            await asyncio.sleep(0.25)
+            if attempt + 1 < self.CONFIRM_ATTEMPTS:
+                await asyncio.sleep(self.CONFIRM_INTERVAL_SECONDS)
         raise CommandRejected("device:write_unconfirmed")
 
     def quantize_number(self, entity_id: str, value: float, *, direction="down"):
