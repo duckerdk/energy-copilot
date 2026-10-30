@@ -16,6 +16,9 @@ from custom_components.energy_copilot.planner import (
 )
 from custom_components.energy_copilot.planning_preview import _terminal_proxy
 from custom_components.energy_copilot.replay import build_replay, simulate_replay
+from custom_components.energy_copilot.robust_strategy import (
+    _relocated_grid_charge_ac_kwh,
+)
 from custom_components.energy_copilot.tou_projection import validate_tou_projection
 
 START = datetime(2026, 10, 30, 0, 0, tzinfo=UTC)
@@ -207,3 +210,71 @@ def test_unpublished_terminal_price_cannot_force_a_full_battery():
     # insufficient to justify buying now to end the horizon at 100%.
     result = optimize_horizon(plant, q, terminal_value_override=price)
     assert result.candidate.final_soc_pct < 99
+
+
+def test_micro_charge_filter_distinguishes_elimination_from_relocation():
+    """A small cost difference between hours is NOT a new charging campaign."""
+    def dispatch(amount):
+        return SimpleNamespace(grid_to_battery_ac_kwh=amount)
+
+    original = tuple(dispatch(x) for x in (0.0, 0.70, 0.65, 0.0))
+    shifted = tuple(dispatch(x) for x in (0.0, 0.0, 0.65, 0.70))
+    eliminated = tuple(dispatch(x) for x in (0.0, 0.0, 0.65, 0.0))
+    partially_shifted = tuple(dispatch(x) for x in (0.0, 0.0, 0.85, 0.0))
+    assert _relocated_grid_charge_ac_kwh(original, shifted, [1]) == pytest.approx(
+        0.70
+    )
+    assert _relocated_grid_charge_ac_kwh(original, eliminated, [1]) == 0
+    assert _relocated_grid_charge_ac_kwh(
+        original, partially_shifted, [1]
+    ) == pytest.approx(0.20)
+
+
+def test_v2_prefers_cheapest_charge_hour_when_adjacent_hour_is_similarly_priced():
+    """Regression: removal of a cheap hour must not move its purchase later.
+
+    Synthetic prices deliberately differ by less than the 0.10 DKK campaign
+    threshold for a full hour of charging; evening demand requires charging.
+    """
+    plant = _plant(soc=63)
+    rows = []
+    start = datetime(2026, 10, 30, 9, 0, tzinfo=UTC)
+    for i in range(56):
+        at = start + timedelta(minutes=15 * i)
+        hour = (at.hour + 1) % 24
+        if hour == 12:
+            buy = 2.47
+        elif hour == 13:
+            buy = 2.495
+        elif hour == 11:
+            buy = 2.505
+        elif 16 <= hour < 21:
+            buy = 4.40
+        else:
+            buy = 3.20
+        rows.append(
+            Quarter(
+                at,
+                at + timedelta(minutes=15),
+                buy,
+                buy - 0.48,
+                0.05 if 10 <= hour < 16 else 0.0,
+                0.40 if 16 <= hour < 21 else 0.25,
+                True,
+            )
+        )
+    quarters = tuple(rows)
+    result = optimize_horizon(
+        plant,
+        quarters,
+        terminal_value_override=0.0,
+        load_risk_accuracy=LOAD_RISK,
+    )
+    cheapest_ac = _charge_in_hours(result, quarters, {12})
+    next_ac = _charge_in_hours(result, quarters, {13})
+    # If the later, dearer hour is needed, the cheapest hour must first
+    # be filled near its 50 A technical capacity (~2.8 kWh per hour).
+    assert next_ac > 0.1
+    assert cheapest_ac > 2.2
+    verified = simulate_candidate(plant, quarters, result.dispatches)
+    assert verified.objective_dkk == pytest.approx(result.candidate.objective_dkk)
