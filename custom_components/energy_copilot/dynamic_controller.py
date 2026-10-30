@@ -360,9 +360,7 @@ class DynamicDeyeController:
                     # before any new command. A previously successful write
                     # can already be visible; do not blindly replay it.
                     if self.recovery_failed_command is not None:
-                        self.adapter._present(
-                            self.recovery_failed_command["entity_id"]
-                        )
+                        self.adapter._present(self.recovery_failed_command["entity_id"])
                     for entity in (
                         TIME_OF_USE,
                         GRID_CHARGE,
@@ -504,10 +502,7 @@ class DynamicDeyeController:
                     # update once. A fresh discharge decision always sets 20.
                     observed_floor = float(self.adapter._present(slot["soc"]).state)
                     requested_hold = ceil(soc_pct)
-                    if (
-                        observed_floor >= soc_pct
-                        or soc_pct - observed_floor < 2.0
-                    ):
+                    if observed_floor >= soc_pct or soc_pct - observed_floor < 2.0:
                         target_soc = observed_floor
                     else:
                         target_soc = requested_hold
