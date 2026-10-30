@@ -163,6 +163,7 @@ async def test_failed_write_recovers_from_fresh_plan_without_disarming():
     assert float(service.states.get(tou_entities(4)["soc"]).state) == 20.0
     assert service.states.get(GRID_CHARGE).state == "off"
 
+
 @pytest.mark.asyncio
 async def test_discharge_rejected_at_minimum_soc():
     now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
@@ -700,7 +701,6 @@ async def test_live_soc_revision_releases_discharge_immediately_in_active_quarte
     assert float(service.states.get(slot["soc"]).state) == 20.0
     assert controller.target_tou_soc == 20
     assert controller.last_plan_start == now.replace(minute=0).isoformat()
-
 
 
 @pytest.mark.asyncio
