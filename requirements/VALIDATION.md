@@ -62,10 +62,16 @@
 | EXP-02 | zgoda wygasła / limit energii przekroczony / brak niezależnego stopu | Zablokuj eksport baterii |
 | EXE-01 | sukces HA API, brak dowodu skutku | `applied`, nie `confirmed` |
 | EXE-02 | restart z utrwalonymi nastawami | Odczyt, nowy plan, bez odtwarzania starej komendy |
-| LOG-01 | plan `idle`/`blocked` i porównanie alternatyw | Dziennik z cenami, czasem, kosztami, powodem i wersją planu |
+| LOG-01 | decyzje `idle`/`blocked` i porównanie alternatyw | Prosta Aktywność HA; szczegóły cen, czasu, kosztów i wersji planu w audycie technicznym |
 | ARM-01 | restart integracji w trybie `automatic` | ARM domyślnie włączony; brak starych komend |
 | ARM-02 | przejściowy `Degraded` lub `Blocked`, potem `Valid` + `Preview` | brak nowych zapisów podczas przerwy, ARM zachowany, automatyczne wznowienie |
-| ARM-03 | awaria HA API w trakcie zapisu | `recovery_required`; bez ślepego retry |
+| ARM-03 | HA potwierdza zmianę nastawy dopiero po kilku sekundach | Jedna zmieniana encja odczytywana co 2 s, najwyżej 30 s; brak ponownego zapisu przy opóźnionym potwierdzeniu |
+| ARM-04 | zapis faktycznie przyjęty, ale readback początkowo niepotwierdzony | ARM pozostaje aktywny, `recovering`, nowy odczyt i aktualny plan bez powtarzania starej wartości |
+| ARM-05 | niedostępny HA API / wielokrotny brak potwierdzenia | Ograniczone próby co 30, 60, 120, 240, maks. 300 sekund; brak lawiny zapisów i trwałego rozbrojenia |
+| ARM-06 | ręczny STOP w trakcie recovery | Wszystkie automatyczne ponowienia zatrzymane |
+| ARM-07 | SOC rośnie o mniej niż 2 pp podczas decyzji o zachowaniu baterii | Brak kosmetycznych zapisów SOC; przejście na rozładowanie natychmiast ustawia 20% |
+| LOG-03 | ładowanie 2,11, przyszła cena 3,89; sprzedaż PV 3,50 | Krótkie zrozumiałe zdania z cenami; bez DKK/kWh, wag, nazw strategii, niepotwierdzonych kwot oszczędności |
+| LOG-04 | wiele zmian prognozowanych Wh przy tym samym działaniu | Brak zalewu Aktywności HA; pełny surowy dziennik techniczny zachowany w diagnostyce |
 | LOG-02 | restart HA oraz upływ 30 dni | zachowanie decyzji, przyczyn i kosztów do limitu 6000; retencja |
 
 ## Backtest i wiarygodność oszczędności
