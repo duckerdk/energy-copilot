@@ -195,8 +195,7 @@ def test_charge_with_future_discharge_shows_price_comparison():
         }
     )
     assert message == (
-        "Ładuję baterię (0,50) po 1,00, żeby wykorzystać ją "
-        "w droższym okresie (3,50)."
+        "Ładuję baterię (0,50) po 1,00, żeby wykorzystać ją w droższym okresie (3,50)."
     )
 
 
@@ -542,7 +541,6 @@ def test_charge_current_change_explains_why_not_just_values():
     assert message == "Zastosowałem aktualny plan. Nastawy zostały sprawdzone."
 
 
-
 @pytest.mark.asyncio
 async def test_activity_revision_noise_suppressed_but_full_raw_event_kept(hass):
     journal = DecisionJournal(hass, "quiet-revisions")
@@ -577,7 +575,10 @@ async def test_activity_revision_noise_suppressed_but_full_raw_event_kept(hass):
 def test_activity_prices_are_short_and_no_fake_economic_savings():
     for action, expected in (
         ("grid_import", "Kupuję teraz po 2,11; zachowuję baterię na później (3,89)."),
-        ("grid_charge", "Ładuję baterię (0,50) po 2,11, żeby wykorzystać ją w droższym okresie (3,89)."),
+        (
+            "grid_charge",
+            "Ładuję baterię (0,50) po 2,11, żeby wykorzystać ją w droższym okresie (3,89).",
+        ),
         ("pv_sell", "Sprzedaję nadwyżkę ze słońca po 3,50."),
     ):
         payload = {
