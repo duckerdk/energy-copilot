@@ -10,6 +10,7 @@ from custom_components.energy_copilot.deye_commands import (
     GRID_CHARGE,
     GRID_CURRENT,
     SOLAR_SELL,
+    CommandRejected,
     TIME_OF_USE,
     tou_entities,
 )
@@ -134,19 +135,32 @@ async def test_dynamic_controller_executes_one_quarter_once():
 
 
 @pytest.mark.asyncio
-async def test_dynamic_controller_failure_latches_stop():
-    now = datetime(2026, 10, 27, 12, 0, tzinfo=timezone.utc)
+async def test_failed_write_recovers_from_fresh_plan_without_disarming():
+    now = datetime(2026, 10, 27, 12, tzinfo=timezone.utc)
     controller, service = setup_controller(fail_on=GRID_CHARGE)
     controller.arm()
-    result = await controller.apply(preview(now), now, soc_pct=50, voltage_v=51)
-    assert result == "recovery_required"
-    assert controller.halted
-    assert not controller.armed
-    count = len(service.calls)
-    assert await controller.apply(preview(now), now, soc_pct=50, voltage_v=51) == (
-        "recovery_required"
+    first = preview(now)
+    assert await controller.apply(first, now, soc_pct=50, voltage_v=51) == (
+        "recovering"
     )
+    assert controller.armed
+    assert not controller.halted
+    assert controller.recovery_attempts == 1
+    count = len(service.calls)
+    assert await controller.apply(
+        first, now + timedelta(seconds=10), soc_pct=50, voltage_v=51
+    ) == "recovering"
     assert len(service.calls) == count
+    # The old charge has been cancelled: only the NEW live dispatch is valid.
+    service.fail_on = None
+    fresh = preview(now, charge=0.0, discharge=0.1, grid_a=0)
+    assert await controller.apply(
+        fresh, now + timedelta(seconds=31), soc_pct=80, voltage_v=51
+    ) == "applied"
+    assert controller.recovery_attempts == 0
+    assert controller.armed
+    assert float(service.states.get(tou_entities(4)["soc"]).state) == 20.0
+    assert service.states.get(GRID_CHARGE).state == "off"
 
 
 @pytest.mark.asyncio
@@ -434,16 +448,16 @@ async def test_partial_write_failure_logs_confirmed_and_uncertain_commands():
     controller.journal = Journal()
     controller.arm()
     assert await controller.apply(preview(now), now, soc_pct=50, voltage_v=51) == (
-        "recovery_required"
+        "recovering"
     )
-    halted = [event for event in events if event["event"] == "halted"]
-    assert len(halted) == 1
-    assert halted[0]["attempted_command"]["entity_id"] == SOLAR_SELL
-    assert halted[0]["attempted_command"]["before"] == "off"
-    assert halted[0]["attempted_command"]["after"] == "on"
-    assert halted[0]["completed_commands"]
-    assert not controller.armed
-    assert controller.halted
+    recovery = [event for event in events if event["event"] == "recovering"]
+    assert len(recovery) == 1
+    assert recovery[0]["attempted_command"]["entity_id"] == SOLAR_SELL
+    assert recovery[0]["attempted_command"]["before"] == "off"
+    assert recovery[0]["attempted_command"]["after"] == "on"
+    assert recovery[0]["completed_commands"]
+    assert controller.armed
+    assert not controller.halted
     assert any(call[2]["entity_id"] == SOLAR_SELL for call in service.calls)
 
 
@@ -686,3 +700,89 @@ async def test_live_soc_revision_releases_discharge_immediately_in_active_quarte
     assert float(service.states.get(slot["soc"]).state) == 20.0
     assert controller.target_tou_soc == 20
     assert controller.last_plan_start == now.replace(minute=0).isoformat()
+
+
+
+@pytest.mark.asyncio
+async def test_uncertain_write_already_applied_is_reconciled_not_replayed():
+    now = datetime(2026, 10, 30, 3, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    controller.arm()
+    original = controller.adapter.set_number
+    attempts = 0
+
+    async def written_but_no_readback(entity, value):
+        nonlocal attempts
+        await original(entity, value)  # Fake inverter accepts the command.
+        attempts += 1
+        if attempts == 1:
+            raise CommandRejected("device:write_unconfirmed")
+
+    controller.adapter.set_number = written_but_no_readback
+    old = preview(now, charge=0, discharge=0, grid_a=0)
+    assert await controller.apply(old, now, soc_pct=78, voltage_v=53) == (
+        "recovering"
+    )
+    slot = tou_entities(1)["soc"]
+    assert service.states.get(slot).state == "78.0"
+    assert controller.armed
+    # The next fresh plan wants discharge. Do not replay the 78% instruction.
+    controller.adapter.set_number = original
+    plan = preview(now, charge=0, discharge=0.25, grid_a=0)
+    assert await controller.apply(
+        plan, now + timedelta(seconds=31), soc_pct=75, voltage_v=53
+    ) == "applied"
+    assert service.states.get(slot).state == "20.0"
+    assert any(
+        e == slot and v == 20.0
+        for _, _, data in service.calls
+        for e, v in [(data["entity_id"], data.get("value"))]
+    )
+
+
+@pytest.mark.asyncio
+async def test_recovery_backoff_is_bounded_and_stop_cancels_retries():
+    now = datetime(2026, 10, 27, 12, tzinfo=timezone.utc)
+    controller, service = setup_controller(fail_on=GRID_CHARGE)
+    controller.arm()
+    plan = preview(now)
+    assert await controller.apply(plan, now, soc_pct=50, voltage_v=51) == (
+        "recovering"
+    )
+    assert await controller.apply(
+        plan, now + timedelta(seconds=31), soc_pct=50, voltage_v=51
+    ) == "recovering"
+    assert controller.recovery_attempts == 2
+    count = len(service.calls)
+    assert await controller.apply(
+        plan, now + timedelta(seconds=60), soc_pct=50, voltage_v=51
+    ) == "recovering"
+    assert len(service.calls) == count
+    controller.stop(manual=True)
+    service.fail_on = None
+    assert await controller.apply(
+        plan, now + timedelta(minutes=5), soc_pct=50, voltage_v=51
+    ) == "stopped"
+    assert not controller.armed
+    assert controller.recovery_next_at is None
+
+
+@pytest.mark.asyncio
+async def test_preserve_soc_does_not_write_for_sub_two_percent_fluctuations():
+    now = datetime(2026, 10, 27, 12, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    controller.arm()
+    plan = preview(now, charge=0, discharge=0, grid_a=0)
+    assert await controller.apply(plan, now, soc_pct=70, voltage_v=53) == "applied"
+    target = tou_entities(4)["soc"]
+    count = len(service.calls)
+    for minute, soc in [(1, 69.8), (2, 70.4), (3, 71.1)]:
+        assert await controller.apply(
+            plan, now + timedelta(minutes=minute), soc_pct=soc, voltage_v=53
+        ) == "applied"
+    assert float(service.states.get(target).state) == 70
+    assert len(service.calls) == count
+    assert await controller.apply(
+        plan, now + timedelta(minutes=4), soc_pct=72.3, voltage_v=53
+    ) == "applied"
+    assert float(service.states.get(target).state) == 73
