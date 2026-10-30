@@ -151,6 +151,9 @@ class DynamicDeyeController:
         elif pv_charge > 1e-7:
             action = "pv_charge"
             reason = "optimizer_selected_pv_storage"
+        elif row.get("grid_export_kwh", 0) > 1e-7:
+            action = "pv_sell"
+            reason = "optimizer_selected_pv_surplus_sale"
         elif row.get("grid_import_kwh", 0) > 1e-7:
             action = "grid_import"
             reason = "optimizer_selected_grid_import_preserving_battery"
@@ -194,6 +197,7 @@ class DynamicDeyeController:
             "battery_discharge_dc_kwh": discharge,
             "pv_charge_dc_kwh": pv_charge,
             "planned_grid_import_kwh": row.get("grid_import_kwh"),
+            "planned_grid_export_kwh": row.get("grid_export_kwh"),
             "grid_charge_current_a": row.get("grid_charge_current_a"),
             "purchase_cost_dkk": row.get("purchase_dkk"),
             "degradation_cost_dkk": row.get("degradation_dkk"),
@@ -268,6 +272,9 @@ class DynamicDeyeController:
         was_armed = self.armed
         self.armed = False
         self._pending_quarter = None
+        self.recovery_next_at = None
+        self.recovery_attempts = 0
+        self.recovery_failed_command = None
         self.status = "stopped"
         if manual:
             self.reason = "controller:manual_stop"
@@ -437,15 +444,9 @@ class DynamicDeyeController:
                     self.reason = reason
                     return self.status
                 decision = self._decision(preview, row, now, soc_pct)
-                decision_key = (
-                    logical_quarter,
-                    decision["action"],
-                    charge,
-                    discharge,
-                    grid_a,
-                    decision["buy_dkk_per_kwh"],
-                    decision["sell_dkk_per_kwh"],
-                )
+                # Replanning continuously changes energy quantities. Only an
+                # actual change of action or quarter warrants new HA Activity.
+                decision_key = (logical_quarter, decision["action"])
                 if decision_key != self._last_decision_key:
                     self._last_decision_key = decision_key
                     self._audit("decision", **decision)
