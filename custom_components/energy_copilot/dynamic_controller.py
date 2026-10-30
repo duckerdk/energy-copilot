@@ -506,7 +506,7 @@ class DynamicDeyeController:
                     requested_hold = ceil(soc_pct)
                     if (
                         observed_floor >= soc_pct
-                        or requested_hold - observed_floor < 2.0
+                        or soc_pct - observed_floor < 2.0
                     ):
                         target_soc = observed_floor
                     else:
