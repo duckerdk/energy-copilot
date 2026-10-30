@@ -40,11 +40,16 @@ Wymagany Home Assistant **2026.10 lub nowszy** (testowany Core 2026.10.2, Python
 
 Alternatywne ręczne kopiowanie `custom_components/energy_copilot` nie zapewnia `BUILD_INFO.json` ani gwarantowanego pochodzenia wydania. Nie trzeba zmieniać ESPHome, Modbus lub ustawień falownika.
 
+**Rollback 2.0.2 → 2.0.1:** HACS pozwala wybrać wcześniejsze wydanie. Po instalacji uruchom ponownie HA. Wydanie 2.0.1 pozostaje nienaruszone.
+
 **Rollback 2.0.1 → 2.0.0 lub 1.16.19:** obie starsze wersje zachowują własne, niezmienione tagi i paczki. W HACS wybierz poprzednią wersję, uruchom ponownie HA i sprawdź `installed_build.tag` w diagnostyce.
 
 **Rollback 2.0.0 → 1.16.19:** wersja `v1.16.19` pozostaje osobnym, niezmienionym [GitHub Release](https://github.com/duckerdk/energy-copilot/releases/tag/v1.16.19), z własną paczką i sumami kontrolnymi. W HACS otwórz integrację Energy Co-Pilot, wybierz ponowne pobranie i wersję `1.16.19`, uruchom ponownie HA i zweryfikuj tag oraz sumę w diagnostyce. Nie przesuwać ani nie nadpisywać istniejących tagów.
 
 ## Planowanie w HA
+
+**2.0.2 — automatyczne odzyskiwanie sterowania:** zapisy są sprawdzane w jednej encji HA co 2 s, maksymalnie przez 30 s. Po niepewnym zapisie ARM pozostaje aktywny, a wykonawca porównuje aktualne nastawy z **nowym** planem po opóźnieniu 30–300 s. Ręczny STOP ma pierwszeństwo. Drobne różnice SOC nie generują serii zapisów. Aktywność HA pokazuje krótkie polskie komunikaty z cenami, np. „Ładuję baterię po 2,11 na droższy okres (3,89)”. Pełne szczegóły zostają w diagnostyce. Potwierdzenie encji HA nie zastępuje niezależnej weryfikacji pracy falownika.
+
 
 **2.0.1 — korekta bieżącego SOC i rozładowania:** Home Assistant przelicza plan od ostatniego odczytu SOC, także dla **pozostałej części aktualnego kwadransa**. Najbliższe przedziały uwzględniają zanikającą korektę prognoz z pomiarów W PV i domu; po zmianie decyzji `battery_discharge` wykonawca ustawia aktywny próg TOU **20%**, nie prognozowany SOC na koniec kwadransa. Wycenianie niepewnego dodatkowego poboru nie karze nominalnego zużycia baterii — liczy koszt rzeczywiście brakującej energii według godzin jej importu. Nie jest to gwarancja fizycznej realizacji przepływów, a działanie na realnym Deye wymaga weryfikacji.
 
