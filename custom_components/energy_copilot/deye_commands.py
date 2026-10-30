@@ -73,7 +73,7 @@ class DeyeCommandAdapter:
             try:
                 if abs(float(state.state) - value) < 1e-6:
                     return
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 pass
             if attempt + 1 < self.CONFIRM_ATTEMPTS:
                 await asyncio.sleep(self.CONFIRM_INTERVAL_SECONDS)
