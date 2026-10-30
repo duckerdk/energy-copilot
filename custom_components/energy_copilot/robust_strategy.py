@@ -253,7 +253,6 @@ def _charge_groups(quarters, dispatches):
     return groups
 
 
-
 def _relocated_grid_charge_ac_kwh(before, after, excluded_group):
     """Measure purchases moved to other quarters, not eliminated by a veto.
 
@@ -267,6 +266,7 @@ def _relocated_grid_charge_ac_kwh(before, after, excluded_group):
         for i, (original, proposed) in enumerate(zip(before, after, strict=True))
         if i not in excluded
     )
+
 
 def select_strategy(
     plant,
