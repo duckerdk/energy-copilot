@@ -40,6 +40,8 @@ Wymagany Home Assistant **2026.10 lub nowszy** (testowany Core 2026.10.2, Python
 
 Alternatywne ręczne kopiowanie `custom_components/energy_copilot` nie zapewnia `BUILD_INFO.json` ani gwarantowanego pochodzenia wydania. Nie trzeba zmieniać ESPHome, Modbus lub ustawień falownika.
 
+**Rollback 2.0.3 → 2.0.2:** wybierz w HACS wydanie `2.0.2` i uruchom ponownie Home Assistant; opublikowany tag i paczka `v2.0.2` pozostają niezmienione.
+
 **Rollback 2.0.2 → 2.0.1:** HACS pozwala wybrać wcześniejsze wydanie. Po instalacji uruchom ponownie HA. Wydanie 2.0.1 pozostaje nienaruszone.
 
 **Rollback 2.0.1 → 2.0.0 lub 1.16.19:** obie starsze wersje zachowują własne, niezmienione tagi i paczki. W HACS wybierz poprzednią wersję, uruchom ponownie HA i sprawdź `installed_build.tag` w diagnostyce.
@@ -47,6 +49,9 @@ Alternatywne ręczne kopiowanie `custom_components/energy_copilot` nie zapewnia 
 **Rollback 2.0.0 → 1.16.19:** wersja `v1.16.19` pozostaje osobnym, niezmienionym [GitHub Release](https://github.com/duckerdk/energy-copilot/releases/tag/v1.16.19), z własną paczką i sumami kontrolnymi. W HACS otwórz integrację Energy Co-Pilot, wybierz ponowne pobranie i wersję `1.16.19`, uruchom ponownie HA i zweryfikuj tag oraz sumę w diagnostyce. Nie przesuwać ani nie nadpisywać istniejących tagów.
 
 ## Planowanie w HA
+
+**2.0.3 — poprawiona selekcja godzin zakupu:** próg opłacalności rozpoczęcia nowej kampanii ładowania (0,10 DKK; kontynuacja 0,05 DKK) **nie służy już do przenoszenia takiego samego zakupu na droższe kwadranse**. Filtr usuwa jedynie naprawdę zbędne ładowanie; jeśli ponowne rozwiązanie pełnego horyzontu zastępuje je zakupem w innych godzinach, oryginalne tańsze okno zostaje zachowane. Diagnostyka podaje `charge_relocations_preserved` oraz osobno `minor_charges_rejected`. Wymaga weryfikacji na żywym HA, a plan nie jest dowodem faktycznego przepływu.
+
 
 **2.0.2 — automatyczne odzyskiwanie sterowania:** zapisy są sprawdzane w jednej encji HA co 2 s, maksymalnie przez 30 s. Po niepewnym zapisie ARM pozostaje aktywny, a wykonawca porównuje aktualne nastawy z **nowym** planem po opóźnieniu 30–300 s. Ręczny STOP ma pierwszeństwo. Drobne różnice SOC nie generują serii zapisów. Aktywność HA pokazuje krótkie polskie komunikaty z cenami, np. „Ładuję baterię po 2,11 na droższy okres (3,89)”. Pełne szczegóły zostają w diagnostyce. Potwierdzenie encji HA nie zastępuje niezależnej weryfikacji pracy falownika.
 
