@@ -45,6 +45,11 @@ class DynamicDeyeController:
         self._command_changes = []
         self._attempted_command = None
         self._last_tou_block_quarter = None
+        # A failed HA readback is not proof that the inverter rejected a
+        # write. Keep automatic mode armed; reconcile on the NEXT fresh plan.
+        self.recovery_attempts = 0
+        self.recovery_next_at = None
+        self.recovery_failed_command = None
 
     def _audit(self, event, **details):
         if self.journal is not None:
@@ -274,8 +279,6 @@ class DynamicDeyeController:
             )
 
     def arm(self):
-        if self.halted:
-            raise CommandRejected("controller:recovery_required")
         was_armed = self.armed
         self.armed = True
         self.status = "armed"
@@ -330,11 +333,14 @@ class DynamicDeyeController:
         raise CommandRejected("controller:no_current_or_next_quarter")
 
     async def apply(self, preview, now, *, soc_pct, voltage_v):
-        if not self.armed or self.halted:
+        if not self.armed:
             return self.status
         if self._lock.locked():
             return self.status
+        if self.recovery_next_at is not None and now < self.recovery_next_at:
+            return "recovering"
         async with self._lock:
+            recovering = self.recovery_next_at is not None
             self._write_started = False
             self._command_changes = []
             self._attempted_command = None
@@ -342,6 +348,22 @@ class DynamicDeyeController:
             try:
                 if not all(isfinite(x) for x in (soc_pct, voltage_v)):
                     raise CommandRejected("controller:invalid_measurements")
+                if recovering:
+                    # Read the affected entity and the global operating state
+                    # before any new command. A previously successful write
+                    # can already be visible; do not blindly replay it.
+                    if self.recovery_failed_command is not None:
+                        self.adapter._present(
+                            self.recovery_failed_command["entity_id"]
+                        )
+                    for entity in (
+                        TIME_OF_USE,
+                        GRID_CHARGE,
+                        GRID_CURRENT,
+                        CHARGE_CURRENT,
+                        SOLAR_SELL,
+                    ):
+                        self.adapter._present(entity)
                 if not 20 <= soc_pct <= 100 or voltage_v <= 0:
                     raise CommandRejected("controller:outside_policy")
                 projection = getattr(preview, "tou_feasibility", None)
@@ -475,9 +497,19 @@ class DynamicDeyeController:
                     # every quarter must not ration access to stored energy.
                     target_soc = 20.0
                 else:
-                    # At or below the TOU floor, Deye will preserve the battery.
-                    # Continue following measured SOC as PV raises the charge.
-                    target_soc = ceil(soc_pct)
+                    # Hold SOC without chasing 1% sensor fluctuations. A
+                    # previous floor already at/above the measured SOC
+                    # prevents discharge; if it is lower by >=2 points,
+                    # update once. A fresh discharge decision always sets 20.
+                    observed_floor = float(self.adapter._present(slot["soc"]).state)
+                    requested_hold = ceil(soc_pct)
+                    if (
+                        observed_floor >= soc_pct
+                        or requested_hold - observed_floor < 2.0
+                    ):
+                        target_soc = observed_floor
+                    else:
+                        target_soc = requested_hold
                 target_soc = self.adapter.quantize_number(
                     slot["soc"],
                     float(max(20, min(100, target_soc))),
@@ -610,6 +642,18 @@ class DynamicDeyeController:
                 self.last_plan_start = logical_quarter
                 self.status = "applied"
                 self.reason = None
+                if recovering:
+                    self._audit(
+                        "recovered",
+                        reason="settings_reconciled_with_fresh_plan",
+                        state=self.status,
+                        attempts=self.recovery_attempts,
+                        quarter_start_utc=logical_quarter,
+                    )
+                self.recovery_next_at = None
+                self.recovery_failed_command = None
+                self.recovery_attempts = 0
+                self.halted = False
                 application_key = (
                     logical_quarter,
                     target_soc,
@@ -648,15 +692,22 @@ class DynamicDeyeController:
                     )
             except Exception as exc:
                 self.reason = f"{type(exc).__name__}:{exc}"
-                if self._write_started:
-                    # A partially executed command cannot be retried blindly.
-                    self.halted = True
-                    self.armed = False
-                    self.status = "recovery_required"
-                    event = "halted"
-                    phase = "device_write_result_uncertain"
+                if self._write_started or recovering:
+                    # A service timeout or delayed HA readback is uncertain.
+                    # Do not disarm. Retry only after re-reading device state,
+                    # current SOC and a freshly optimized live quarter.
+                    # Bounded exponential cooldown prevents command storms.
+                    self.recovery_attempts += 1
+                    delay = min(300, 30 * 2 ** min(self.recovery_attempts - 1, 4))
+                    self.recovery_next_at = now + timedelta(seconds=delay)
+                    if self._attempted_command is not None:
+                        self.recovery_failed_command = dict(self._attempted_command)
+                    self.status = "recovering"
+                    self.halted = False
+                    event = "recovering"
+                    phase = "reconcile_after_uncertain_write"
                 else:
-                    # A bad measurement/preview must not permanently disarm.
+                    # A bad measurement/preview blocks only this cycle.
                     self.status = "blocked"
                     event = "blocked"
                     phase = "pre_write_validation"
@@ -666,7 +717,7 @@ class DynamicDeyeController:
                     microsecond=0,
                 ).isoformat()
                 block_fingerprint = (self.reason, quarter)
-                if event == "halted" or block_fingerprint != getattr(
+                if event == "recovering" or block_fingerprint != getattr(
                     self, "_last_block_reason", None
                 ):
                     self._audit(
@@ -677,6 +728,12 @@ class DynamicDeyeController:
                         phase=phase,
                         completed_commands=list(self._command_changes),
                         attempted_command=self._attempted_command,
+                        recovery_attempts=self.recovery_attempts,
+                        retry_after_utc=(
+                            self.recovery_next_at.isoformat()
+                            if self.recovery_next_at is not None
+                            else None
+                        ),
                     )
                 self._last_block_reason = block_fingerprint
             return self.status
