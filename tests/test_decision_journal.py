@@ -86,9 +86,9 @@ async def test_activity_event_is_human_readable_and_explains_plan(hass):
     assert events[0]["name"] == "Energy Co-Pilot"
     assert events[0]["domain"] == "energy_copilot"
     assert events[0]["entity_id"] == "sensor.energy_co_pilot_decision_journal"
-    assert "2,73 DKK/kWh" in events[0]["message"]
-    assert "08:00" in events[0]["message"]
-    assert "Uzasadnienie:" in events[0]["message"]
+    assert "Zasilam dom z sieci po 2,73." in events[0]["message"]
+    assert "DKK/kWh" not in events[0]["message"]
+    assert "Uzasadnienie:" not in events[0]["message"]
     assert "optimizer_selected_" not in events[0]["message"]
     await journal.async_close()
 
@@ -108,9 +108,8 @@ async def test_activity_blocked_and_recovered_are_visible(hass):
     journal.record("recovered", reason="fresh_valid_measurements_and_plan")
     await hass.async_block_till_done()
     assert len(events) == 2
-    assert "brak pomiarów: soc" in events[0]["message"]
-    assert "ARM zachowany" in events[0]["message"]
-    assert "Wznowiono" in events[1]["message"]
+    assert "Wstrzymuję zmianę nastaw" in events[0]["message"]
+    assert "Sterowanie wznowione" in events[1]["message"]
     await journal.async_close()
 
 
@@ -138,9 +137,9 @@ async def test_applied_does_not_claim_physical_confirmation(hass):
         ],
     )
     await hass.async_block_till_done()
-    assert "25 A" in events[0]["message"]
-    assert "Limit ładowania z sieci 0 A → 25 A" in events[0]["message"]
-    assert "potwierdzone odczytem" in events[0]["message"]
+    assert "Zastosowałem aktualny plan" in events[0]["message"]
+    assert journal.entries[-1]["command_changes"][0]["after"] == 25
+    assert journal.entries[-1]["grid_limit_a"] == 25
     assert "przepływu energii" not in events[0]["message"]
     await journal.async_close()
 
@@ -161,11 +160,7 @@ def test_grid_import_has_evidence_not_tautological_justification():
             "later_discharge_buy_dkk_per_kwh": 2.728,
         }
     )
-    assert "08:00" in message
-    assert "08:45" in message
-    assert "0,09 kWh AC" in message
-    assert "Cena późniejszego rozładowania jest taka sama" in message
-    assert "Brak obliczonego kosztu wariantu" in message
+    assert message == "Kupuję teraz po 2,73; zachowuję baterię na później (2,73)."
     assert "minimalizując modelowany koszt" not in message
 
 
@@ -183,11 +178,7 @@ def test_discharge_explains_avoided_purchase_and_degradation():
             "degradation_cost_dkk": 0.08,
         }
     )
-    assert "0,20 kWh DC" in message
-    assert "0,19 kWh AC" in message
-    assert "0,57 DKK" in message
-    assert "0,08 DKK" in message
-    assert "0,49 DKK" in message
+    assert message == "Zasilam dom z baterii (0,19), bo zakup kosztuje teraz 3,00."
     assert "minimalizując modelowany koszt" not in message
 
 
@@ -203,9 +194,10 @@ def test_charge_with_future_discharge_shows_price_comparison():
             "later_discharge_buy_dkk_per_kwh": 3.5,
         }
     )
-    assert "2,50 DKK/kWh" in message
-    assert "17:00" in message
-    assert "przed stratami i degradacją" in message
+    assert message == (
+        "Ładuję baterię (0,50) po 1,00, żeby wykorzystać ją "
+        "w droższym okresie (3,50)."
+    )
 
 
 def test_blocked_event_shows_real_planner_reason_not_historical_noise():
@@ -228,7 +220,7 @@ def test_blocked_event_shows_real_planner_reason_not_historical_noise():
             ],
         }
     )
-    assert "Luka w opublikowanych cenach" in message
+    assert "Wstrzymuję zmianę nastaw" in message
     assert "niepotwierdzona jakość danych historycznych" not in message
 
 
@@ -328,9 +320,9 @@ async def test_activity_planner_state_transition_explains_block(hass):
     )
     await hass.async_block_till_done()
     assert len(events) == 2
-    assert "preview → blocked" in events[0]["message"]
+    assert "Nie mogę przygotować planu" in events[0]["message"]
     assert "Luka w opublikowanych cenach" in events[0]["message"]
-    assert "planer: Luka w opublikowanych cenach" in events[1]["message"]
+    assert "Wstrzymuję zmianę nastaw" in events[1]["message"]
     assert "historycznych" not in events[1]["message"]
     await journal.async_close()
 
@@ -353,12 +345,8 @@ async def test_activity_same_settings_reports_no_commands(hass):
         active_tou_slot=3,
     )
     await hass.async_block_till_done()
-    msg = events[0]["message"]
-    assert "09:15" in msg
-    assert "nie wysłano poleceń" in msg
-    assert "TOU 3" in msg
-    assert "wysłane i odczytane" not in msg
-    assert "przepływu energii" not in msg
+    assert not events
+    assert journal.entries[-1]["commands_sent"] == 0
     await journal.async_close()
 
 
@@ -369,7 +357,7 @@ async def test_activity_failed_write_has_requested_setting_and_safety_state(hass
     hass.bus.async_listen("logbook_entry", lambda event: events.append(event.data))
     await journal.async_load()
     journal.record(
-        "halted",
+        "recovering",
         reason="CommandRejected:device:write_unconfirmed",
         phase="device_write_result_uncertain",
         attempted_command={
@@ -383,10 +371,10 @@ async def test_activity_failed_write_has_requested_setting_and_safety_state(hass
     )
     await hass.async_block_till_done()
     msg = events[0]["message"]
-    assert "Falownik nie potwierdził zmiany nastawy" in msg
-    assert "Nastawa 0 → 100" in msg
-    assert "Wcześniejsze potwierdzone zmiany: 1" in msg
-    assert "ARM wyłączony" in msg
+    assert "Sprawdzę ją ponownie" in msg
+    assert "automatycznie wznowię" in msg
+    assert journal.entries[-1]["attempted_command"]["after"] == 100
+    assert len(journal.entries[-1]["completed_commands"]) == 1
     await journal.async_close()
 
 
@@ -432,9 +420,7 @@ def test_pv_economic_reason_gives_conclusion_without_repeating_input_values():
             "pv_export_enabled": True,
         }
     )
-    assert "Uzasadnienie: Ta akcja obniża koszt całego planu o 0,073 DKK" in message
-    assert "najlepszego wariantu bez magazynowania PV teraz" in message
-    assert "dodatkowo 0,198 DKK" in message
+    assert message == "Magazynuję nadwyżkę ze słońca zamiast sprzedawać po 1,79."
     assert "Dane kwadransa" not in message
     assert "Koszt zakupu w kwadransie: 0,00" not in message
 
@@ -460,11 +446,9 @@ def test_same_quarter_revision_is_delta_not_duplicate_plan():
             "soc_planned_end_pct": 74.1,
         }
     )
-    assert message.startswith("Korekta planu na 11:00:")
-    assert "PV 0,30 kWh → 0,31 kWh" in message
-    assert "ładowanie PV 0,11 kWh → 0,12 kWh" in message
-    assert "SOC końcowy 74,0 % → 74,1 %" in message
-    assert "(po aktualizacji danych)" in message
+    assert message.startswith("Plan zaktualizowany:")
+    assert "Magazynuję nadwyżkę ze słońca" in message
+    assert "0,31" not in message
     assert "Sprzedaż:" not in message
     assert "Uzasadnienie:" not in message
 
@@ -484,9 +468,7 @@ def test_change_of_action_in_revision_includes_new_compared_cost():
             "economic_saving_dkk": 0.041,
         }
     )
-    assert "akcja zasilanie domu z sieci" in message
-    assert "ładowanie baterii z instalacji PV" in message
-    assert "0,041 DKK" in message
+    assert message == "Zmiana planu: Ładuję baterię nadwyżką ze słońca."
 
 
 def test_equal_cost_comparison_does_not_claim_unproved_benefit():
@@ -499,8 +481,8 @@ def test_equal_cost_comparison_does_not_claim_unproved_benefit():
             "economic_saving_dkk": 0.0,
         }
     )
-    assert "praktycznie taki sam koszt" in message
-    assert "nie wykazuje istotnej przewagi" in message
+    assert "Ładuję baterię nadwyżką ze słońca" in message
+    assert "koszt" not in message
 
 
 def test_audit_timeout_never_invents_economic_reason():
@@ -511,8 +493,8 @@ def test_audit_timeout_never_invents_economic_reason():
             "economic_comparison_status": "unavailable",
         }
     )
-    assert "Brak policzonego porównania" in message
-    assert "obniża koszt" not in message
+    assert "Ładuję baterię nadwyżką ze słońca" in message
+    assert "oszczęd" not in message
 
 
 def test_sub_cent_grid_charge_benefit_is_logged_as_immaterial():
@@ -526,8 +508,7 @@ def test_sub_cent_grid_charge_benefit_is_logged_as_immaterial():
             "economic_policy_benefit_dkk": 0.0096,
         }
     )
-    assert "poniżej 0,01 DKK (pomijalna)" in message
-    assert "progu 0,10 DKK" in message
+    assert message == "Zasilam dom z sieci."
 
 
 def test_soc99_grid_charge_rejection_is_explicit_in_plan():
@@ -540,7 +521,7 @@ def test_soc99_grid_charge_rejection_is_explicit_in_plan():
             "economic_policy_reason": "soc_99_satisfies_grid_charge_target",
         }
     )
-    assert "SOC 99% uznano za osiągnięty cel 100%" in message
+    assert message == "Zasilam dom z sieci."
 
 
 def test_charge_current_change_explains_why_not_just_values():
@@ -558,4 +539,61 @@ def test_charge_current_change_explains_why_not_just_values():
             "charging_current_policy": "defer_pv_storage_for_export_then_charge_later",
         }
     )
-    assert "eksport teraz, magazynowanie później" in message
+    assert message == "Zastosowałem aktualny plan. Nastawy zostały sprawdzone."
+
+
+
+@pytest.mark.asyncio
+async def test_activity_revision_noise_suppressed_but_full_raw_event_kept(hass):
+    journal = DecisionJournal(hass, "quiet-revisions")
+    events = []
+    hass.bus.async_listen("logbook_entry", lambda evt: events.append(evt.data))
+    await journal.async_load()
+    original = {"action": "grid_import"}
+    journal.record(
+        "revised",
+        action="grid_import",
+        previous_plan=original,
+        buy_dkk_per_kwh=2.50,
+    )
+    await hass.async_block_till_done()
+    assert not events
+    assert journal.entries[-1]["buy_dkk_per_kwh"] == 2.50
+    journal.record(
+        "revised",
+        action="battery_discharge",
+        previous_plan=original,
+        buy_dkk_per_kwh=3.89,
+        battery_discharge_dc_kwh=0.20,
+        battery_to_ac_efficiency=0.95,
+    )
+    await hass.async_block_till_done()
+    assert len(events) == 1
+    assert "3,89" in events[0]["message"]
+    assert "Zmiana planu" in events[0]["message"]
+    await journal.async_close()
+
+
+def test_activity_prices_are_short_and_no_fake_economic_savings():
+    for action, expected in (
+        ("grid_import", "Kupuję teraz po 2,11; zachowuję baterię na później (3,89)."),
+        ("grid_charge", "Ładuję baterię (0,50) po 2,11, żeby wykorzystać ją w droższym okresie (3,89)."),
+        ("pv_sell", "Sprzedaję nadwyżkę ze słońca po 3,50."),
+    ):
+        payload = {
+            "event": "decision",
+            "action": action,
+            "buy_dkk_per_kwh": 2.11,
+            "sell_dkk_per_kwh": 3.50,
+            "later_discharge_start_utc": "2026-10-30T17:00:00+00:00",
+            "later_discharge_buy_dkk_per_kwh": 3.89,
+            "grid_charge_ac_kwh": 0.50,
+            "robust_strategy": "load_uncertainty_reserve",
+            "robust_risk_reduction_dkk": 0.352,
+        }
+        actual = readable_event(payload)
+        assert actual == expected
+        assert "empiryczn" not in actual
+        assert "Scenariusze" not in actual
+        assert "0,352" not in actual
+        assert "DKK" not in actual
