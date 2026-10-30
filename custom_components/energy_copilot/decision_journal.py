@@ -411,8 +411,10 @@ def _simple_action(entry):
             return f"Magazynuję nadwyżkę ze słońca zamiast sprzedawać po {sell}."
         return "Ładuję baterię nadwyżką ze słońca."
     if action == "pv_sell":
-        return f"Sprzedaję nadwyżkę ze słońca po {sell}." if sell else (
-            "Sprzedaję nadwyżkę energii ze słońca."
+        return (
+            f"Sprzedaję nadwyżkę ze słońca po {sell}."
+            if sell
+            else ("Sprzedaję nadwyżkę energii ze słońca.")
         )
     return "Nie zmieniam teraz pracy baterii."
 
@@ -523,9 +525,9 @@ class DecisionJournal:
                 and entry.get("previous_quality") == entry.get("quality") == "valid"
             ):
                 publish = False
-            if event == "revised" and (
-                entry.get("previous_plan") or {}
-            ).get("action") == entry.get("action"):
+            if event == "revised" and (entry.get("previous_plan") or {}).get(
+                "action"
+            ) == entry.get("action"):
                 publish = False
             if event == "applied" and entry.get("commands_sent") == 0:
                 publish = False
