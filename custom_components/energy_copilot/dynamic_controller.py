@@ -245,6 +245,8 @@ class DynamicDeyeController:
         return tou_entities(point)
 
     async def _set_number_if_changed(self, entity, value):
+        if not self.armed:
+            raise CommandRejected("controller:manual_stop")
         state = self.adapter._present(entity)
         if abs(float(state.state) - value) > 1e-6:
             change = {"entity_id": entity, "before": state.state, "after": value}
@@ -255,6 +257,8 @@ class DynamicDeyeController:
             self._attempted_command = None
 
     async def _set_switch_if_changed(self, entity, enabled):
+        if not self.armed:
+            raise CommandRejected("controller:manual_stop")
         state = self.adapter._present(entity)
         if state.state != ("on" if enabled else "off"):
             change = {
@@ -687,6 +691,11 @@ class DynamicDeyeController:
                         commands_sent=len(self._command_changes),
                     )
             except Exception as exc:
+                # A manual STOP during an awaited HA service/readback must
+                # never be turned into an automatic retry or a further write.
+                if not self.armed:
+                    self.status = "stopped"
+                    return self.status
                 self.reason = f"{type(exc).__name__}:{exc}"
                 if self._write_started or recovering:
                     # A service timeout or delayed HA readback is uncertain.
