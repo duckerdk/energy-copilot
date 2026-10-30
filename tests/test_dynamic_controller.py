@@ -630,7 +630,9 @@ async def test_soc_99_without_grid_plan_disables_stale_grid_charge():
     )
     assert service.states.get(GRID_CHARGE).state == "off"
     assert service.states.get(slot["grid_charge"]).state == "off"
-    assert service.states.get(slot["soc"]).state == "99.0"
+    # Existing 100% floor already preserves 99% SOC, so avoid a needless write.
+    assert service.states.get(slot["soc"]).state == "100"
+    assert not any(call[2]["entity_id"] == slot["soc"] for call in service.calls)
 
 
 @pytest.mark.asyncio
