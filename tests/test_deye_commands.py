@@ -1,6 +1,7 @@
 """Deye execution boundary: explicit allowlists and confirmed reads."""
 
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -81,8 +82,40 @@ async def test_number_write_policy_and_readback():
 @pytest.mark.asyncio
 async def test_unconfirmed_write_does_not_retry():
     device, services = adapter(acknowledge=False)
-    with pytest.raises(CommandRejected, match="write_unconfirmed"):
-        await device.set_switch(GRID_CHARGE, True)
+    with patch(
+        "custom_components.energy_copilot.deye_commands.asyncio.sleep",
+        new_callable=AsyncMock,
+    ) as pause:
+        with pytest.raises(CommandRejected, match="write_unconfirmed"):
+            await device.set_switch(GRID_CHARGE, True)
+    assert len(services.calls) == 1
+    # 16 HA-cache reads spaced 2 seconds apart, not 40 reads at 4 Hz.
+    assert pause.await_count == 15
+    assert all(call.args == (2,) for call in pause.await_args_list)
+
+
+@pytest.mark.asyncio
+async def test_delayed_home_assistant_readback_is_accepted_without_second_write():
+    device, services = adapter(acknowledge=False)
+    observed = 0
+
+    async def advance(seconds):
+        nonlocal observed
+        assert seconds == 2
+        observed += 1
+        if observed == 3:
+            item = services.states.values[GRID_CHARGE]
+            services.states.values[GRID_CHARGE] = SimpleNamespace(
+                state="on", attributes=item.attributes
+            )
+
+    with patch(
+        "custom_components.energy_copilot.deye_commands.asyncio.sleep",
+        side_effect=advance,
+    ):
+        result = await device.set_switch(GRID_CHARGE, True)
+    assert result.confirmed
+    assert observed == 3
     assert len(services.calls) == 1
 
 
