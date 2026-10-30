@@ -791,3 +791,22 @@ async def test_preserve_soc_does_not_write_for_sub_two_percent_fluctuations():
     )
     assert result == "applied"
     assert float(service.states.get(target).state) == 73
+
+
+@pytest.mark.asyncio
+async def test_manual_stop_during_inflight_confirmation_never_resumes_or_writes_more():
+    now = datetime(2026, 10, 27, 12, tzinfo=timezone.utc)
+    controller, service = setup_controller()
+    controller.arm()
+    original = service.async_call
+
+    async def stop_after_first_command(domain, action, data, blocking=False):
+        await original(domain, action, data, blocking)
+        controller.stop(manual=True)
+
+    service.async_call = stop_after_first_command
+    result = await controller.apply(preview(now), now, soc_pct=70, voltage_v=53)
+    assert result == "stopped"
+    assert not controller.armed
+    assert controller.recovery_next_at is None
+    assert len(service.calls) == 1
