@@ -253,6 +253,21 @@ def _charge_groups(quarters, dispatches):
     return groups
 
 
+
+def _relocated_grid_charge_ac_kwh(before, after, excluded_group):
+    """Measure purchases moved to other quarters, not eliminated by a veto.
+
+    The campaign materiality threshold must never turn a small *timing*
+    advantage into permission to buy essentially the same energy at a higher
+    price. Compare all published quarters after a full re-optimization.
+    """
+    excluded = set(excluded_group)
+    return sum(
+        max(0.0, proposed.grid_to_battery_ac_kwh - original.grid_to_battery_ac_kwh)
+        for i, (original, proposed) in enumerate(zip(before, after, strict=True))
+        if i not in excluded
+    )
+
 def select_strategy(
     plant,
     quarters,
@@ -401,6 +416,7 @@ def select_strategy(
     # because it is not in the first quarter. Re-optimize if this entire
     # campaign is forbidden; reject only when its benefit is <10 oere.
     dropped = []
+    preserved_relocations = []
     _, label, chosen, options = picked
     for group in _charge_groups(quarters, chosen.dispatches):
         forbidden = frozenset(options.get("grid_charge_excluded", ())) | frozenset(
@@ -411,6 +427,25 @@ def select_strategy(
         try:
             alternative = optimize_continuous(plant, quarters, **base_args, **changed)
         except InfeasibleCandidate:
+            continue
+        # A cheaper quarter is not an autonomous additional operation when
+        # forbidding it simply makes the solver buy that energy elsewhere.
+        # Only apply the micro-charge threshold to a genuinely eliminated
+        # campaign; do not allow it to select a more expensive time slot.
+        relocated_ac = _relocated_grid_charge_ac_kwh(
+            chosen.dispatches, alternative.dispatches, group
+        )
+        if relocated_ac > 0.001:
+            preserved_relocations.append(
+                {
+                    "start_utc": quarters[group[0]].start.isoformat(),
+                    "energy_ac_kwh": round(
+                        sum(chosen.dispatches[i].grid_to_battery_ac_kwh for i in group),
+                        4,
+                    ),
+                    "relocated_ac_kwh": round(relocated_ac, 4),
+                }
+            )
             continue
         proposed = _score(plant, quarters, alternative, peaks, upside)
         existing = _score(plant, quarters, chosen, peaks, upside)
@@ -484,6 +519,7 @@ def select_strategy(
             max(hard_reserve.values(), default=0), 4
         ),
         "minor_charges_rejected": dropped,
+        "charge_relocations_preserved": preserved_relocations,
         "alternative_scores_dkk": [
             {
                 "strategy": row[1],
