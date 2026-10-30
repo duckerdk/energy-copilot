@@ -52,7 +52,6 @@ Alternatywne ręczne kopiowanie `custom_components/energy_copilot` nie zapewnia 
 
 **2.0.3 — poprawiona selekcja godzin zakupu:** próg opłacalności rozpoczęcia nowej kampanii ładowania (0,10 DKK; kontynuacja 0,05 DKK) **nie służy już do przenoszenia takiego samego zakupu na droższe kwadranse**. Filtr usuwa jedynie naprawdę zbędne ładowanie; jeśli ponowne rozwiązanie pełnego horyzontu zastępuje je zakupem w innych godzinach, oryginalne tańsze okno zostaje zachowane. Diagnostyka podaje `charge_relocations_preserved` oraz osobno `minor_charges_rejected`. Wymaga weryfikacji na żywym HA, a plan nie jest dowodem faktycznego przepływu.
 
-
 **2.0.2 — automatyczne odzyskiwanie sterowania:** zapisy są sprawdzane w jednej encji HA co 2 s, maksymalnie przez 30 s. Po niepewnym zapisie ARM pozostaje aktywny, a wykonawca porównuje aktualne nastawy z **nowym** planem po opóźnieniu 30–300 s. Ręczny STOP ma pierwszeństwo. Drobne różnice SOC nie generują serii zapisów. Aktywność HA pokazuje krótkie polskie komunikaty z cenami, np. „Ładuję baterię po 2,11 na droższy okres (3,89)”. Pełne szczegóły zostają w diagnostyce. Potwierdzenie encji HA nie zastępuje niezależnej weryfikacji pracy falownika.
 
 
