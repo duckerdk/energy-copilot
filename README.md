@@ -11,7 +11,7 @@ Integracja Home Assistant do ekonomicznego sterowania magazynem energii i falown
 3. W **Energy Co-Pilot → Konfiguruj** wybierz `dry_run` (symulacja) albo świadomie aktywuj `automatic` (sterowanie). **Automatic control ARM / STOP** pozwala zatrzymać zapisy.
 4. Po aktualizacji sprawdź w pobranej diagnostyce `installed_version`, `installed_build.tag` i `installed_build.integrity`. Dla oficjalnej paczki oczekiwane jest `payload_matches_build_info`.
 
-Do cofnięcia aktualizacji wybierz wcześniejszą dostępną wersję w HACS, uruchom ponownie HA i zweryfikuj tag. Polityka retencji zakłada **bieżące wydanie i pięć poprzednich**; starsze wydania są przeznaczone do usunięcia po sprawdzeniu punktów rollbacku. Ręczne kopiowanie folderu integracji nie zapewnia metadanych pochodzenia paczki.
+Do cofnięcia aktualizacji wybierz wcześniejszą dostępną wersję w HACS, uruchom ponownie HA i zweryfikuj tag. Repozytorium przechowuje **bieżące wydanie i pięć poprzednich** (obecnie od `v1.16.18` do `v2.0.3`); starsze wydania i tagi zostały usunięte. Ręczne kopiowanie folderu integracji nie zapewnia metadanych pochodzenia paczki.
 
 ## Jak działa
 
