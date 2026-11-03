@@ -19,6 +19,7 @@
 8. Prowadź nadzór nad GitHub Actions **w ramach bieżącego zadania** do sukcesu lub konkretnej, wykazanej blokady. Gdy run się nie powiedzie, odczytaj logi, popraw przyczynę, ponów weryfikację. Nie przerzucaj rutynowego monitorowania na użytkownika i nie deklaruj sukcesu po samym wyzwoleniu runa. Nie obiecuj pracy w tle, jeśli środowisko jej nie obsługuje.
 9. Nigdy nie przenoś istniejącego taga wersji ani nie nadpisuj opublikowanego wydania. Nie wydawaj nowej paczki pod tym samym numerem. Gdy tag istnieje bez wydania, sprawdź **oryginalny commit taga** i wznów proces bez fałszowania historii.
 10. Dokumentacyjne zmiany nie wymagają podnoszenia wersji ani instalacji HACS. Nie publikuj przypadkowego wydania tylko dlatego, że zmieniła się instrukcja.
+   **Retencja wydań:** po weryfikacji nowego Release zachowaj bieżącą wersję i pięć bezpośrednio poprzednich. Starsze Releases wraz z odpowiadającymi im tagami można usuwać, ale tylko po sprawdzeniu dostępności pięciu punktów rollbacku; nigdy nie przesuwaj ani nie nadpisuj zachowanych tagów.
 
 ## Raport końcowy
 11. Podaj commit/PR, zakres zmian, dokładnie wykonane testy i ich wyniki oraz ewentualne ograniczenia. Przy wydaniu podaj **link do GitHub Release** i listę zweryfikowanych aktywów. Jeśli publikacja się nie udała, napisz wprost **NIEGOTOWE**, wskaż wynik workflow i jednoznaczny błąd — bez sugerowania, że merge oznacza gotową wersję.
