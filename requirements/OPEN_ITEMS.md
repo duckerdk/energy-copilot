@@ -1,29 +1,29 @@
 # Otwarte kwestie techniczne
 
-**Stan przeglądu dokumentacji: 29.10.2026, manifest 2.0.2.** To lista prac **niepotwierdzonych jako zakończone na rzeczywistym HA**. Testy CI nie zastępują pomiarów falownika. Decyzje użytkownika: [REQUIREMENTS.md](REQUIREMENTS.md). Wersje i rozwiązane błędy: historia GitHub Releases, nie ten plik.
+Stan: **03.11.2026**, manifest **2.0.3**. Poniższe zadania **nie zostały potwierdzone na rzeczywistym Home Assistant i falowniku**. Testy CI nie zastępują odbioru fizycznego. Zatwierdzone reguły: [REQUIREMENTS](REQUIREMENTS.md). Historia napraw: [GitHub Releases](https://github.com/duckerdk/energy-copilot/releases).
 
-## P0 — bezpieczeństwo i zgodność rzeczywistego sterowania
+## P0 — sterowanie i bezpieczeństwo
 
-- [ ] **Walidacja fizyczna:** porównać bieżący plan SOC/PV/dom/sieć z pomiarami falownika w następujących po sobie kwadransach, również w szczycie cenowym; sprawdzić brak niezamierzonego ograniczenia rozładowania.
-- [ ] **TOU i recovery:** potwierdzić zapis i odczyt aktywnego slotu, zmianę SOC w krokach 1%, granicę kwadransa, restart HA, częściowy zapis oraz status `recovering`, odczyty co 2 s i samoczynne odzyskanie sterowania bez utraty kwadransów. Nie utożsamiać testów kodu z testem urządzenia.
-- [ ] **Bezpieczeństwo Deye:** potwierdzić w integracji całkowity brak odniesień do nastawy maksymalnego prądu rozładowania (odczytu, zapisu, modelu, diagnostyki). Falownik/BMS odpowiada za sprzętowe limity; osobno potwierdzić brak eksportu baterii przy Solar Sell/TOU.
-- [ ] **Prądy ładowania:** potwierdzić, że jedynym powodem zmiany jest celowe przesunięcie albo rozciągnięcie w czasie ładowania; prognozy prądu i SOC nie są poleceniem. Potwierdzić przywrócenie 50 A z dawnego ograniczenia 1 A po restarcie, z zachowaniem ręcznych ustawień, oraz brak nieplanowanego dławienia PV.
-- [ ] **SOC i PV:** sprawdzić skutki zmian 1.16.17: rzeczywisty nadmiar PV może ładować ponad prognozowany SOC. Odróżnić działanie zaimplementowane od potwierdzonego pomiarem.
+- [ ] **Plan kontra wykonanie:** porównać plan i rzeczywiste SOC, PV, zużycie domu oraz sieć przez kolejne kwadranse, również w szczycie; wykluczyć niezamierzone ograniczanie rozładowania.
+- [ ] **TOU i recovery:** zweryfikować sześć slotów, kroki SOC 1%, przekazanie między kwadransami, restart HA, częściowy zapis, odczyty potwierdzające co 2 s i samoczynne odzyskanie sterowania bez utraty kwadransów.
+- [ ] **Bezpieczeństwo Deye:** potwierdzić brak odczytu, zapisu i modelowania maksymalnego prądu rozładowania; sprawdzić brak eksportu energii z baterii przy Solar Sell/TOU.
+- [ ] **Prądy ładowania:** potwierdzić zmianę tylko dla przesunięcia/rozciągnięcia ładowania, przywracanie wcześniejszych nastaw (w tym po restarcie), poszanowanie ręcznych zmian oraz brak dławienia nadwyżek PV.
+- [ ] **Nieplanowany nadmiar PV:** sprawdzić, czy rzeczywiste ładowanie może przekroczyć prognozowany SOC bez ograniczania produkcji.
 
-## P1 — jakość prognoz i opłacalność
+## P1 — wiarygodność i ekonomia planu
 
-- [ ] **Prognozy:** porównać 45 dni z mocną wagą ostatnich 7/14 dni z dawnym oknem 365 dni; ocenić MAE/bias oraz wieczorne P75 w 7-dniowym holdoucie na żywych danych; rozdzielić błędy pogody od curtailment i niepełnych danych.
-- [ ] **Polityka 2.0.1 na żywym HA:** zweryfikować poprawkę wyceny dodatkowego importu przy niedoszacowaniu zużycia, przejście w aktywnym kwadransie z SOC 83% na 96%, wykonawcze ustawienie TOU 20% po decyzji o rozładowaniu oraz jakość krótkoterminowego nowcastu PV i domu przy asynchronicznych raportach.
-- [ ] **Polityka 2.0.0 na żywym HA:** sprawdzić wspólną ocenę niedoszacowania zużycia i potencjalnej PV, doładowanie przed szczytem zamiast za wczesnego zakupu, brak zapełnienia wyłącznie przez sztuczną cenę końcową oraz eliminację nieopłacalnych mikrocykli; wagi scenariuszy 0,65/0,55 i niepewność PV wymagają kalibracji.
-- [ ] **2.0.3 — kolejność godzin ładowania:** potwierdzić na nowych planach HA, że korekta nie przenosi zakupów z tańszej godziny do droższej wyłącznie z powodu progu mikrooperacji; sprawdzić `charge_relocations_preserved`, `minor_charges_rejected` i kwadransowe przepływy, z uwzględnieniem SOC/PV/ograniczenia 50 A.
-- [ ] **Ceny/DST:** zweryfikować lokalny czas Europe/Copenhagen, 23/25 h przy zmianie czasu i moment otrzymania nowych cen na rzeczywistym HA.
-- [ ] **Efekty ekonomiczne:** porównać plan z realnym baseline Deye, uwzględniając sprawność i ograniczenia; weryfikować pełen horyzont zamiast izolowanych kwadransów.
-- [ ] **Kontrfaktyczne uzasadnienia:** istnieje porównanie dla wybranych akcji, ale brak niezależnego wariantu `grid_import` z **wymuszonym dodatnim rozładowaniem**. Nie przedstawiać takiego porównania jako obliczonego.
+- [ ] **Prognozy domu i PV:** porównać model 45 dni (wagi ostatnich 7/14 dni) ze starszym oknem 365 dni; ocenić MAE, bias i wieczorne P75 z podziałem na błędy prognozy, curtailment i braki danych.
+- [ ] **Bieżący kwadrans (2.0.1):** potwierdzić replan na aktualnym SOC (w tym przypadek 83→96%), poprawne TOU 20% przy rozładowaniu, szacowanie kosztu brakującego importu i działanie nowcastu przy asynchronicznych odczytach.
+- [ ] **Ryzyko i bufor PV (2.0.0):** zweryfikować wspólny scenariusz obciążenia/PV, termin ładowania przed szczytem, wycenę końcowego SOC i eliminację mikrocykli; skalibrować wagi 0,65/0,55 oraz niepewność PV na danych HA.
+- [ ] **Kolejność godzin zakupu (2.0.3):** potwierdzić, że próg mikrooperacji nie przenosi zakupu z tańszych na droższe kwadranse. Sprawdzić `charge_relocations_preserved`, `minor_charges_rejected`, SOC, PV i ograniczenie 50 A.
+- [ ] **Ceny i czas:** potwierdzić publikację cen, lokalny czas Europe/Copenhagen oraz dni DST z 23/25 godzinami.
+- [ ] **Oszczędność:** porównać cały plan z rzeczywistym baseline Deye, z uwzględnieniem strat, ograniczeń sprzętu i niepewności.
+- [ ] **Uzasadnienia kontrfaktyczne:** dodać niezależne porównanie `grid_import` z wymuszonym dodatnim rozładowaniem; do tego czasu nie przedstawiać go jako obliczonego.
 
-## P2 — użyteczność i szersze wydanie
+## P2 — eksploatacja
 
-- [ ] Odbiór czytelności krótkich wpisów z cenami w Aktywności HA oraz zapisów recovery. W diagnostyce potwierdzić pełny audyt, ograniczoną liczbę zapisów i wznowienie przy opóźnionym odświeżeniu encji.
-- [ ] Dashboard wyszukiwania historii oraz osobne zatwierdzanie każdej operacji eksportu baterii; funkcja eksportu nadal zablokowana bez odrębnej zgody.
-- [ ] Testy kompatybilności kolejnych wersji HA i dłuższa walidacja pracy ciągłej (dzień, noc, utrata i odzyskanie źródła).
+- [ ] Ocenić czytelność wpisów w Aktywności HA (ceny, zapisy, recovery), kompletność diagnostyki i ograniczenie zbędnych komend.
+- [ ] Ocenić potrzebę dashboardu historii oraz odrębnego zatwierdzania każdej operacji eksportu baterii; eksport pozostaje niedostępny bez zgody.
+- [ ] Przeprowadzić testy kolejnych wersji HA i dłuższą obserwację pracy (dzień, noc, utrata i powrót danych).
 
-Kryteria regresji: [VALIDATION.md](VALIDATION.md). Bezpieczeństwo wykonania: [EXECUTION.md](EXECUTION.md).
+Kryteria regresji: [VALIDATION](VALIDATION.md). Zasady wykonania: [EXECUTION](EXECUTION.md).
