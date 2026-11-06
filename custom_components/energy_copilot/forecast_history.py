@@ -324,7 +324,7 @@ class ForecastHistory:
                 utc(row["captured_at"]),
                 period_index=row["period_index"],
             ),
-            version=row["version"]
+            version=row["version"],
         )
 
     def decision_periods_as_of(self, decision_at, *, source_entry=None):
