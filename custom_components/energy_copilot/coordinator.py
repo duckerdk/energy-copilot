@@ -102,6 +102,7 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
         self._actual_yesterday_date = None
         self.live_context = LiveSourceContext()
         self.live_window = LiveMeasurementWindow()
+        self.last_refresh_error = None
 
     async def _async_setup(self):
         await self.decision_journal.async_load()
@@ -135,6 +136,29 @@ class EnergyCoordinator(DataUpdateCoordinator[InputSnapshot]):
             self._archive_available = False
 
     async def _async_update_data(self):
+        try:
+            result = await self._async_update_data_impl()
+        except Exception as err:
+            self.last_refresh_error = {
+                "at_utc": dt_util.utcnow().isoformat(),
+                "type": type(err).__name__,
+                "message": str(err)[:240],
+            }
+            _LOGGER.exception("Energy Co-Pilot: coordinator refresh failed")
+            try:
+                self.decision_journal.record(
+                    "failure",
+                    reason="coordinator:unhandled_exception",
+                    state="blocked",
+                    **self.last_refresh_error,
+                )
+            except Exception:
+                _LOGGER.exception("Energy Co-Pilot: failed to record refresh error")
+            raise
+        self.last_refresh_error = None
+        return result
+
+    async def _async_update_data_impl(self):
         now = dt_util.utcnow()
         snapshot = InputSnapshot(now)
         states = {
