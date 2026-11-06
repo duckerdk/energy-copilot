@@ -4,6 +4,8 @@ Integracja Home Assistant do ekonomicznego sterowania magazynem energii i falown
 
 **Aktualna wersja:** [manifest.json](custom_components/energy_copilot/manifest.json) · **Instalacja HACS:** [GitHub Releases](https://github.com/duckerdk/energy-copilot/releases) · **Wymagany Home Assistant:** 2026.10 lub nowszy (obsługa zmiany formatu prognozy PV w HA 2026.11).
 
+**Ostatnia wersja oznaczona jako stabilna przez użytkownika: [`v2.0.3`](https://github.com/duckerdk/energy-copilot/releases/tag/v2.0.3) (06.11.2026).** To stały, bezterminowy punkt przywracania, wyłączony z rotacji wydań. Zachować bez zmian GitHub Release, tag `v2.0.3`, wszystkie trzy aktywa i archiwalną gałąź [`stable/v2.0.3`](https://github.com/duckerdk/energy-copilot/tree/stable/v2.0.3). Nowsza `v2.0.4` jest opublikowana, ale nie została oznaczona jako stabilna po odbiorze na żywym HA.
+
 ## Instalacja
 
 1. W HACS dodaj `https://github.com/duckerdk/energy-copilot` jako repozytorium typu **Integration**.
@@ -11,7 +13,7 @@ Integracja Home Assistant do ekonomicznego sterowania magazynem energii i falown
 3. W **Energy Co-Pilot → Konfiguruj** wybierz `dry_run` (symulacja) albo świadomie aktywuj `automatic` (sterowanie). **Automatic control ARM / STOP** pozwala zatrzymać zapisy.
 4. Po aktualizacji sprawdź w pobranej diagnostyce `installed_version`, `installed_build.tag` i `installed_build.integrity`. Dla oficjalnej paczki oczekiwane jest `payload_matches_build_info`.
 
-Do cofnięcia aktualizacji wybierz wcześniejszą dostępną wersję w HACS, uruchom ponownie HA i zweryfikuj tag. Repozytorium przechowuje **bieżące wydanie i pięć poprzednich** (obecnie od `v1.16.18` do `v2.0.3`); starsze wydania i tagi zostały usunięte. Ręczne kopiowanie folderu integracji nie zapewnia metadanych pochodzenia paczki.
+Do cofnięcia aktualizacji wybierz wcześniejszą dostępną wersję w HACS, uruchom ponownie HA i zweryfikuj tag. Repozytorium zachowuje **bieżące wydanie i pięć poprzednich oraz zawsze `v2.0.3`, nawet gdy wypadnie poza to okno**. Nie usuwać ani nie przenosić jego taga, GitHub Release, aktywów ani gałęzi `stable/v2.0.3`. Ręczne kopiowanie folderu integracji nie zapewnia metadanych pochodzenia paczki.
 
 ## Jak działa
 
