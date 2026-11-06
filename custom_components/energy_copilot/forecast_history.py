@@ -11,6 +11,7 @@ from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime, timedelta
 
+from homeassistant.const import MAJOR_VERSION, MINOR_VERSION
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import json as json_helper
 from homeassistant.helpers.storage import Store
@@ -27,6 +28,7 @@ from .validation import forecast, number, utc
 
 MAX_STORAGE_BYTES = 32 * 1024 * 1024
 MAX_SERIES_POINTS = 4096
+HA_PERIOD_INDEX = "start" if (MAJOR_VERSION, MINOR_VERSION) >= (2026, 11) else "end"
 
 
 class ForecastHistory:
@@ -102,8 +104,9 @@ class ForecastHistory:
         """Validate persisted data in an executor before replacing live state."""
         if not isinstance(data, dict) or not isinstance(data.get("versions"), list):
             raise ValueError("invalid_forecast_storage")
-        migrated = "format" not in data
-        if not migrated and data.get("format") != 2:
+        storage_format = data.get("format")
+        migrated = storage_format is None
+        if storage_format not in (None, 2, 3):
             raise ValueError("unsupported_forecast_storage")
         if not migrated and not isinstance(data.get("payloads"), dict):
             raise ValueError("invalid_forecast_storage")
@@ -116,6 +119,7 @@ class ForecastHistory:
             if migrated:
                 payload = {"legacy_periods": deepcopy(row["periods"])}
                 source = None
+                period_index = "legacy"
                 version = self._digest(payload, source)
                 self._legacy_snapshot(payload, at, version)
             else:
@@ -124,15 +128,22 @@ class ForecastHistory:
                     raise ValueError("invalid_forecast_source")
                 version = row["version"]
                 payload = data["payloads"][version]
+                period_index = (
+                    "legacy"
+                    if "legacy_periods" in payload
+                    else "end"
+                    if storage_format == 2
+                    else row.get("period_index")
+                )
                 if "legacy_periods" in payload:
-                    if source is not None:
+                    if source is not None or period_index != "legacy":
                         raise ValueError("invalid_legacy_source")
                     self._legacy_snapshot(payload, at, version)
                 else:
-                    if source is None:
-                        raise ValueError("invalid_forecast_source")
+                    if source is None or period_index not in {"start", "end"}:
+                        raise ValueError("invalid_forecast_source_or_period_index")
                     self._validate_shape(payload)
-                    forecast(payload, at)
+                    forecast(payload, at, period_index=period_index)
                 if self._digest(payload, source) != version:
                     raise ValueError("invalid_forecast_digest")
             previous = at
@@ -142,10 +153,11 @@ class ForecastHistory:
                     "captured_at": at.isoformat(),
                     "version": version,
                     "source_entry": source,
+                    "period_index": period_index,
                 }
             )
         cleaned = (
-            migrated
+            storage_format != 3
             or versions != data["versions"]
             or set(payloads) != set(data.get("payloads", {}))
         )
@@ -171,7 +183,7 @@ class ForecastHistory:
     def _data(self) -> dict:
         # Copy containers: executor sizing/pruning never mutates state seen by replay.
         return {
-            "format": 2,
+            "format": 3,
             "versions": list(self.versions),
             "payloads": dict(self.payloads),
         }
@@ -244,7 +256,7 @@ class ForecastHistory:
     def _prepare(self, response, captured_at, source_entry):
         payload = {k: deepcopy(response[k]) for k in ("watts", "wh_period")}
         self._validate_shape(payload)
-        snapshot = forecast(payload, captured_at)
+        snapshot = forecast(payload, captured_at, period_index=HA_PERIOD_INDEX)
         if len(json.dumps(payload, allow_nan=False).encode()) > MAX_STORAGE_BYTES // 2:
             raise ValueError("forecast_response_too_large")
         return payload, snapshot, self._digest(payload, source_entry)
@@ -262,13 +274,18 @@ class ForecastHistory:
             if self.versions and captured_at < utc(self.versions[-1]["captured_at"]):
                 raise ValueError("nonmonotonic_forecast_capture")
             self._prune_metadata(captured_at)
-            if not self.versions or self.versions[-1]["version"] != version:
+            if (
+                not self.versions
+                or self.versions[-1]["version"] != version
+                or self.versions[-1]["period_index"] != HA_PERIOD_INDEX
+            ):
                 self.payloads[version] = payload
                 self.versions.append(
                     {
                         "captured_at": captured_at.isoformat(),
                         "version": version,
                         "source_entry": source_entry,
+                        "period_index": HA_PERIOD_INDEX,
                     }
                 )
                 self._dirty = True
@@ -302,7 +319,12 @@ class ForecastHistory:
             # Without the original end-index Wh map they cannot be repaired safely.
             return None
         return replace(
-            forecast(payload, utc(row["captured_at"])), version=row["version"]
+            forecast(
+                payload,
+                utc(row["captured_at"]),
+                period_index=row["period_index"],
+            ),
+            version=row["version"],
         )
 
     def decision_periods_as_of(self, decision_at, *, source_entry=None):
@@ -336,6 +358,12 @@ class ForecastHistory:
             ),
             "evicted_this_runtime": self.evicted,
             "provider_generated_at_available": False,
-            "interval_semantics": "end_timestamp",
+            "interval_semantics": HA_PERIOD_INDEX + "_timestamp",
+            "stored_start_timestamp_versions": sum(
+                row["period_index"] == "start" for row in self.versions
+            ),
+            "stored_end_timestamp_versions": sum(
+                row["period_index"] == "end" for row in self.versions
+            ),
             "legacy_replay_supported": False,
         }

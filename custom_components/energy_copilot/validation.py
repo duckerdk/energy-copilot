@@ -7,6 +7,8 @@ from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from homeassistant.const import MAJOR_VERSION, MINOR_VERSION
+
 from .const import HISTORY_ROLES, MAX_FUTURE_OFFSET, POWER_ROLES
 from .models import (
     ForecastPeriod,
@@ -290,19 +292,26 @@ def prices(buy_state, sell_state, now):
     return slots, issues
 
 
-def forecast(response, captured_at):
-    """Parse observed HA raw Wh for the interval ENDING at each timestamp.
+def forecast(response, captured_at, *, period_index=None):
+    """Parse Forecast.Solar energy with the contract of its HA Core version.
 
-    The native service's start-index docstring contradicts the exported data.
-    The contract in HA_CONTRACT is backed by adjacent watts/time integrals.
+    Before HA 2026.11 the service used interval END timestamps. HA 2026.11+
+    returns interval START timestamps. Historical snapshots must pass their
+    recorded period_index rather than being reinterpreted on an HA upgrade.
     """
+    if period_index is None:
+        period_index = (
+            "start" if (MAJOR_VERSION, MINOR_VERSION) >= (2026, 11) else "end"
+        )
+    if period_index not in {"start", "end"}:
+        raise ValueError("invalid_forecast_period_index")
     if not isinstance(response, Mapping):
         raise ValueError("invalid_forecast_response")
     periods = response.get("wh_period")
     if not isinstance(periods, Mapping) or not periods:
         raise ValueError("invalid_forecast_response")
-    # The first energy value has no known preceding boundary. Every later
-    # value belongs to the interval bounded by the preceding/current watts keys.
+    # The timestamp denotes the beginning (2026.11+) or end (older HA)
+    # of the interval. The other boundary comes from the watts series.
     watts = response.get("watts")
     if not isinstance(watts, Mapping):
         raise ValueError("forecast_boundaries_unverifiable")
@@ -318,8 +327,9 @@ def forecast(response, captured_at):
         raise ValueError("invalid_forecast_response")
     result = []
     for start, end in zip(boundaries, boundaries[1:]):
-        if end in values and end > captured_at:
-            result.append(ForecastPeriod(start, end, values[end] / 1000))
+        energy_at = start if period_index == "start" else end
+        if energy_at in values and end > captured_at:
+            result.append(ForecastPeriod(start, end, values[energy_at] / 1000))
     if not result:
         raise ValueError("empty_forecast")
     serial = [(p.start.isoformat(), p.end.isoformat(), p.kwh) for p in result]
@@ -334,12 +344,22 @@ def forecast(response, captured_at):
         tuple(result),
         source_start=boundaries[0],
         source_end=boundaries[-1],
-        # A nonzero final value is bounded by the previous timestamp. Only
-        # initial energy lacks its PRECEDING boundary; never invent that period.
-        unbounded_prior_energy_at=tuple(
-            t for t, value in values.items() if t == boundaries[0] and value != 0
+        # The unbounded endpoint differs between the two HA service contracts.
+        unbounded_energy_at=tuple(
+            t
+            for t, value in values.items()
+            if period_index == "start" and t == boundaries[-1] and value != 0
         ),
-        missing_energy_at=tuple(t for t in boundaries[1:] if t not in values),
+        unbounded_prior_energy_at=tuple(
+            t
+            for t, value in values.items()
+            if period_index == "end" and t == boundaries[0] and value != 0
+        ),
+        missing_energy_at=tuple(
+            t
+            for t in (boundaries[:-1] if period_index == "start" else boundaries[1:])
+            if t not in values
+        ),
         first_watts_zero=(
             number(watts[next(t for t in watts if utc(t) == boundaries[0])]) == 0
             and values.get(boundaries[0], 0) == 0

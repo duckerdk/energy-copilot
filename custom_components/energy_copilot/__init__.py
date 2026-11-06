@@ -26,10 +26,11 @@ type EnergyConfigEntry = ConfigEntry[EnergyRuntimeData]
 
 async def async_setup_entry(hass: HomeAssistant, entry: EnergyConfigEntry) -> bool:
     coordinator = EnergyCoordinator(hass, entry)
-    await coordinator.async_config_entry_first_refresh()
+    # Expose diagnostic state even when the first coordinator refresh fails.
     entry.runtime_data = EnergyRuntimeData(
         coordinator, await async_installed_build(hass)
     )
+    await coordinator.async_config_entry_first_refresh()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
     return True

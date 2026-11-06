@@ -101,3 +101,9 @@ Każde `decision_id`, `plan_id`, start i ważność, dane wejściowe oraz ich we
 - Odbiór na żywym HA (dziennik, poprawność TOU, energia, płynność kwadransów, realna oszczędność) wymaga osobnych obserwacji z instalacji; brak dowodów pozostaje **otwarty**, nie opisany jako zamknięty.
 
 Sprawy nieweryfikowane sprzętowo: [OPEN_ITEMS.md](OPEN_ITEMS.md).
+
+## Regresje zgodności HA 2026.11 (2.0.4)
+
+- Start-indeksowany `Forecast.Solar wh_period`: poprawna energia w oknach i zgłoszenie luki na początku przedziału; brak sztucznej energii na końcowej granicy.
+- Archiwum prognoz: migracja formatu 2 (końcowe indeksowanie) do 3 z zachowaniem metadanych; nowe obserwacje z HA 2026.11 indeksowane początkowo; replay bez zamiany dawnych Wh.
+- Błąd wykonywania koordynatora: zachowany timestamp, typ wyjątku, wpis `failure`, diagnoza uproszczona przy braku pierwszego poprawnego odświeżenia. Zielone CI nie potwierdza fizycznego ładowania falownika.

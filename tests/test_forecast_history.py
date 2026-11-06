@@ -144,7 +144,7 @@ async def test_legacy_migration_keeps_known_periods_without_fabricated_originals
     )  # Legacy normalized Wh used the wrong interval index.
     assert archive.original_at(NOW) is None
     assert archive.summary["legacy_versions_without_originals"] == 1
-    assert (await store.async_load())["format"] == 2
+    assert (await store.async_load())["format"] == 3
     restored = ForecastHistory(hass, "entry")
     await restored.async_load(NOW)
     assert restored.as_of(NOW) is None
