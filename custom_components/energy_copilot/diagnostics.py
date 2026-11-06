@@ -32,6 +32,27 @@ def history_diagnostics(summary):
 async def async_get_config_entry_diagnostics(hass, entry):
     coordinator = entry.runtime_data.coordinator
     data = coordinator.data
+    if (
+        data is None
+        or coordinator.planning_preview is None
+        or coordinator.quality is None
+    ):
+        # A failed first refresh must not make the failure evidence inaccessible.
+        return {
+            "status": "coordinator_not_ready",
+            "last_refresh_error": coordinator.last_refresh_error,
+            "installed_build": entry.runtime_data.installed_build,
+            "mode": coordinator.settings.get("mode", "monitor"),
+            "execution": {
+                "armed": coordinator.dynamic_controller.armed,
+                "status": coordinator.dynamic_controller.status,
+                "reason": coordinator.dynamic_controller.reason,
+            },
+            "decision_journal": {
+                **coordinator.decision_journal.summary,
+                "events": coordinator.decision_journal.recent(6000),
+            },
+        }
     unconfigured = [
         role for role in OPTIONAL_ENTITY_ROLES if not coordinator.entities[role]
     ]
@@ -134,6 +155,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
         },
         "installed_version": entry.runtime_data.installed_build["installed_version"],
         "installed_build": entry.runtime_data.installed_build,
+        "last_refresh_error": coordinator.last_refresh_error,
         "mode": coordinator.settings.get("mode", "monitor"),
         "read_only": not coordinator.dynamic_controller.armed,
         "decision_journal": {
