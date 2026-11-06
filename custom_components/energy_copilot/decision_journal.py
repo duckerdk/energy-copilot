@@ -59,6 +59,7 @@ _REASON_NAMES = {
     "controller:grid_current_limit": "Przekroczony dopuszczalny limit ładowania z sieci.",
     "controller:charge_plan_without_grid_current": "Plan ładowania nie zawiera odpowiedniego limitu prądu.",
     "planner:internal_error": "Wystąpił wewnętrzny błąd planowania.",
+    "coordinator:unhandled_exception": "Nieoczekiwany błąd odświeżania integracji; szczegóły w diagnostyce i logach Core.",
     "soc:invalid_or_missing": "Brak poprawnego odczytu SOC.",
     "soc:outside_policy": "SOC jest poza dopuszczalnym zakresem.",
     "battery:invalid_voltage": "Brak poprawnego napięcia baterii.",
