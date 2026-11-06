@@ -256,7 +256,7 @@ class ForecastHistory:
     def _prepare(self, response, captured_at, source_entry):
         payload = {k: deepcopy(response[k]) for k in ("watts", "wh_period")}
         self._validate_shape(payload)
-        snapshot = forecast(payload, captured_at)
+        snapshot = forecast(payload, captured_at, period_index=HA_PERIOD_INDEX)
         if len(json.dumps(payload, allow_nan=False).encode()) > MAX_STORAGE_BYTES // 2:
             raise ValueError("forecast_response_too_large")
         return payload, snapshot, self._digest(payload, source_entry)
