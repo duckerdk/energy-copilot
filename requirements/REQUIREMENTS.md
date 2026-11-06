@@ -40,6 +40,12 @@ Minimalizować **całkowity koszt energii w DKK w pełnym horyzoncie opublikowan
 - **Nie odrzucać całego 15-minutowego kwadransa tylko z powodu ujemnego piku.** Używać `max(0, P_dom)` w całkowaniu na odpowiednich odcinkach czasowych. Jawnie oznaczać poprawione fragmenty (liczba, łączny czas, udział, ew. wpływ na energię), rozdzielać energię oryginalną od skorygowanej w lokalnym audycie i nie nazywać skorygowanej serii niezależnym, zweryfikowanym pomiarem fizycznym. Nie publikować szczegółowej historii gospodarstwa w domyślnej diagnostyce.
 - Polityka eliminuje nieuzasadnione odrzucanie historii z powodu pojedynczych ujemnych pików, **nie udowadnia poprawności fizycznego bilansu DC/AC** ani nie usuwa rozbieżności dodatnich powodowanych asynchronią. Przed M3/M5 ocenić błąd i wrażliwość profilu zużycia.
 
+## Stabilne wydanie i bezterminowa retencja — decyzja użytkownika 06.11.2026
+
+- **`v2.0.3` jest ostatnią wersją wyznaczoną przez użytkownika jako stabilna**, niezależnie od opublikowania nowszego `v2.0.4`. Jest to status zatwierdzony przez użytkownika, nie nowe potwierdzenie testów fizycznych.
+- GitHub Release [`v2.0.3`](https://github.com/duckerdk/energy-copilot/releases/tag/v2.0.3), tag `v2.0.3`, jego trzy aktywa (`energy_copilot.zip`, `BUILD_INFO.json`, `SHA256SUMS`) i dodatkowa gałąź `stable/v2.0.3` mają pozostać **na stałe i poza standardową rotacją** bieżącego wydania oraz pięciu poprzednich. Nie kasować, nie przenosić, nie nadpisywać, nie zastępować inną zawartością, nawet po kolejnych publikacjach. Wyjątek można zmienić wyłącznie na nowe wyraźne polecenie użytkownika.
+- Późniejsze wersje pozostają kandydatami do uznania za stabilne po odrębnej decyzji; uznanie nowszej wersji za stabilną samo w sobie nie cofa ochrony `v2.0.3`.
+
 ## Oczekiwany wynik integracji
 Natywne encje HA, config/options flow, prognoza PV i zużycia, plan dla opublikowanych cen, wyjaśnienie decyzji i wariantów, przewidywane koszty/straty, stany `planned/applied/confirmed`, dziennik wszystkich decyzji, dashboard i UI zatwierdzania eksportu baterii. Raporty oszczędności rozróżniają wynik modelowany, backtest i rzeczywisty. Wymagania techniczne: [HA_CONTRACT.md](HA_CONTRACT.md), [OPTIMIZATION.md](OPTIMIZATION.md), [VALIDATION.md](VALIDATION.md).
 
