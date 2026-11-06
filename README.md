@@ -2,7 +2,7 @@
 
 Integracja Home Assistant do ekonomicznego sterowania magazynem energii i falownikiem Deye przez istniejące encje i usługi HA. Planer optymalizuje koszt zakupu energii, przychody ze sprzedaży PV, zużycie baterii i ryzyko prognoz. Plan powstaje co 15 minut na podstawie **opublikowanych cen i dostępnych prognoz**, bez zgadywania brakujących danych.
 
-**Aktualna wersja:** [manifest.json](custom_components/energy_copilot/manifest.json) · **Instalacja HACS:** [GitHub Releases](https://github.com/duckerdk/energy-copilot/releases) · **Wymagany Home Assistant:** 2026.10 lub nowszy.
+**Aktualna wersja:** [manifest.json](custom_components/energy_copilot/manifest.json) · **Instalacja HACS:** [GitHub Releases](https://github.com/duckerdk/energy-copilot/releases) · **Wymagany Home Assistant:** 2026.10 lub nowszy (obsługa zmiany formatu prognozy PV w HA 2026.11).
 
 ## Instalacja
 
@@ -56,7 +56,8 @@ Replay korzysta z oryginalnych **15-minutowych wejść**, bez ponownego doliczan
 
 - **`sensor.energy_co_pilot_planning_status`:** `monitor` — brak planowania, `blocked` — brak wymaganych danych, `preview` — plan dostępny dla pełnego lub częściowego horyzontu.
 - **Aktywność HA (Logbook):** chronologiczne decyzje, wykonane zapisy, blokady i odzyskiwanie sterowania; **Logi systemowe → Core:** ostrzeżenia i błędy oraz komunikaty INFO (zależnie od poziomu logowania).
-- **Pobierz diagnostykę:** szczegółowy dziennik, wejścia optymalizatora i dane do Replay HA.
+- **Pobierz diagnostykę:** szczegółowy dziennik, wejścia optymalizatora i dane do Replay HA. Jeśli pierwszy odczyt nie powiedzie się po inicjalizacji koordynatora, dostępny jest uproszczony raport z błędem odświeżania i dziennikiem.
+- **HA 2026.11:** `forecast_solar.get_forecast.wh_period` używa początku przedziału zamiast końca; parser dobiera format do Core. Starsze prognozy pozostają odczytywane z oryginalną semantyką dzięki migracji archiwum do formatu 3. Nie podmieniaj dawnych danych na dane przeliczone nowym formatem.
 - **`sensor.energy_co_pilot_modeled_saving`:** oszczędność *modelowana* względem scenariusza bez cykli magazynu — **nie** potwierdzona oszczędność względem rzeczywistej pracy Deye.
 
 ## Dokumentacja projektu
