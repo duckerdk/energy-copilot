@@ -29,7 +29,6 @@ def history_diagnostics(summary):
     return result
 
 
-
 def _journal_diagnostics(coordinator, *, full):
     journal = coordinator.decision_journal
     if full:
@@ -52,7 +51,6 @@ async def async_get_device_diagnostics(hass, entry, device):
 
 
 async def _build_diagnostics(hass, entry, *, full_journal):
-
     coordinator = entry.runtime_data.coordinator
     data = coordinator.data
     if (
@@ -71,9 +69,7 @@ async def _build_diagnostics(hass, entry, *, full_journal):
                 "status": coordinator.dynamic_controller.status,
                 "reason": coordinator.dynamic_controller.reason,
             },
-            "decision_journal": _journal_diagnostics(
-                coordinator, full=full_journal
-            ),
+            "decision_journal": _journal_diagnostics(coordinator, full=full_journal),
         }
     unconfigured = [
         role for role in OPTIONAL_ENTITY_ROLES if not coordinator.entities[role]
