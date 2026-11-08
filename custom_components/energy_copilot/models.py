@@ -52,6 +52,7 @@ class ForecastSnapshot:
     last_watts_zero: bool = False
     # Edge-only zero extensions applied to the live planning copy, not archive.
     night_zero_filled_seconds: float = 0.0
+    period_index: str = "end"
 
 
 @dataclass(frozen=True)
