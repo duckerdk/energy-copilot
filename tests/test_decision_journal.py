@@ -600,7 +600,6 @@ def test_activity_prices_are_short_and_no_fake_economic_savings():
         assert "DKK" not in actual
 
 
-
 @pytest.mark.asyncio
 async def test_minor_same_action_revisions_are_compacted_without_losing_incidents(hass):
     """One quarter stores first/latest evidence, not 30-second duplicate plans."""
@@ -721,9 +720,7 @@ async def test_legacy_store_is_compacted_during_load_and_preserves_failures(hass
 
     journal = DecisionJournal(hass, "migrate-compaction")
     stamp = dt_util.utcnow().isoformat()
-    quarter = dt_util.utcnow().replace(
-        minute=0, second=0, microsecond=0
-    ).isoformat()
+    quarter = dt_util.utcnow().replace(minute=0, second=0, microsecond=0).isoformat()
     previous = {"action": "grid_import", "planned_grid_import_kwh": 0.3}
     legacy = [
         {
