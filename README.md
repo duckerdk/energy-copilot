@@ -4,7 +4,7 @@ Integracja Home Assistant do ekonomicznego sterowania magazynem energii i falown
 
 **Aktualna wersja:** [manifest.json](custom_components/energy_copilot/manifest.json) · **Instalacja HACS:** [GitHub Releases](https://github.com/duckerdk/energy-copilot/releases) · **Wymagany Home Assistant:** 2026.10 lub nowszy (obsługa zmiany formatu prognozy PV w HA 2026.11).
 
-**Ostatnia wersja oznaczona jako stabilna przez użytkownika: [`v2.0.3`](https://github.com/duckerdk/energy-copilot/releases/tag/v2.0.3) (06.11.2026).** To stały, bezterminowy punkt przywracania, wyłączony z rotacji wydań. Zachować bez zmian GitHub Release, tag `v2.0.3`, wszystkie trzy aktywa i archiwalną gałąź [`stable/v2.0.3`](https://github.com/duckerdk/energy-copilot/tree/stable/v2.0.3). Nowsza `v2.0.4` jest opublikowana, ale nie została oznaczona jako stabilna po odbiorze na żywym HA.
+**Ostatnia wersja oznaczona jako stabilna przez użytkownika: [`v2.0.3`](https://github.com/duckerdk/energy-copilot/releases/tag/v2.0.3) (06.11.2026).** To stały, bezterminowy punkt przywracania, wyłączony z rotacji wydań. Zachować bez zmian GitHub Release, tag `v2.0.3`, wszystkie trzy aktywa i archiwalną gałąź [`stable/v2.0.3`](https://github.com/duckerdk/energy-copilot/tree/stable/v2.0.3). Nowsze wydania nie są automatycznie oznaczane jako stabilne bez osobnej decyzji użytkownika.
 
 ## Instalacja
 
@@ -58,7 +58,9 @@ Replay korzysta z oryginalnych **15-minutowych wejść**, bez ponownego doliczan
 
 - **`sensor.energy_co_pilot_planning_status`:** `monitor` — brak planowania, `blocked` — brak wymaganych danych, `preview` — plan dostępny dla pełnego lub częściowego horyzontu.
 - **Aktywność HA (Logbook):** chronologiczne decyzje, wykonane zapisy, blokady i odzyskiwanie sterowania; **Logi systemowe → Core:** ostrzeżenia i błędy oraz komunikaty INFO (zależnie od poziomu logowania).
-- **Pobierz diagnostykę:** szczegółowy dziennik, wejścia optymalizatora i dane do Replay HA. Jeśli pierwszy odczyt nie powiedzie się po inicjalizacji koordynatora, dostępny jest uproszczony raport z błędem odświeżania i dziennikiem.
+- **Pobierz diagnostykę integracji (standard):** pełny aktualny Replay HA, ostatnie 200 zdarzeń audytu i do 500 wcześniejszych wpisów dotyczących błędów, blokad, odzyskania i zmian statusu; raport zawiera informację o ewentualnym ucięciu wcześniejszych incydentów. Jeśli pierwszy odczyt nie powiedzie się po inicjalizacji koordynatora, dostępny jest uproszczony raport z błędem i tym samym ograniczonym dziennikiem.
+- **Pełny dziennik:** **Ustawienia → Urządzenia i usługi → Energy Co-Pilot → Urządzenia → Energy Co-Pilot → Pobierz diagnostykę urządzenia** (natywny eksport HA). Zawiera wszystkie zachowane zdarzenia; może być większy i zawiera prywatne informacje o instalacji. Jest odrębny od standardowego raportu używanego przez Replay HA.
+- **Retencja od 2.0.6:** do 30 dni i maks. 30 000 zapisów; powtarzające się nieistotne rewizje tego samego działania w tym samym kwadransie są scalane z zachowaniem pierwszego czasu, pierwotnego planu, ostatniego stanu oraz licznika rewizji. Zmiany rodzaju działania, znaczące korekty energii/SOC/prądu, zapisy, blokady i błędy pozostają osobnymi zdarzeniami. Starszej historii utraconej przed aktualizacją nie można automatycznie odzyskać.
 - **HA 2026.11:** `forecast_solar.get_forecast.wh_period` używa początku przedziału zamiast końca; parser dobiera format do Core. **Od 2.0.5 niezerowa energia w pierwszym przedziale po wschodzie słońca nie blokuje uzupełnienia brakujących godzin nocnych**, jeżeli pierwsze `watts` to 0 W i wschód jest potwierdzony geometrią PV. Starsze prognozy pozostają odczytywane z oryginalną semantyką dzięki migracji archiwum do formatu 3. Nie podmieniaj dawnych danych na dane przeliczone nowym formatem.
 - **`sensor.energy_co_pilot_modeled_saving`:** oszczędność *modelowana* względem scenariusza bez cykli magazynu — **nie** potwierdzona oszczędność względem rzeczywistej pracy Deye.
 
