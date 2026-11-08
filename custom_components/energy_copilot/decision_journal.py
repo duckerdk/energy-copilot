@@ -13,7 +13,40 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 RETENTION_DAYS = 30
-MAX_EVENTS = 6000
+# A 30-day journal at four planning decisions/hour needs more than 6,000 records.
+# Minor same-action revisions are compacted before this safety ceiling applies.
+MAX_EVENTS = 30000
+STANDARD_DIAGNOSTIC_EVENTS = 200
+STANDARD_DIAGNOSTIC_INCIDENTS = 500
+INCIDENT_EVENTS = frozenset(
+    {
+        "armed",
+        "manual_stop",
+        "stop",
+        "waiting",
+        "blocked",
+        "recovered",
+        "recovering",
+        "halted",
+        "failure",
+        "plan_status",
+        "input_quality",
+    }
+)
+# Preserve significant within-quarter changes rather than burying them in
+# routine updates of the same 30-second optimizer action.
+_MATERIAL_REVISION_DELTAS = {
+    "buy_dkk_per_kwh": 0.10,
+    "sell_dkk_per_kwh": 0.10,
+    "soc_observed_pct": 2.0,
+    "soc_planned_end_pct": 2.0,
+    "grid_charge_ac_kwh": 0.10,
+    "pv_charge_dc_kwh": 0.10,
+    "battery_discharge_dc_kwh": 0.10,
+    "grid_charge_current_a": 0.5,
+    "planned_grid_import_kwh": 0.2,
+}
+
 _LOCAL_TIMEZONE = ZoneInfo("Europe/Copenhagen")
 _ACTIVITY_EVENTS = {
     "armed",
@@ -465,6 +498,35 @@ def readable_event(entry):
     return "Zmieniono stan sterowania: " + _reason(reason)
 
 
+def _minor_same_action_revision(entry):
+    """Only tiny intra-quarter replans may be aggregated.
+
+    Never combine action transitions, charging limits, or meaningful energy,
+    price and SOC changes. A rollup carries the first previous plan and latest
+    full technical state; actual commands and failures are separate events.
+    """
+    if entry.get("event") != "revised" or not entry.get("quarter_start_utc"):
+        return False
+    previous = entry.get("previous_plan")
+    if not isinstance(previous, dict) or previous.get("action") != entry.get("action"):
+        return False
+    for key in ("robust_strategy", "economic_policy_reason", "pv_export_enabled"):
+        if key in previous and previous[key] != entry.get(key):
+            return False
+    for key, minimum in _MATERIAL_REVISION_DELTAS.items():
+        before, after = previous.get(key), entry.get(key)
+        if before is None or after is None:
+            if before != after:
+                return False
+            continue
+        try:
+            if abs(float(after) - float(before)) >= minimum:
+                return False
+        except ValueError, TypeError, OverflowError:
+            return False
+    return True
+
+
 class DecisionJournal:
     """Persist technical evidence and publish readable events to native HA views."""
 
@@ -483,14 +545,72 @@ class DecisionJournal:
                 entries = saved.get("entries")
                 if not isinstance(entries, list):
                     raise ValueError("invalid_decision_journal")
-                self.entries = [item for item in entries if isinstance(item, dict)]
+                legacy = [item for item in entries if isinstance(item, dict)]
+                # Upgrade existing noisy stores in place. Preserve each
+                # significant event and the first/latest revision evidence.
+                self.entries = []
+                for item in legacy:
+                    self._append_compacted(item)
+            previous_size = len(self.entries)
             self._trim()
+            if saved is not None and (
+                len(self.entries) != len(legacy) or len(self.entries) != previous_size
+            ):
+                await self.store.async_save({"entries": self.entries})
         except Exception as exc:  # A corrupt archive must never stop the controller.
             self.available = False
             self.error = f"{type(exc).__name__}:{exc}"
             _LOGGER.error(
                 "Energy Co-Pilot: niedostępne archiwum decyzji: %s", self.error
             )
+
+    def _append_compacted(self, entry):
+        """Coalesce minor revisions per quarter/action without dropping incidents.
+
+        A material revision or action transition splits the sequence. Records
+        are moved to their latest event time, preserving chronology, while the
+        first observed timestamp and baseline plan remain available.
+        """
+        if _minor_same_action_revision(entry):
+            quarter = entry["quarter_start_utc"]
+            for index in range(len(self.entries) - 1, -1, -1):
+                previous = self.entries[index]
+                if previous.get("quarter_start_utc") != quarter:
+                    # Do not aggregate across a newer planning quarter.
+                    if previous.get("event") in {"planned", "decision", "revised"}:
+                        break
+                    continue
+                if previous.get("event") == "revised":
+                    if previous.get("action") != entry.get("action"):
+                        break
+                    if not previous.get("aggregated_revisions"):
+                        # Preserve a preceding material replan as a separate record.
+                        break
+                    entry = {
+                        **entry,
+                        "aggregated_revisions": previous["aggregated_revisions"] + 1,
+                        "first_revision_utc": previous.get(
+                            "first_revision_utc", previous["time_utc"]
+                        ),
+                        "first_decision_id": previous.get(
+                            "first_decision_id", previous.get("decision_id")
+                        ),
+                        "previous_plan": previous.get("previous_plan"),
+                    }
+                    self.entries.pop(index)
+                    break
+                if previous.get("event") in {"planned", "decision"} and previous.get(
+                    "action"
+                ) != entry.get("action"):
+                    break
+            if "aggregated_revisions" not in entry:
+                entry = {
+                    **entry,
+                    "aggregated_revisions": 1,
+                    "first_revision_utc": entry["time_utc"],
+                    "first_decision_id": entry.get("decision_id"),
+                }
+        self.entries.append(entry)
 
     def _trim(self):
         cutoff = (dt_util.utcnow() - timedelta(days=RETENTION_DAYS)).isoformat()
@@ -510,7 +630,10 @@ class DecisionJournal:
         }
         try:
             message = readable_event(entry)
-            if event in {"halted", "failure"}:
+            if _minor_same_action_revision(entry):
+                # Kept as compact audit evidence; not a user-facing log flood.
+                pass
+            elif event in {"halted", "failure"}:
                 _LOGGER.error("Energy Co-Pilot: %s", message)
             elif event == "blocked" or (
                 event == "input_quality" and entry.get("quality") != "valid"
@@ -556,7 +679,7 @@ class DecisionJournal:
             )
         if self.available:
             try:
-                self.entries.append(entry)
+                self._append_compacted(entry)
                 self._trim()
                 self.store.async_delay_save(lambda: {"entries": self.entries}, 5)
             except Exception as exc:
@@ -570,6 +693,20 @@ class DecisionJournal:
     def recent(self, limit=30):
         return self.entries[-limit:]
 
+    def standard_diagnostic_events(self):
+        """Bound ordinary exports while retaining separate incident evidence."""
+        recent = self.recent(STANDARD_DIAGNOSTIC_EVENTS)
+        prior = self.entries[:-STANDARD_DIAGNOSTIC_EVENTS]
+        critical = [row for row in prior if row.get("event") in INCIDENT_EVENTS]
+        return {
+            "events": recent,
+            "critical_events": critical[-STANDARD_DIAGNOSTIC_INCIDENTS:],
+            "critical_events_total": len(critical),
+            "critical_events_truncated": len(critical) > STANDARD_DIAGNOSTIC_INCIDENTS,
+            "export_scope": "recent_200_plus_prior_incidents_500",
+            "full_export_via": "device_diagnostics",
+        }
+
     @property
     def summary(self):
         return {
@@ -578,6 +715,9 @@ class DecisionJournal:
             "retention_days": RETENTION_DAYS,
             "max_events": MAX_EVENTS,
             "retained_events": len(self.entries),
+            "aggregated_revision_samples": sum(
+                item.get("aggregated_revisions", 0) for item in self.entries
+            ),
             "oldest_utc": self.entries[0]["time_utc"] if self.entries else None,
             "newest_utc": self.entries[-1]["time_utc"] if self.entries else None,
         }

@@ -340,5 +340,5 @@ class DecisionJournalSensor(CoordinatorEntity, SensorEntity):
         return {
             **journal.summary,
             "last_events": journal.recent(5),
-            "full_history": "Settings > Devices & services > Energy Co-Pilot > Download diagnostics",
+            "full_history": "Settings > Devices & services > Energy Co-Pilot > Devices > Energy Co-Pilot > Download diagnostics",
         }

@@ -14,6 +14,7 @@ from custom_components.energy_copilot.config_flow import normalize
 from custom_components.energy_copilot.const import DOMAIN
 from custom_components.energy_copilot.diagnostics import (
     async_get_config_entry_diagnostics,
+    async_get_device_diagnostics,
 )
 
 from .conftest import NOW
@@ -375,4 +376,38 @@ async def test_automatic_mode_starts_armed_and_transient_block_retains_arm(
     assert any(
         item["event"] == "manual_stop" for item in restored.decision_journal.entries
     )
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_compact_integration_vs_full_device_diagnostics_are_json_serializable(
+    hass, populated_hass, entry
+):
+    import json
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = entry.runtime_data.coordinator
+    stamp = coordinator.data.at.isoformat()
+    coordinator.decision_journal.entries = [
+        {
+            "event": "blocked" if i == 9 else "decision",
+            "time_utc": stamp,
+            "decision_id": str(i),
+            "quarter_start_utc": stamp,
+            "action": "grid_import",
+            "buy_dkk_per_kwh": 2.6,
+        }
+        for i in range(600)
+    ]
+    standard = await async_get_config_entry_diagnostics(hass, entry)
+    detailed = await async_get_device_diagnostics(hass, entry, None)
+    assert standard["decision_journal"]["export_scope"] == (
+        "recent_200_plus_prior_incidents_500"
+    )
+    assert len(standard["decision_journal"]["events"]) == 200
+    assert len(standard["decision_journal"]["critical_events"]) == 1
+    assert detailed["decision_journal"]["export_scope"] == ("complete_retained_audit")
+    assert len(detailed["decision_journal"]["events"]) == 600
+    assert standard["planner_replay"] == detailed["planner_replay"]
+    assert len(json.dumps(standard)) < len(json.dumps(detailed))
     assert await hass.config_entries.async_unload(entry.entry_id)

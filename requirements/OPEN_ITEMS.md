@@ -1,6 +1,6 @@
 # Otwarte kwestie techniczne
 
-Stan: **08.11.2026**, docelowy manifest **2.0.5**. Poniższe zadania **nie zostały potwierdzone na rzeczywistym Home Assistant i falowniku**. Testy CI nie zastępują odbioru fizycznego. Zatwierdzone reguły: [REQUIREMENTS](REQUIREMENTS.md). Historia napraw: [GitHub Releases](https://github.com/duckerdk/energy-copilot/releases).
+Stan: **08.11.2026**, docelowy manifest **2.0.6**. Poniższe zadania **nie zostały potwierdzone na rzeczywistym Home Assistant i falowniku**. Testy CI nie zastępują odbioru fizycznego. Zatwierdzone reguły: [REQUIREMENTS](REQUIREMENTS.md). Historia napraw: [GitHub Releases](https://github.com/duckerdk/energy-copilot/releases).
 
 ## P0 — sterowanie i bezpieczeństwo
 
@@ -22,10 +22,10 @@ Stan: **08.11.2026**, docelowy manifest **2.0.5**. Poniższe zadania **nie zosta
 
 ## P2 — eksploatacja
 
-- [ ] Ocenić czytelność wpisów w Aktywności HA (ceny, zapisy, recovery), kompletność diagnostyki i ograniczenie zbędnych komend.
+- [ ] Ocenić czytelność wpisów w Aktywności HA (ceny, zapisy, recovery), kompletność diagnostyki i ograniczenie zbędnych komend. Po 2.0.6 sprawdzić, czy standardowy eksport przy dużym dzienniku działa bez błędów, a pełne 30-dniowe archiwum jest dostępne z diagnostyki urządzenia. Dotychczasowe zapisy już wyparte limitem 6000 nie wrócą.
 - [ ] Ocenić potrzebę dashboardu historii oraz odrębnego zatwierdzania każdej operacji eksportu baterii; eksport pozostaje niedostępny bez zgody.
 - [ ] Przeprowadzić testy kolejnych wersji HA i dłuższą obserwację pracy (dzień, noc, utrata i powrót danych).
 
 Kryteria regresji: [VALIDATION](VALIDATION.md). Zasady wykonania: [EXECUTION](EXECUTION.md).
 
-- [ ] **Po aktualizacji HA 2026.11:** na realnym systemie zweryfikować, czy nocne godziny przed wschodem otrzymują ciągły plan przy pierwszym `wh_period` różnym od zera, a Grid Charge wykonuje zaplanowany kwadrans. Zgłoszony 08.11.2026 błąd jednego kwadransa jest odtwarzany w teście syntetycznym po poprawce walidacji. **Brak możliwości pobrania pełnej diagnostyki nadal wymaga logów Core i odrębnej diagnozy**; nie uznawać tego problemu za naprawiony.
+- [ ] **Po aktualizacji HA 2026.11:** na realnym systemie zweryfikować, czy nocne godziny przed wschodem otrzymują ciągły plan przy pierwszym `wh_period` różnym od zera, a Grid Charge wykonuje zaplanowany kwadrans. Zgłoszony 08.11.2026 błąd jednego kwadransa jest odtwarzany w teście syntetycznym po poprawce walidacji. **Sporadyczna niemożność pobrania diagnostyki:** duży plik 27 MB i 5030 rewizji w 6000 wpisach to potwierdzone obciążenie; bez błędu HTTP/traceback nie udowodniono pierwotnej przyczyny. Od 2.0.6 standardowy eksport jest ograniczony, pełny audyt osobny; sprawdzić zachowanie na rzeczywistym HA.

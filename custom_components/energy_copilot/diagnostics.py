@@ -29,7 +29,28 @@ def history_diagnostics(summary):
     return result
 
 
+def _journal_diagnostics(coordinator, *, full):
+    journal = coordinator.decision_journal
+    if full:
+        return {
+            **journal.summary,
+            "events": list(journal.entries),
+            "export_scope": "complete_retained_audit",
+        }
+    return {**journal.summary, **journal.standard_diagnostic_events()}
+
+
 async def async_get_config_entry_diagnostics(hass, entry):
+    """Compact everyday diagnostics, including Replay HA and incident history."""
+    return await _build_diagnostics(hass, entry, full_journal=False)
+
+
+async def async_get_device_diagnostics(hass, entry, device):
+    """Optional full decision audit through HA's native device download."""
+    return await _build_diagnostics(hass, entry, full_journal=True)
+
+
+async def _build_diagnostics(hass, entry, *, full_journal):
     coordinator = entry.runtime_data.coordinator
     data = coordinator.data
     if (
@@ -48,10 +69,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
                 "status": coordinator.dynamic_controller.status,
                 "reason": coordinator.dynamic_controller.reason,
             },
-            "decision_journal": {
-                **coordinator.decision_journal.summary,
-                "events": coordinator.decision_journal.recent(6000),
-            },
+            "decision_journal": _journal_diagnostics(coordinator, full=full_journal),
         }
     unconfigured = [
         role for role in OPTIONAL_ENTITY_ROLES if not coordinator.entities[role]
@@ -158,10 +176,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
         "last_refresh_error": coordinator.last_refresh_error,
         "mode": coordinator.settings.get("mode", "monitor"),
         "read_only": not coordinator.dynamic_controller.armed,
-        "decision_journal": {
-            **coordinator.decision_journal.summary,
-            "events": coordinator.decision_journal.recent(6000),
-        },
+        "decision_journal": _journal_diagnostics(coordinator, full=full_journal),
         "execution": {
             "armed": coordinator.dynamic_controller.armed,
             "status": coordinator.dynamic_controller.status,
