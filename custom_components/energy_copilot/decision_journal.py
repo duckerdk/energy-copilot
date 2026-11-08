@@ -696,14 +696,13 @@ class DecisionJournal:
     def standard_diagnostic_events(self):
         """Bound ordinary exports while retaining separate incident evidence."""
         recent = self.recent(STANDARD_DIAGNOSTIC_EVENTS)
-        prior = self.entries[: -STANDARD_DIAGNOSTIC_EVENTS]
+        prior = self.entries[:-STANDARD_DIAGNOSTIC_EVENTS]
         critical = [row for row in prior if row.get("event") in INCIDENT_EVENTS]
         return {
             "events": recent,
             "critical_events": critical[-STANDARD_DIAGNOSTIC_INCIDENTS:],
             "critical_events_total": len(critical),
-            "critical_events_truncated": len(critical)
-            > STANDARD_DIAGNOSTIC_INCIDENTS,
+            "critical_events_truncated": len(critical) > STANDARD_DIAGNOSTIC_INCIDENTS,
             "export_scope": "recent_200_plus_prior_incidents_500",
             "full_export_via": "device_diagnostics",
         }
