@@ -1,6 +1,6 @@
 # Otwarte kwestie techniczne
 
-Stan: **06.11.2026**, docelowy manifest **2.0.4**. Poniższe zadania **nie zostały potwierdzone na rzeczywistym Home Assistant i falowniku**. Testy CI nie zastępują odbioru fizycznego. Zatwierdzone reguły: [REQUIREMENTS](REQUIREMENTS.md). Historia napraw: [GitHub Releases](https://github.com/duckerdk/energy-copilot/releases).
+Stan: **08.11.2026**, docelowy manifest **2.0.5**. Poniższe zadania **nie zostały potwierdzone na rzeczywistym Home Assistant i falowniku**. Testy CI nie zastępują odbioru fizycznego. Zatwierdzone reguły: [REQUIREMENTS](REQUIREMENTS.md). Historia napraw: [GitHub Releases](https://github.com/duckerdk/energy-copilot/releases).
 
 ## P0 — sterowanie i bezpieczeństwo
 
@@ -28,4 +28,4 @@ Stan: **06.11.2026**, docelowy manifest **2.0.4**. Poniższe zadania **nie zosta
 
 Kryteria regresji: [VALIDATION](VALIDATION.md). Zasady wykonania: [EXECUTION](EXECUTION.md).
 
-- [ ] **Po aktualizacji HA 2026.11:** na realnym systemie porównać surowe `wh_period`, odtworzony plan PV, rzeczywiste uruchomienie Grid Charge w kwadransie oraz pobranie diagnostyki także po błędzie pierwszego odświeżenia. Regresje jednostkowe nie dowodzą wykonania ładowania.
+- [ ] **Po aktualizacji HA 2026.11:** na realnym systemie zweryfikować, czy nocne godziny przed wschodem otrzymują ciągły plan przy pierwszym `wh_period` różnym od zera, a Grid Charge wykonuje zaplanowany kwadrans. Zgłoszony 08.11.2026 błąd jednego kwadransa jest odtwarzany w teście syntetycznym po poprawce walidacji. **Brak możliwości pobrania pełnej diagnostyki nadal wymaga logów Core i odrębnej diagnozy**; nie uznawać tego problemu za naprawiony.
