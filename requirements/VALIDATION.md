@@ -71,8 +71,9 @@
 | ARM-06 | ręczny STOP w trakcie recovery | Wszystkie automatyczne ponowienia zatrzymane |
 | ARM-07 | SOC rośnie o mniej niż 2 pp podczas decyzji o zachowaniu baterii | Brak kosmetycznych zapisów SOC; przejście na rozładowanie natychmiast ustawia 20% |
 | LOG-03 | ładowanie 2,11, przyszła cena 3,89; sprzedaż PV 3,50 | Krótkie zrozumiałe zdania z cenami; bez DKK/kWh, wag, nazw strategii, niepotwierdzonych kwot oszczędności |
-| LOG-04 | wiele zmian prognozowanych Wh przy tym samym działaniu | Brak zalewu Aktywności HA; pełny surowy dziennik techniczny zachowany w diagnostyce |
-| LOG-02 | restart HA oraz upływ 30 dni | zachowanie decyzji, przyczyn i kosztów do limitu 6000; retencja |
+| LOG-04 | wiele drobnych zmian prognozowanych Wh przy tym samym działaniu i kwadransie | Brak zalewu Aktywności HA; agregacja nieistotnych rewizji z licznikiem i pierwszym/ostatnim stanem; zmiany istotne oraz działania zachowane oddzielnie |
+| LOG-02 | restart HA, migracja starego archiwum oraz upływ 30 dni | Zachowanie istotnych decyzji i incydentów; agregacja powtórek; retencja 30 dni i limit bezpieczeństwa 30 000 zapisów |
+| LOG-05 | 6000 wpisów, z czego większość to rewizje bez zmiany akcji | Standardowy eksport max 200 ostatnich + 500 wcześniejszych incydentów, Replay HA kompletny; osobny pełny eksport urządzenia, poprawny JSON; błędy i zapisy nie są usuwane |
 
 ## Backtest i wiarygodność oszczędności
 Dla okresu t: odtwarzaj tylko opublikowane wtedy ceny i prognozy **sprzed** decyzji, wraz z pierwotnym SOC i ograniczeniami. Porównuj realny baseline Deye z wykonawczą alternatywą Co-Pilot przy tej samej pogodzie, obciążeniu, cenach, stanie baterii i granicach BMS. Pomijaj okresy z niedostępnymi historycznymi składowymi domu i podejrzanym curtailment; raportuj procent pokrycia. Wycena końcowego SOC nie może magicznie zerować pozostałej energii ani posługiwać się nieopublikowanymi cenami. Rozdzielić `simulated`, `backtested` i `observed`; brak testu fizycznego ≠ osiągnięty zysk.
