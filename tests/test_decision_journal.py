@@ -598,3 +598,178 @@ def test_activity_prices_are_short_and_no_fake_economic_savings():
         assert "Scenariusze" not in actual
         assert "0,352" not in actual
         assert "DKK" not in actual
+
+
+
+@pytest.mark.asyncio
+async def test_minor_same_action_revisions_are_compacted_without_losing_incidents(hass):
+    """One quarter stores first/latest evidence, not 30-second duplicate plans."""
+    journal = DecisionJournal(hass, "compact-revisions")
+    await journal.async_load()
+    quarter = "2026-11-08T06:00:00+00:00"
+    baseline = {
+        "action": "grid_import",
+        "quarter_start_utc": quarter,
+        "planned_grid_import_kwh": 0.3,
+        "soc_observed_pct": 55,
+        "buy_dkk_per_kwh": 2.51,
+        "grid_charge_current_a": 0,
+    }
+    for index in range(80):
+        journal.record(
+            "revised",
+            previous_plan=baseline,
+            action="grid_import",
+            quarter_start_utc=quarter,
+            planned_grid_import_kwh=0.301 + index * 0.0001,
+            soc_observed_pct=55,
+            buy_dkk_per_kwh=2.51,
+            grid_charge_current_a=0,
+        )
+    assert len(journal.entries) == 1
+    revision = journal.entries[0]
+    assert revision["aggregated_revisions"] == 80
+    assert revision["previous_plan"] == baseline
+    assert revision["planned_grid_import_kwh"] == pytest.approx(0.3089)
+    assert revision["first_revision_utc"] <= revision["time_utc"]
+
+    journal.record(
+        "applied",
+        quarter_start_utc=quarter,
+        commands_sent=1,
+        command_changes=[{"entity_id": "number.test", "before": 20, "after": 25}],
+    )
+    journal.record(
+        "failure",
+        reason="coordinator:unhandled_exception",
+        quarter_start_utc=quarter,
+    )
+    journal.record(
+        "revised",
+        previous_plan=baseline,
+        action="grid_import",
+        quarter_start_utc=quarter,
+        planned_grid_import_kwh=0.31,
+        soc_observed_pct=55,
+        buy_dkk_per_kwh=2.51,
+        grid_charge_current_a=0,
+    )
+    assert len(journal.entries) == 3
+    assert journal.entries[-1]["aggregated_revisions"] == 81
+    assert [x["event"] for x in journal.entries[:2]] == ["applied", "failure"]
+    await journal.async_close()
+
+    restored = DecisionJournal(hass, "compact-revisions")
+    await restored.async_load()
+    assert restored.summary["aggregated_revision_samples"] == 81
+    assert len(restored.entries) == 3
+    assert any(e["event"] == "failure" for e in restored.entries)
+    assert any(e["event"] == "applied" for e in restored.entries)
+
+
+@pytest.mark.asyncio
+async def test_material_revision_and_action_transition_never_merged(hass):
+    journal = DecisionJournal(hass, "material-revisions")
+    await journal.async_load()
+    quarter = "2026-11-08T06:00:00+00:00"
+    previous = {
+        "action": "grid_import",
+        "quarter_start_utc": quarter,
+        "planned_grid_import_kwh": 0.3,
+    }
+    journal.record(
+        "revised",
+        previous_plan=previous,
+        action="grid_import",
+        quarter_start_utc=quarter,
+        planned_grid_import_kwh=0.31,
+    )
+    journal.record(
+        "revised",
+        previous_plan=previous,
+        action="grid_import",
+        quarter_start_utc=quarter,
+        planned_grid_import_kwh=0.65,
+    )
+    journal.record(
+        "revised",
+        previous_plan=previous,
+        action="battery_discharge",
+        quarter_start_utc=quarter,
+        planned_grid_import_kwh=0.0,
+    )
+    journal.record(
+        "revised",
+        previous_plan=previous,
+        action="grid_import",
+        quarter_start_utc=quarter,
+        planned_grid_import_kwh=0.315,
+    )
+    assert [x.get("aggregated_revisions") for x in journal.entries] == [
+        1,
+        None,
+        None,
+        1,
+    ]
+    assert len(journal.entries) == 4
+    await journal.async_close()
+
+
+@pytest.mark.asyncio
+async def test_legacy_store_is_compacted_during_load_and_preserves_failures(hass):
+    from homeassistant.util import dt as dt_util
+
+    journal = DecisionJournal(hass, "migrate-compaction")
+    stamp = dt_util.utcnow().isoformat()
+    quarter = dt_util.utcnow().replace(
+        minute=0, second=0, microsecond=0
+    ).isoformat()
+    previous = {"action": "grid_import", "planned_grid_import_kwh": 0.3}
+    legacy = [
+        {
+            "event": "revised",
+            "decision_id": f"rev-{index}",
+            "time_utc": stamp,
+            "quarter_start_utc": quarter,
+            "action": "grid_import",
+            "planned_grid_import_kwh": 0.31 + index * 0.0001,
+            "previous_plan": previous,
+        }
+        for index in range(100)
+    ] + [
+        {
+            "event": "blocked",
+            "time_utc": stamp,
+            "decision_id": "incident-1",
+        }
+    ]
+    await journal.store.async_save({"entries": legacy})
+    restored = DecisionJournal(hass, "migrate-compaction")
+    await restored.async_load()
+    assert len(restored.entries) == 2
+    assert restored.entries[0]["aggregated_revisions"] == 100
+    assert restored.entries[-1]["decision_id"] == "incident-1"
+    await restored.async_close()
+
+
+def test_standard_audit_includes_older_incidents_but_not_all_verbose_records(hass):
+    journal = DecisionJournal(hass, "bounded-standard")
+    stamp = datetime.now(timezone.utc).isoformat()
+    journal.entries = [
+        {
+            "event": "failure" if i in (7, 42, 119) else "decision",
+            "decision_id": str(i),
+            "time_utc": stamp,
+        }
+        for i in range(600)
+    ]
+    compact = journal.standard_diagnostic_events()
+    assert len(compact["events"]) == 200
+    assert [i["decision_id"] for i in compact["critical_events"]] == [
+        "7",
+        "42",
+        "119",
+    ]
+    assert compact["critical_events_truncated"] is False
+    assert compact["critical_events_total"] == 3
+    assert len(journal.entries) == 600  # Export does not mutate audit.
