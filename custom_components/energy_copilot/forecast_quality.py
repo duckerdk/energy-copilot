@@ -121,7 +121,7 @@ def forecast_coverage(
         "unbounded_prior_energy_timestamps_utc": [
             t.isoformat() for t in snapshot.unbounded_prior_energy_at
         ],
-        "energy_timestamp_semantics": "interval_end",
+        "energy_timestamp_semantics": "interval_" + snapshot.period_index,
         "available_at_utc": snapshot.captured_at.isoformat(),
         "complete_periods_known_at_evaluation": len(
             periods_for_decision(snapshot, now)
