@@ -379,7 +379,6 @@ async def test_automatic_mode_starts_armed_and_transient_block_retains_arm(
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 
-
 async def test_compact_integration_vs_full_device_diagnostics_are_json_serializable(
     hass, populated_hass, entry
 ):
@@ -407,9 +406,7 @@ async def test_compact_integration_vs_full_device_diagnostics_are_json_serializa
     )
     assert len(standard["decision_journal"]["events"]) == 200
     assert len(standard["decision_journal"]["critical_events"]) == 1
-    assert detailed["decision_journal"]["export_scope"] == (
-        "complete_retained_audit"
-    )
+    assert detailed["decision_journal"]["export_scope"] == ("complete_retained_audit")
     assert len(detailed["decision_journal"]["events"]) == 600
     assert standard["planner_replay"] == detailed["planner_replay"]
     assert len(json.dumps(standard)) < len(json.dumps(detailed))
