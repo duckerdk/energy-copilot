@@ -59,7 +59,7 @@ Replay korzysta z oryginalnych **15-minutowych wejść**, bez ponownego doliczan
 - **`sensor.energy_co_pilot_planning_status`:** `monitor` — brak planowania, `blocked` — brak wymaganych danych, `preview` — plan dostępny dla pełnego lub częściowego horyzontu.
 - **Aktywność HA (Logbook):** chronologiczne decyzje, wykonane zapisy, blokady i odzyskiwanie sterowania; **Logi systemowe → Core:** ostrzeżenia i błędy oraz komunikaty INFO (zależnie od poziomu logowania).
 - **Pobierz diagnostykę:** szczegółowy dziennik, wejścia optymalizatora i dane do Replay HA. Jeśli pierwszy odczyt nie powiedzie się po inicjalizacji koordynatora, dostępny jest uproszczony raport z błędem odświeżania i dziennikiem.
-- **HA 2026.11:** `forecast_solar.get_forecast.wh_period` używa początku przedziału zamiast końca; parser dobiera format do Core. Starsze prognozy pozostają odczytywane z oryginalną semantyką dzięki migracji archiwum do formatu 3. Nie podmieniaj dawnych danych na dane przeliczone nowym formatem.
+- **HA 2026.11:** `forecast_solar.get_forecast.wh_period` używa początku przedziału zamiast końca; parser dobiera format do Core. **Od 2.0.5 niezerowa energia w pierwszym przedziale po wschodzie słońca nie blokuje uzupełnienia brakujących godzin nocnych**, jeżeli pierwsze `watts` to 0 W i wschód jest potwierdzony geometrią PV. Starsze prognozy pozostają odczytywane z oryginalną semantyką dzięki migracji archiwum do formatu 3. Nie podmieniaj dawnych danych na dane przeliczone nowym formatem.
 - **`sensor.energy_co_pilot_modeled_saving`:** oszczędność *modelowana* względem scenariusza bez cykli magazynu — **nie** potwierdzona oszczędność względem rzeczywistej pracy Deye.
 
 ## Dokumentacja projektu
