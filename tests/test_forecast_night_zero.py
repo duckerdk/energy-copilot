@@ -148,3 +148,105 @@ def test_dst_midnight_boundary_is_local_day_not_always_24_utc_hours():
     completed = complete_night_forecast_edges(raw, sun, now, end)
     assert completed.periods[-1].end == end
     assert end - now == timedelta(hours=25)
+
+
+def test_ha_202611_nonzero_sunrise_wh_does_not_block_night_backfill():
+    """Start-indexed sunrise Wh belongs to daylight, not preceding night."""
+    from datetime import date
+
+    from astral import Observer
+    from astral.sun import sunrise, sunset
+
+    observer = Observer(LOCATION["latitude"], LOCATION["longitude"], 0)
+    first = sunrise(observer, date=date(2026, 11, 8))
+    sunset_today = sunset(observer, date=date(2026, 11, 8))
+    sunrise_tomorrow = sunrise(observer, date=date(2026, 11, 9))
+    second = first + timedelta(minutes=15)
+    end = sunrise_tomorrow + timedelta(minutes=15)
+    now = first - timedelta(minutes=45)
+    keys = (first, second, sunset_today, sunrise_tomorrow, end)
+    synthetic = {
+        "watts": dict(
+            zip(
+                (key.isoformat() for key in keys),
+                (0, 180, 0, 0, 150),
+                strict=True,
+            )
+        ),
+        "wh_period": {
+            first.isoformat(): 17,
+            second.isoformat(): 300,
+            sunset_today.isoformat(): 0,
+            sunrise_tomorrow.isoformat(): 13,
+        },
+    }
+    raw = forecast(synthetic, now, period_index="start")
+    assert raw.first_watts_zero
+    assert raw.period_index == "start"
+    assert raw.periods[0].kwh == 0.017
+    assert any(
+        period.start == sunset_today
+        and period.end == sunrise_tomorrow
+        and period.kwh == 0
+        for period in raw.periods
+    )
+
+    sun = solar_evidence(LOCATION, now, end, now)
+    completed = complete_night_forecast_edges(raw, sun, now, end)
+    assert completed.periods[0].start == now
+    assert completed.periods[0].end == first
+    assert completed.periods[0].kwh == 0
+    assert completed.periods[1].kwh == 0.017
+    assert raw.periods[0].start == first  # Original payload remains immutable.
+    assert completed.night_zero_filled_seconds == pytest.approx(45 * 60)
+
+    coverage = forecast_coverage(
+        completed, (PriceSlot(now, end, 1, 1),), now, solar=sun
+    )
+    assert coverage["missing_intervals"] == []
+    assert coverage["energy_timestamp_semantics"] == "interval_start"
+
+
+def test_ha_202611_never_fills_without_explicit_zero_watt_sunrise():
+    """A positive sunrise power is not evidence of a zero-energy night edge."""
+    from datetime import date
+
+    from astral import Observer
+    from astral.sun import sunrise
+
+    observer = Observer(LOCATION["latitude"], LOCATION["longitude"], 0)
+    first = sunrise(observer, date=date(2026, 11, 8))
+    now = first - timedelta(minutes=45)
+    second = first + timedelta(hours=1)
+    data = {
+        "watts": {first.isoformat(): 25, second.isoformat(): 300},
+        "wh_period": {first.isoformat(): 100},
+    }
+    raw = forecast(data, now, period_index="start")
+    assert not raw.first_watts_zero
+    sun = solar_evidence(LOCATION, now, second, now)
+    assert complete_night_forecast_edges(raw, sun, now, second) == raw
+
+
+def test_pre_202611_nonzero_first_wh_remains_ineligible_for_night_fill():
+    """Legacy end-indexed series cannot reinterpret energy as post-sunrise."""
+    from datetime import date
+
+    from astral import Observer
+    from astral.sun import sunrise
+
+    observer = Observer(LOCATION["latitude"], LOCATION["longitude"], 0)
+    first = sunrise(observer, date=date(2026, 11, 8))
+    second = first + timedelta(hours=1)
+    now = first - timedelta(minutes=45)
+    raw = forecast(
+        {
+            "watts": {first.isoformat(): 0, second.isoformat(): 200},
+            "wh_period": {first.isoformat(): 17, second.isoformat(): 300},
+        },
+        now,
+        period_index="end",
+    )
+    assert not raw.first_watts_zero
+    sun = solar_evidence(LOCATION, now, second, now)
+    assert complete_night_forecast_edges(raw, sun, now, second) == raw
